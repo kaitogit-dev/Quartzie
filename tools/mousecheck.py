@@ -21,7 +21,7 @@ def wait_ready(process, serial, timeout):
     raise RuntimeError('Desktop did not boot before mouse test')
 
 
-def verify_mouse(image):
+def verify_mouse(image, usb=False):
     code, variables = choose_firmware()
     with tempfile.TemporaryDirectory() as folder:
         root = pathlib.Path(folder)
@@ -39,7 +39,7 @@ def verify_mouse(image):
             '-qmp', f'unix:{qmp},server=on,wait=off',
             '-cdrom', str(image), '-boot', 'order=d',
         ]
-        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if usb:\n            command += ['-usb', '-device', 'usb-tablet']\n        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
             before = wait_ready(process, serial, 35)
             print(before.decode('ascii', errors='replace'))
@@ -77,4 +77,4 @@ def verify_mouse(image):
 
 
 if __name__ == '__main__':
-    verify_mouse(pathlib.Path(sys.argv[1]).resolve())
+    verify_mouse(pathlib.Path(sys.argv[1]).resolve(), len(sys.argv) > 2 and sys.argv[2] == 'usb')
