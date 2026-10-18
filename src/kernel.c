@@ -533,8 +533,6 @@ static uint32_t saturate_color(uint32_t color, int amount) {
     return (uint32_t)(r << 16 | g << 8 | b);
 }
 
-static uint32_t frost_rows[5][1920];
-
 static void frosted(int x, int y, int w, int h, uint32_t tint, int opacity, int sample_mix) {
     if (w <= 0 || h <= 0) return;
     int x0 = x > clip_left ? x : clip_left;
@@ -546,35 +544,24 @@ static void frosted(int x, int y, int w, int h, uint32_t tint, int opacity, int 
     if (x1 > sw) x1 = sw;
     if (y1 > sh) y1 = sh;
     if (x0 >= x1 || y0 >= y1) return;
-    for (int k = 0; k < 5; k++) {
-        int sy = y0 + k - 2;
-        if (sy < y0) sy = y0;
-        if (sy >= y1) sy = y1 - 1;
-        const uint32_t *source = canvas + (size_t)sy * sw;
-        for (int px = x0; px < x1; px++) frost_rows[k][px] = source[px];
-    }
-    int material_weight = sample_mix + (256 - sample_mix) / 2;
+    int weight = sample_mix + (256 - sample_mix) / 2;
     for (int py = y0; py < y1; py++) {
-        int base = (py - y0) % 5;
-        const uint32_t *above = frost_rows[base];
-        const uint32_t *center = frost_rows[(base + 2) % 5];
-        const uint32_t *below = frost_rows[(base + 4) % 5];
+        int uy = py > 4 ? py - 4 : 0;
+        int ly = py + 4 < sh ? py + 4 : sh - 1;
+        const uint32_t *upper = desktop_cache + (size_t)uy * sw;
+        const uint32_t *middle = desktop_cache + (size_t)py * sw;
+        const uint32_t *lower = desktop_cache + (size_t)ly * sw;
         uint32_t *destination = canvas + (size_t)py * sw;
         for (int px = x0; px < x1; px++) {
-            int lx = px - 3 >= x0 ? px - 3 : x0;
-            int rx = px + 3 < x1 ? px + 3 : x1 - 1;
-            uint32_t a = above[px], b = center[lx], c = center[px], d = center[rx], e = below[px];
-            uint32_t blurred = (((((a >> 16 & 255) + (b >> 16 & 255) + (c >> 16 & 255) + (d >> 16 & 255) + (e >> 16 & 255)) / 5) << 16) |
-                ((((a >> 8 & 255) + (b >> 8 & 255) + (c >> 8 & 255) + (d >> 8 & 255) + (e >> 8 & 255)) / 5) << 8) |
-                (((a & 255) + (b & 255) + (c & 255) + (d & 255) + (e & 255)) / 5));
+            int lx = px > 4 ? px - 4 : 0;
+            int rx = px + 4 < sw ? px + 4 : sw - 1;
+            uint32_t a = upper[px], b = middle[lx], c = middle[px], d = middle[rx], e = lower[px];
+            uint32_t blurred = (((((a >> 16 & 255) + (b >> 16 & 255) + 2 * (c >> 16 & 255) + (d >> 16 & 255) + (e >> 16 & 255)) / 6) << 16) |
+                ((((a >> 8 & 255) + (b >> 8 & 255) + 2 * (c >> 8 & 255) + (d >> 8 & 255) + (e >> 8 & 255)) / 6) << 8) |
+                (((a & 255) + (b & 255) + 2 * (c & 255) + (d & 255) + (e & 255)) / 6));
             uint32_t sampled = opacity ? saturate_color(blurred, NIGHT ? 280 : 300) : blurred;
-            uint32_t material = blend(sampled, tint, opacity);
-            destination[px] = blend(c, material, material_weight);
+            destination[px] = blend(destination[px], blend(sampled, tint, opacity), weight);
         }
-        int next_y = py + 3;
-        if (next_y >= y1) next_y = y1 - 1;
-        const uint32_t *source = canvas + (size_t)next_y * sw;
-        for (int px = x0; px < x1; px++) frost_rows[base][px] = source[px];
     }
 }
 
