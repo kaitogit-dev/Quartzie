@@ -533,6 +533,8 @@ static uint32_t saturate_color(uint32_t color, int amount) {
     return (uint32_t)(r << 16 | g << 8 | b);
 }
 
+static uint32_t frost_rows[5][1920];
+
 static void frosted(int x, int y, int w, int h, uint32_t tint, int opacity, int sample_mix) {
     if (w <= 0 || h <= 0) return;
     int x0 = x > clip_left ? x : clip_left;
@@ -544,18 +546,35 @@ static void frosted(int x, int y, int w, int h, uint32_t tint, int opacity, int 
     if (x1 > sw) x1 = sw;
     if (y1 > sh) y1 = sh;
     if (x0 >= x1 || y0 >= y1) return;
-    int cx = x0 + (x1 - x0) / 2;
-    int ox = x0 + (x1 - x0) / 4;
-    int tx = x1 - (x1 - x0) / 4 - 1;
+    for (int k = 0; k < 5; k++) {
+        int sy = y0 + k - 2;
+        if (sy < y0) sy = y0;
+        if (sy >= y1) sy = y1 - 1;
+        const uint32_t *source = canvas + (size_t)sy * sw;
+        for (int px = x0; px < x1; px++) frost_rows[k][px] = source[px];
+    }
+    int material_weight = sample_mix + (256 - sample_mix) / 2;
     for (int py = y0; py < y1; py++) {
-        size_t offset = (size_t)py * sw;
-        uint32_t a = desktop_cache[offset + ox];
-        uint32_t b = desktop_cache[offset + cx];
-        uint32_t c = desktop_cache[offset + tx];
-        uint32_t sample = blend(blend(a,b,128),c,85);
-        uint32_t color = blend(saturate_color(sample,NIGHT ? 320 : 352),tint,opacity);
-        uint32_t *line = canvas + offset;
-        for (int px = x0; px < x1; px++) line[px] = blend(line[px],color,sample_mix + (256 - sample_mix) / 2);
+        int base = (py - y0) % 5;
+        const uint32_t *above = frost_rows[base];
+        const uint32_t *center = frost_rows[(base + 2) % 5];
+        const uint32_t *below = frost_rows[(base + 4) % 5];
+        uint32_t *destination = canvas + (size_t)py * sw;
+        for (int px = x0; px < x1; px++) {
+            int lx = px - 3 >= x0 ? px - 3 : x0;
+            int rx = px + 3 < x1 ? px + 3 : x1 - 1;
+            uint32_t a = above[px], b = center[lx], c = center[px], d = center[rx], e = below[px];
+            uint32_t blurred = (((((a >> 16 & 255) + (b >> 16 & 255) + (c >> 16 & 255) + (d >> 16 & 255) + (e >> 16 & 255)) / 5) << 16) |
+                ((((a >> 8 & 255) + (b >> 8 & 255) + (c >> 8 & 255) + (d >> 8 & 255) + (e >> 8 & 255)) / 5) << 8) |
+                (((a & 255) + (b & 255) + (c & 255) + (d & 255) + (e & 255)) / 5));
+            uint32_t sampled = opacity ? saturate_color(blurred, NIGHT ? 280 : 300) : blurred;
+            uint32_t material = blend(sampled, tint, opacity);
+            destination[px] = blend(c, material, material_weight);
+        }
+        int next_y = py + 3;
+        if (next_y >= y1) next_y = y1 - 1;
+        const uint32_t *source = canvas + (size_t)next_y * sw;
+        for (int px = x0; px < x1; px++) frost_rows[base][px] = source[px];
     }
 }
 
@@ -730,32 +749,7 @@ static void glass(int x, int y, int w, int h, uint32_t tint, int opacity) {
 }
 
 static void blur_region(int x, int y, int w, int h) {
-    int left = x > clip_left ? x : clip_left;
-    int top = y > clip_top ? y : clip_top;
-    int right = x + w < clip_right ? x + w : clip_right;
-    int bottom = y + h < clip_bottom ? y + h : clip_bottom;
-    if (left < 1) left = 1;
-    if (top < 1) top = 1;
-    if (right > sw - 1) right = sw - 1;
-    if (bottom > sh - 1) bottom = sh - 1;
-    if (left >= right || top >= bottom) return;
-    for (int yy = top; yy < bottom; yy += 2) {
-        int y1 = yy + 1 < bottom ? yy + 1 : yy;
-        for (int xx = left; xx < right; xx += 2) {
-            int x1 = xx + 1 < right ? xx + 1 : xx;
-            uint32_t a = canvas[(size_t)yy * sw + xx];
-            uint32_t b = canvas[(size_t)yy * sw + x1];
-            uint32_t c = canvas[(size_t)y1 * sw + xx];
-            uint32_t d = canvas[(size_t)y1 * sw + x1];
-            uint32_t average = ((((a >> 16 & 255) + (b >> 16 & 255) + (c >> 16 & 255) + (d >> 16 & 255)) >> 2) << 16) |
-                ((((a >> 8 & 255) + (b >> 8 & 255) + (c >> 8 & 255) + (d >> 8 & 255)) >> 2) << 8) |
-                (((a & 255) + (b & 255) + (c & 255) + (d & 255)) >> 2);
-            canvas[(size_t)yy * sw + xx] = average;
-            canvas[(size_t)yy * sw + x1] = average;
-            canvas[(size_t)y1 * sw + xx] = average;
-            canvas[(size_t)y1 * sw + x1] = average;
-        }
-    }
+    frosted(x, y, w, h, 0, 0, 256);
 }
 
 static void smooth_pixel(int x, int y, uint32_t color, int coverage) {
@@ -872,18 +866,39 @@ static __attribute__((unused)) void glass_button(int x, int y, int w, int h, uin
 
 static void soft_shadow(int x, int y, int w, int h, int radius, int depth) {
     if (w <= 0 || h <= 0) return;
-    const int distances[4] = {10, 7, 4, 2};
-    const int strengths[4] = {22, 28, 35, 46};
-    for (int i = 0; i < 4; i++) {
-        int d = distances[i], alpha = strengths[i];
-        int yy = y + depth;
-        glass(x-d,yy-d,w+2*d,d,0x081222,alpha);
-        glass(x-d,yy+h,w+2*d,d,0x081222,alpha);
-        glass(x-d,yy,d,h,0x081222,alpha);
-        glass(x+w,yy,d,h,0x081222,alpha);
-        shadow_pixels += (uint32_t)((w+h)*2*d);
+    int spread = 14 + depth;
+    int strength = 66 + depth * 5;
+    if (strength > 132) strength = 132;
+    int top = y + depth;
+    int left = x - spread, right = x + w + spread;
+    int upper = top - spread, lower = top + h + spread;
+    if (left < clip_left) left = clip_left;
+    if (upper < clip_top) upper = clip_top;
+    if (right > clip_right) right = clip_right;
+    if (lower > clip_bottom) lower = clip_bottom;
+    if (left < 0) left = 0;
+    if (upper < 0) upper = 0;
+    if (right > sw) right = sw;
+    if (lower > sh) lower = sh;
+    for (int py = upper; py < lower; py++) {
+        int dy = py < top + radius ? top + radius - py :
+            py >= top + h - radius ? py - (top + h - radius - 1) : 0;
+        uint32_t *row = canvas + (size_t)py * sw;
+        for (int px = left; px < right; px++) {
+            int dx = px < x + radius ? x + radius - px :
+                px >= x + w - radius ? px - (x + w - radius - 1) : 0;
+            int wide = dx > dy ? dx : dy;
+            int narrow = dx > dy ? dy : dx;
+            int distance = wide + (narrow * 3) / 8 - radius;
+            if (distance <= 0 || distance >= spread) continue;
+            int fade = spread - distance;
+            int alpha = strength * fade * fade / (spread * spread);
+            if (alpha > 0) {
+                row[px] = blend(row[px], 0x081322, alpha);
+                shadow_pixels++;
+            }
+        }
     }
-    (void)radius;
 }
 
 static void outline(int x, int y, int w, int h, uint32_t color) {
@@ -3292,6 +3307,15 @@ static int handle_dock_click(int x, int y) {
         toggle_desktop();
         return 1;
     }
+    int app = taskbar_hit(x, y);
+    if (app >= 0) {
+        if (windows[app].opened && !windows[app].minimized && active_window() == app) {
+            dismiss_popup_layers();
+            close_window(app, 1);
+        } else open_window(app);
+        dirty = 1;
+        return 1;
+    }
     if (sw >= 700 && x >= sw - 177 && x < sw - 125) {
         int opening = !notification_open;
         dismiss_popup_layers();
@@ -3310,15 +3334,6 @@ static int handle_dock_click(int x, int y) {
             quick_open = 1;
             quick_anim = 8;
         }
-        dirty = 1;
-        return 1;
-    }
-    int app = taskbar_hit(x, y);
-    if (app >= 0) {
-        if (windows[app].opened && !windows[app].minimized && active_window() == app) {
-            dismiss_popup_layers();
-            close_window(app, 1);
-        } else open_window(app);
         dirty = 1;
         return 1;
     }
@@ -3605,11 +3620,11 @@ static void handle_right_click(void) {
 }
 
 static void handle_mouse_byte(uint8_t b) {
-    if (mouse_index == 0 && (b & 0xc8u) != 0x08u) return;
+    if (mouse_index == 0 && (b & 0x08u) == 0) return;
     mouse_packet[mouse_index++] = b;
     if (mouse_index != 3) return;
     mouse_index = 0;
-    if ((mouse_packet[0] & 0xc8u) != 0x08u) return;
+    if ((mouse_packet[0] & 0x08u) == 0 || (mouse_packet[0] & 0xc0u)) return;
     int dx = (int8_t)mouse_packet[1];
     int dy = (int8_t)mouse_packet[2];
     int nx = mouse_x + dx;
