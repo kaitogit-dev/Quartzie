@@ -46,7 +46,7 @@ int main(void) {
     check(w == windows[FILES].w);
     check(h == windows[FILES].h);
     repaint();
-    check(anim_ticks[FILES] == 0 - 1);
+    check(anim_ticks[FILES] == 0);
     check(color_at(files_x, y) != files_plain);
     check(color_at(notes_x, y) == notes_plain);
     for (int i = 0; i < WINDOW_OPEN_STEPS + 1; i++) repaint();
@@ -70,7 +70,7 @@ int main(void) {
     check(anim_ticks[NOTES] == 0);
     repaint();
     check(active_window() == NOTES);
-    check(anim_ticks[NOTES] == 0 - 1);
+    check(anim_ticks[NOTES] == 0);
     snapshot("build/window-opening-133.ppm");
     for (int i = 0; i < WINDOW_OPEN_STEPS + 1; i++) repaint();
     check(anim_ticks[NOTES] == 0);
