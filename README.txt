@@ -1,4 +1,4 @@
-Quartzie 0.30 - experimental 32-bit x86 graphical operating system
+Quartzie 0.31 - experimental 32-bit x86 graphical operating system
 
 Boot this El Torito CD using a legacy BIOS emulator. A compatible VBE
 adapter is recommended. Quartzie prefers 1920x1080x32 when available.

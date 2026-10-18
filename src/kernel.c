@@ -35,25 +35,19 @@ static int accent_index;
 static const uint32_t accent_colors[4] = {0x2167b3,0x178f99,0x7852ba,0xcf7343};
 static int desktop_hidden;
 static int desktop_saved[11];
-static const uint32_t palette[4][13] = {
-    {0x243d60,0x537caa,0xa7bfd8,0xf9fcff,0xffffff,0x285f9a,0xd4e2ef,0xf2f7fc,0x2167b3,0x7ec5fc,0x10223b,0x3067a0,0xe5f0fc},
-    {0x3a597c,0x6e93b4,0xb7cadf,0xf8fbfe,0xffffff,0x638eac,0xdbe5ed,0xfafcff,0x3d729f,0x9ed6fa,0x213b56,0x7797b8,0xeef4fa},
-    {0x1d2b4a,0x435c86,0x8ea7cc,0xeef4fc,0xffffff,0x122c58,0xb5c5df,0xe3eaf7,0x4679c5,0x93b9fb,0x07152c,0x22416c,0xdce7fa},
-    {0xe9f2ff,0xb9d6f0,0x97b4d0,0x182637,0xf4faff,0x132b44,0x39546f,0x26384d,0x5fa9f2,0xa4dcff,0x0b1729,0x243955,0x304863}
-};
-#define INK palette[theme][0]
-#define INK2 palette[theme][1]
-#define STEEL palette[theme][2]
-#define PAPER palette[theme][3]
-#define WHITE palette[theme][4]
-#define FLOOR palette[theme][5]
-#define HAIR palette[theme][6]
-#define LIGHT palette[theme][7]
-#define BLUE (accent_index ? accent_colors[accent_index] : palette[theme][8])
-#define ACTIVE palette[theme][9]
-#define BLACK palette[theme][10]
-#define DESK2 palette[theme][11]
-#define TILE palette[theme][12]
+#define INK (theme == 3 ? 0xe9f2ffu : theme == 2 ? 0x1d2b4au : theme == 1 ? 0x3a597cu : 0x243d60u)
+#define INK2 (theme == 3 ? 0xb9d6f0u : theme == 2 ? 0x435c86u : theme == 1 ? 0x6e93b4u : 0x537caau)
+#define STEEL (theme == 3 ? 0x97b4d0u : theme == 2 ? 0x8ea7ccu : theme == 1 ? 0xb7cadfu : 0xa7bfd8u)
+#define PAPER (theme == 3 ? 0x182637u : theme == 2 ? 0xeef4fcu : theme == 1 ? 0xf8fbfeu : 0xf9fcffu)
+#define WHITE (theme == 3 ? 0xf4faffu : theme == 2 ? 0xffffffu : theme == 1 ? 0xffffffu : 0xffffffu)
+#define FLOOR (theme == 3 ? 0x132b44u : theme == 2 ? 0x122c58u : theme == 1 ? 0x638eacu : 0x285f9au)
+#define HAIR (theme == 3 ? 0x39546fu : theme == 2 ? 0xb5c5dfu : theme == 1 ? 0xdbe5edu : 0xd4e2efu)
+#define LIGHT (theme == 3 ? 0x26384du : theme == 2 ? 0xe3eaf7u : theme == 1 ? 0xfafcffu : 0xf2f7fcu)
+#define BLUE (accent_index > 0 && accent_index < 4 ? (accent_index == 1 ? 0x178f99u : accent_index == 2 ? 0x7852bau : 0xcf7343u) : (theme == 3 ? 0x5fa9f2u : theme == 2 ? 0x4679c5u : theme == 1 ? 0x3d729fu : 0x2167b3u))
+#define ACTIVE (theme == 3 ? 0xa4dcffu : theme == 2 ? 0x93b9fbu : theme == 1 ? 0x9ed6fau : 0x7ec5fcu)
+#define BLACK (theme == 3 ? 0xb1729u : theme == 2 ? 0x7152cu : theme == 1 ? 0x213b56u : 0x10223bu)
+#define DESK2 (theme == 3 ? 0x243955u : theme == 2 ? 0x22416cu : theme == 1 ? 0x7797b8u : 0x3067a0u)
+#define TILE (theme == 3 ? 0x304863u : theme == 2 ? 0xdce7fau : theme == 1 ? 0xeef4fau : 0xe5f0fcu)
 #define NIGHT (theme == 3)
 #define UI_CARD (NIGHT ? 0x162235 : 0xf7fbff)
 #define UI_FIELD (NIGHT ? 0x111b2a : 0xfcfeff)
@@ -1376,7 +1370,7 @@ static void execute_command(void) {
     log_write(linebuf);
     if (!console_len) return;
     if (same(console_input, "help")) print_info();
-    else if (same(console_input, "ver")) log_write("Quartzie 0.30  |  PE32 executable loader  |  i386");
+    else if (same(console_input, "ver")) log_write("Quartzie 0.31  |  PE32 executable loader  |  i386");
     else if (same(console_input, "clear")) log_count = 0;
     else if (same(console_input, "context")) log_write("Right click on desktop");
     else if (same(console_input, "dark")) { select_theme(3); log_write("Dark Glass enabled"); }
@@ -1389,7 +1383,7 @@ static void execute_command(void) {
         log_write("/ram/readme.txt");
         log_write("/ram/boot.log");
         log_write("/ram/notes.txt");
-    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.30; PE32/CUI; .NET/GTK not yet available");
+    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.31; PE32/CUI; .NET/GTK not yet available");
     else if (same(console_input, "cat boot.log")) log_write("El Torito -> kernel -> protected mode -> UI");
     else if (same(console_input, "cat notes.txt")) {
         char one[72] = "";
@@ -3019,6 +3013,8 @@ static void draw_scene(void) {
 }
 
 static void repaint(void) {
+    if ((unsigned)theme > 3u) theme = 0;
+    if ((unsigned)accent_index > 3u) accent_index = 0;
     panel_sync();
     int entire = !frame_valid || frame_theme != theme || frame_wallpaper != wallpaper ||
         frame_glass != glass_level || frame_accent != accent_index;
@@ -4068,11 +4064,14 @@ void kmain(void) {
         files_restore();
         log_write("QuartzieFS disk mounted at D: (ATA IDE)");
     } else log_write("RAM only: attach Quartzie disk to enable persistence");
-    log_write("Quartzie kernel 0.29 / Fluid Layers");
+    if (theme < 0 || theme > 3) theme = 0;
+    if (previous_theme < 0 || previous_theme > 2) previous_theme = 0;
+    if (accent_index < 0 || accent_index > 3) accent_index = 0;
+    log_write("Quartzie kernel 0.31 / palette-safe desktop");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.30 is ready");
+    notify("Quartzie 0.31 is ready");
     repaint();
 #ifdef __i386__
     cm_userspace_ready = 0;

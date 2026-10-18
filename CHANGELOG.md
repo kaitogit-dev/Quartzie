@@ -2,6 +2,13 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.31 — v86 palette repair
+
+- Replace indirect theme-palette data lookups with inline theme colors, preventing dark/black desktop icons and cursor colors when palette memory or theme state is invalid.
+- Clamp theme and accent indices before repainting and after reading persistent settings, so corrupted settings cannot access outside palette ranges.
+- Add a dedicated native test for valid and invalid theme values, desktop icon colors, default closed window states, and cursor rendering.
+- Preserve the native-resolution wallpaper, built-in applications, and previous disk format. Actual browser-emulator results still need verification.
+
 ## Quartzie 0.30 — v86 graphics stability
 
 - Render newly opened application windows at their final dimensions immediately, rather than showing intermediate window shells without usable content.
