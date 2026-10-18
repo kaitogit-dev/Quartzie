@@ -878,7 +878,7 @@ static __attribute__((unused)) void glass_button(int x, int y, int w, int h, uin
 
 static void soft_shadow(int x, int y, int w, int h, int radius, int depth) {
     if (w <= 0 || h <= 0) return;
-    const int distances[4] = {21, 15, 9, 4};
+    const int distances[4] = {10, 7, 4, 2};
     const int strengths[4] = {22, 28, 35, 46};
     for (int i = 0; i < 4; i++) {
         int d = distances[i], alpha = strengths[i];
