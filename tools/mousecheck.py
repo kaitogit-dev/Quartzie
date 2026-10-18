@@ -39,7 +39,9 @@ def verify_mouse(image, usb=False):
             '-qmp', f'unix:{qmp},server=on,wait=off',
             '-cdrom', str(image), '-boot', 'order=d',
         ]
-        if usb:\n            command += ['-usb', '-device', 'usb-tablet']\n        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if usb:
+            command += ['-usb', '-device', 'usb-tablet']
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
             before = wait_ready(process, serial, 35)
             print(before.decode('ascii', errors='replace'))
@@ -51,10 +53,16 @@ def verify_mouse(image, usb=False):
                 response = sock.recv(4096)
                 if b'"return"' not in response:
                     raise RuntimeError(f'QMP capabilities failed: {response!r}')
-                command = {'execute': 'input-send-event', 'arguments': {'events': [
+                sock.sendall(b'{"execute":"query-mice"}\\r\\n')
+                print('QMP mice:', sock.recv(4096))
+                events = ([
+                    {'type': 'abs', 'data': {'axis': 'x', 'value': 24000}},
+                    {'type': 'abs', 'data': {'axis': 'y', 'value': 33000}},
+                ] if usb else [
                     {'type': 'rel', 'data': {'axis': 'x', 'value': 90}},
                     {'type': 'rel', 'data': {'axis': 'y', 'value': 40}},
-                ]}}
+                ])
+                command = {'execute': 'input-send-event', 'arguments': {'events': events}}
                 sock.sendall(json.dumps(command).encode('ascii') + b'\r\n')
                 response = sock.recv(4096)
                 if b'"return"' not in response:
