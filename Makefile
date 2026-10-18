@@ -17,7 +17,7 @@ build/esp-iso.img: build/BOOTX64.EFI tools/compact_esp.py
 Quartzie-x64-uefi.img: build/esp.img tools/gpt.py
 	$(PYTHON) tools/gpt.py build/esp.img $@
 Quartzie-x64.iso: build/esp-iso.img tools/iso.py
-	$(PYTHON) tools/iso.py build/esp.img $@
+	$(PYTHON) tools/iso.py $< $@
 build/ui-test: tests/ui.c src/ui.c src/font.c src/ui.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ui.c src/ui.c src/font.c -o $@
 test: build/ui-test
