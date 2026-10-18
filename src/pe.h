@@ -1,5 +1,5 @@
-#ifndef CINMIX_PE_H
-#define CINMIX_PE_H
+#ifndef QUARTZIE_PE_H
+#define QUARTZIE_PE_H
 #include <stdint.h>
 
 #define CM_PE_BASE 0x40000000u

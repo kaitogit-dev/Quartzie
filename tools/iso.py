@@ -53,14 +53,14 @@ def create(bootpath, kernelpath, readmepath, destination):
             raise ValueError('Block overflow')
         image[index * BLOCK:index * BLOCK + len(data)] = data
 
-    entries = [record(b'\0', ROOT_LBA, BLOCK, 2), record(b'\1', ROOT_LBA, BLOCK, 2), record('BOOT.CAT;1', CATALOG_LBA, BLOCK), record('CINMIX.BIN;1', BOOT_LBA, (1 + KERNEL_BLOCKS) * BLOCK), record('README.TXT;1', README_LBA, len(readme))]
+    entries = [record(b'\0', ROOT_LBA, BLOCK, 2), record(b'\1', ROOT_LBA, BLOCK, 2), record('BOOT.CAT;1', CATALOG_LBA, BLOCK), record('QUARTZIE.BIN;1', BOOT_LBA, (1 + KERNEL_BLOCKS) * BLOCK), record('README.TXT;1', README_LBA, len(readme))]
     directory = b''.join(entries)
     setblock(ROOT_LBA, directory)
 
     pvd = bytearray(BLOCK)
     pvd[0:7] = b'\x01CD001\x01'
-    pvd[8:40] = b'CINMIX'.ljust(32, b' ')
-    pvd[40:72] = b'CINMIX_0_23'.ljust(32, b' ')
+    pvd[8:40] = b'QUARTZIE'.ljust(32, b' ')
+    pvd[40:72] = b'QUARTZIE_0_24'.ljust(32, b' ')
     pvd[80:88] = dual32(sectors)
     pvd[120:124] = dual16(1)
     pvd[124:128] = dual16(1)
@@ -86,7 +86,7 @@ def create(bootpath, kernelpath, readmepath, destination):
 
     validation = bytearray(32)
     validation[0] = 1
-    validation[4:28] = b'CINMIX 0.23'.ljust(24, b' ')
+    validation[4:28] = b'QUARTZIE 0.24'.ljust(24, b' ')
     validation[30:32] = b'\x55\xaa'
     checksum = -sum(struct.unpack('<16H', validation)) & 0xffff
     struct.pack_into('<H', validation, 28, checksum)

@@ -42,7 +42,7 @@ int main(void) {
     for (int i=0;i<6;i++) frame();
     require(anim_ticks[FILES]==WINDOW_OPEN_STEPS);
     animation_step_allowed=1;
-    for (int i=0;i<8;i++) frame();
+    for (int i=0;i<TASK_ICON_FRAMES+2;i++) frame();
     require(anim_ticks[FILES]==0 && !anim_visible[FILES] && !dirty);
     close_window(FILES,0);
     for (int i=0;i<8;i++) frame();

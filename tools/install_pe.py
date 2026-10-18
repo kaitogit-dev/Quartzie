@@ -11,11 +11,11 @@ def install(diskname, executable):
     path = pathlib.Path(diskname)
     image = pathlib.Path(executable).read_bytes()
     if not image or len(image) > 4096:
-        raise ValueError('Executable must be 1-4096 bytes for CinmixFS v1')
+        raise ValueError('Executable must be 1-4096 bytes for QuartzieFS v1')
     with path.open('r+b') as disk:
         header = disk.read(BLOCK)
         if (header[:8] != b'CINMIXFS' or zlib.crc32(header[:28]) != struct.unpack_from('<I', header, 28)[0]):
-            raise ValueError('Refusing to write an unsigned/non-CinmixFS disk image')
+            raise ValueError('Refusing to write an unsigned/non-QuartzieFS disk image')
         if tuple(struct.unpack_from('<IIIII', header, 8)) != (1, 32768, 16, 64, 16):
             raise ValueError('Unexpected filesystem geometry')
         dirs = []
@@ -26,7 +26,7 @@ def install(diskname, executable):
             if valid:
                 dirs.append((sector, directory, struct.unpack_from('<I', directory, 8)[0]))
         if not dirs:
-            raise ValueError('Missing or corrupted CinmixFS directory')
+            raise ValueError('Missing or corrupted QuartzieFS directory')
         latest_sector, directory, sequence = max(dirs, key=lambda d: d[2])
         slot = -1
         for idx in range(16):
@@ -57,7 +57,7 @@ def install(diskname, executable):
         disk.seek((3-latest_sector)*BLOCK)
         disk.write(directory)
         disk.flush()
-        print(f'Installed {NAME.decode()} ({len(image)} bytes) in CinmixFS slot {slot}')
+        print(f'Installed {NAME.decode()} ({len(image)} bytes) in QuartzieFS slot {slot}')
 
 
 if __name__=='__main__':

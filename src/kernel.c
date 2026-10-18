@@ -16,7 +16,7 @@ extern uint16_t boot_pitch;
 extern uint16_t boot_width;
 extern uint16_t boot_height;
 extern uint8_t boot_bpp;
-extern const uint8_t cinmix_font[96][16][8];
+extern const uint8_t quartzie_font[96][16][8];
 
 static uint8_t pe_file_cache[4097];
 static uint32_t pe_reported_exits;
@@ -152,6 +152,20 @@ static int desktop_hover = -1;
 static int desktop_focus = -1;
 static int last_desktop_focus = -1;
 static int last_desktop_hover = -1;
+#define CLICK_WINDOW_TICKS 36
+#define TASK_ICON_FRAMES 10
+static int click_wait;
+static int click_class = -1;
+static int click_item = -1;
+static int click_x, click_y;
+static uint8_t icon_motion[APPS];
+static uint8_t icon_frame[APPS];
+static int keyboard_extended;
+static int clipboard_type;
+static char clipboard_filename[24];
+static char clipboard_text[2048];
+static int clipboard_text_len;
+static int notes_select_all;
 static int tab_active;
 static int tab_apps[APPS];
 static int tab_count;
@@ -393,6 +407,7 @@ static void notify(const char *message) {
 
 static void toggle_desktop(void);
 static void open_window(int app);
+static void icon_kick(int app, int mode);
 static void cm_ui_dispatch(int app, const struct CmMessage *event);
 
 static void select_theme(int selected) {
@@ -620,7 +635,7 @@ static void close_window(int app, int minimizing) {
     animated_window_rect(app, &x, &y, &width, &height);
     begin_window_animation(app, x, y, width, height, WINDOW_CLOSE_STEPS, 1);
     anim_exit[app] = 1;
-    if (minimizing) w->minimized = 1;
+    if (minimizing) { w->minimized = 1; icon_kick(app, 2); }
     else w->opened = 0;
 }
 
@@ -825,7 +840,7 @@ static void glyph(int x, int y, char c, uint32_t color, int scale) {
     if ((unsigned char)c < 32 || (unsigned char)c > 127) return;
     for (int row = 0; row < 16; row++) {
         for (int col = 0; col < 8; col++) {
-            int amount = cinmix_font[(int)c - 32][row][col];
+            int amount = quartzie_font[(int)c - 32][row][col];
             if (!amount) continue;
             if (scale == 1) {
                 int px = x + col, py = y + row;
@@ -868,11 +883,11 @@ static int active_window(void);
 static int inside(int px, int py, int x, int y, int w, int h);
 
 static void draw_mark(int x, int y, uint32_t color) {
-    rect(x, y, 9, 4, color);
-    rect(x, y, 4, 22, color);
-    rect(x + 17, y, 4, 22, color);
-    rect(x + 12, y + 18, 9, 4, color);
-    rect(x + 8, y + 8, 6, 6, color);
+    rect(x + 5, y + 1, 12, 3, color);
+    rect(x + 2, y + 4, 3, 14, color);
+    rect(x + 17, y + 4, 3, 14, color);
+    rect(x + 5, y + 18, 12, 3, color);
+    line(x + 12, y + 14, x + 22, y + 23, color);
 }
 
 static void draw_icon(int x, int y, int id) {
@@ -1051,6 +1066,48 @@ static void draw_task_icon(int x, int y, int id) {
     }
 }
 
+static uint32_t task_icon_base[32 * 32];
+static uint32_t task_icon_art[32 * 32];
+static const uint16_t task_icon_scale[10] = {256, 226, 213, 232, 272, 284, 272, 258, 255, 256};
+static const int8_t task_icon_down[10] = {0, 3, 7, 10, 9, 6, 2, -1, 0, 0};
+static const int8_t task_icon_up[10] = {0, -3, -7, -11, -9, -5, 1, 2, 0, 0};
+
+static void draw_bouncing_icon(int x, int y, int app) {
+    int mode = icon_motion[app];
+    if (!mode) { draw_task_icon(x, y, app); return; }
+    int phase = icon_frame[app];
+    if (phase >= TASK_ICON_FRAMES) phase = TASK_ICON_FRAMES - 1;
+    if (mode != 1) {
+        draw_task_icon(x, y + (mode == 2 ? task_icon_down[phase] : task_icon_up[phase]), app);
+        return;
+    }
+    int scaled = task_icon_scale[phase];
+    if (scaled == 256) { draw_task_icon(x, y, app); return; }
+    for (int yy = 0; yy < 32; yy++) for (int xx = 0; xx < 32; xx++) {
+        int px = x + xx, py = y + yy;
+        task_icon_base[yy * 32 + xx] = (px >= 0 && px < sw && py >= 0 && py < sh) ? canvas[(size_t)py * sw + px] : 0;
+    }
+    draw_task_icon(x, y, app);
+    for (int yy = 0; yy < 32; yy++) for (int xx = 0; xx < 32; xx++) {
+        int px = x + xx, py = y + yy;
+        task_icon_art[yy * 32 + xx] = (px >= 0 && px < sw && py >= 0 && py < sh) ? canvas[(size_t)py * sw + px] : 0;
+        if (px >= clip_left && px < clip_right && py >= clip_top && py < clip_bottom) {
+            canvas[(size_t)py * sw + px] = task_icon_base[yy * 32 + xx];
+        }
+    }
+    int extent = (32 * scaled + 128) / 256;
+    for (int yy = 0; yy < extent; yy++) for (int xx = 0; xx < extent; xx++) {
+        int sx = xx * 32 / extent, sy = yy * 32 / extent;
+        int sp = sy * 32 + sx;
+        if (task_icon_base[sp] == task_icon_art[sp]) continue;
+        int px = x + 16 - extent / 2 + xx;
+        int py = y + 16 - extent / 2 + yy;
+        if (px >= clip_left && px < clip_right && py >= clip_top && py < clip_bottom) {
+            canvas[(size_t)py * sw + px] = task_icon_art[sp];
+        }
+    }
+}
+
 static void taskbar_mark(int cx, int cy) {
     circle(cx, cy + 1, 23, 0x24405e);
     circle(cx, cy, 21, 0xb6e4fc);
@@ -1148,7 +1205,7 @@ static void draw_desktop(void) {
         if (focus) rounded(x + 21, y + h - 9, 38, 3, 1, 0xbdefff);
     }
     if (sw >= 600 && sh >= 480) {
-        text(sw - 148, sh - 105, "cinmix", 0xd5eeff);
+        text(sw - 166, sh - 105, "quartzie", 0xd5eeff);
         rect(sw - 148, sh - 84, 69, 1, 0x81ceee);
     }
     glass(0, sh - 52, sw, 52, NIGHT ? 0x071527 : theme == 2 ? 0x16283d : 0x12344f, 188 + glass_level * 15);
@@ -1174,7 +1231,7 @@ static void draw_desktop(void) {
                 0xffffff, active ? 47 : 35);
             round_finish(x + 2, sh - 46, taskbar_width() - 4, 39, 8);
         }
-        draw_task_icon(x + 7, sh - 41, id);
+        draw_bouncing_icon(x + 7, sh - 41, id);
         if (running) {
             if (active) {
                 rounded(x + 10, sh - 6, 26, 3, 1, 0xc5f5ff);
@@ -1247,7 +1304,7 @@ static void execute_command(void) {
     log_write(linebuf);
     if (!console_len) return;
     if (same(console_input, "help")) print_info();
-    else if (same(console_input, "ver")) log_write("Cinmix 0.23  |  PE32 executable loader  |  i386");
+    else if (same(console_input, "ver")) log_write("Quartzie 0.24  |  PE32 executable loader  |  i386");
     else if (same(console_input, "clear")) log_count = 0;
     else if (same(console_input, "context")) log_write("Right click on desktop");
     else if (same(console_input, "dark")) { select_theme(3); log_write("Dark Aero enabled"); }
@@ -1260,7 +1317,7 @@ static void execute_command(void) {
         log_write("/ram/readme.txt");
         log_write("/ram/boot.log");
         log_write("/ram/notes.txt");
-    } else if (same(console_input, "cat readme.txt")) log_write("Cinmix 0.23; PE32/CUI; .NET/GTK not yet available");
+    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.24; PE32/CUI; .NET/GTK not yet available");
     else if (same(console_input, "cat boot.log")) log_write("El Torito -> kernel -> protected mode -> UI");
     else if (same(console_input, "cat notes.txt")) {
         char one[72] = "";
@@ -1268,7 +1325,7 @@ static void execute_command(void) {
         while (notes[i] && notes[i] != '\n' && i < 65) { one[i] = notes[i]; i++; }
         one[i] = 0;
         log_write(one);
-    } else if (same(console_input, "disk")) log_write(storage_ready ? "D: CinmixFS on ATA primary master" : "No formatted writable disk detected");
+    } else if (same(console_input, "disk")) log_write(storage_ready ? "D: QuartzieFS on ATA primary master" : "No formatted writable disk detected");
     else if (same(console_input, "save")) { notes_commit(); log_write(storage_ready && !notes_dirty ? "Notes saved on D:" : "No writable storage"); }
     else if (same(console_input, "mem")) log_write("Physical canvas: 0x00400000");
     else if (same(console_input, "handles")) {
@@ -1295,7 +1352,7 @@ static void execute_command(void) {
         log_write(cm_pe_error(pe_last_launch_status));
     }
     else if (begins(console_input, "runpe ")) {
-        if (!storage_ready) log_write("Attach a writable CinmixFS disk first");
+        if (!storage_ready) log_write("Attach a writable QuartzieFS disk first");
         else {
             int n=storage_load(console_input+6,(char *)pe_file_cache,sizeof(pe_file_cache));
             if (n<0) log_write("Executable not found on D: or failed checksum");
@@ -1496,7 +1553,10 @@ static void open_window(int app) {
     desktop_focus = -1;
     desktop_hidden = 0;
     run_open = 0;
-    int first = !windows[app].opened || windows[app].minimized;
+    int was_active = active_window() == app;
+    int was_minimized = windows[app].minimized;
+    int was_closed = !windows[app].opened;
+    int first = was_closed || was_minimized;
     int new_object = !cm_window_handle(app);
     uint32_t handle = cm_window_open(app);
     if (handle && new_object) cm_post(handle, CM_MSG_CREATE, app, 0);
@@ -1515,6 +1575,8 @@ static void open_window(int app) {
         if (reversing) begin_window_animation(app, reverse_x, reverse_y, reverse_w, reverse_h, WINDOW_OPEN_STEPS, 0);
         else begin_window_animation(app, windows[app].x + windows[app].w / 24, windows[app].y + 12, windows[app].w * 11 / 12, windows[app].h * 11 / 12, WINDOW_OPEN_STEPS, 0);
     }
+    if (was_closed) icon_kick(app, 1);
+    else if (was_minimized || !was_active) icon_kick(app, 3);
     dirty = 1;
 }
 
@@ -1946,11 +2008,13 @@ static void window_content(int app, const Window *w) {
             if (c == '\n' || col >= max_columns) { line_index++; col = 0; }
             if (c && c != '\n') {
                 if (line_index >= skip && line_index - skip < max_lines) {
-                    glyph(x + 13 + col * 8, y + 36 + (line_index - skip) * 19, c, INK, 1);
+                    int gx = x + 13 + col * 8, gy = y + 36 + (line_index - skip) * 19;
+                    if (notes_select_all) rounded(gx, gy - 1, 8, 17, 1, UI_HOVER);
+                    glyph(gx, gy, c, INK, 1);
                 }
                 col++;
             }
-            if (!c && line_index >= skip && line_index - skip < max_lines) {
+            if (!c && !notes_select_all && line_index >= skip && line_index - skip < max_lines) {
                 rect(x + 13 + col * 8, y + 36 + (line_index - skip) * 19 + 14, 7, 2, BLUE);
             }
         }
@@ -1970,11 +2034,11 @@ static void window_content(int app, const Window *w) {
         rect(x + 28 + console_len * 8, y + ch - 13, 7, 2, WHITE);
     } else if (app == SYSTEM) {
         rect(x, y, cw, 4, BLUE);
-        big_text(x + 21, y + 22, "CINMIX", INK);
-        text(x + 24, y + 62, "RELEASE 0.22", STEEL);
+        big_text(x + 21, y + 22, "QUARTZIE", INK);
+        text(x + 24, y + 62, "RELEASE 0.24", STEEL);
         rect(x + 21, y + 91, cw - 42, 1, HAIR);
         text(x + 24, y + 106, "Kernel", STEEL);
-        text(x + 166, y + 106, "Cinmix 0.23", INK);
+        text(x + 166, y + 106, "Quartzie 0.24", INK);
         text(x + 24, y + 134, "Target", STEEL);
         text(x + 166, y + 134, "i386 protected", INK);
         text(x + 24, y + 162, "Firmware", STEEL);
@@ -1990,7 +2054,7 @@ static void window_content(int app, const Window *w) {
         append(display, boot_bpp == 32 ? " / VBE" : " / VGA", 48);
         text(x + 166, y + 218, display, INK);
         text(x + 24, y + 246, "Storage", STEEL);
-        text(x + 166, y + 246, storage_ready ? "Disk D: / CinmixFS" : "RAM-only session", INK);
+        text(x + 166, y + 246, storage_ready ? "Disk D: / QuartzieFS" : "RAM-only session", INK);
         text(x + 24, y + 274, "Window manager", STEEL);
         text(x + 166, y + 274, "Message-based dispatch", INK);
         text(x + 24, y + 302, "Kernel objects", STEEL);
@@ -2001,11 +2065,11 @@ static void window_content(int app, const Window *w) {
         number(objects, (uint32_t)tasks);
         text(x + 166, y + 330, objects, INK);
         text(x + 24, y + 358, "NT I/O Manager", STEEL);
-        text(x + 166, y + 358, nt_driver_ready ? "IRP / CinmixFS" : "Not initialized", INK);
+        text(x + 166, y + 358, nt_driver_ready ? "IRP / QuartzieFS" : "Not initialized", INK);
         text(x + 24, y + 386, "Device namespace", STEEL);
-        text(x + 166, y + 386, "\\Device\\CinmixDisk", INK);
+        text(x + 166, y + 386, "\\Device\\QuartzieDisk", INK);
         text(x + 24, y + 414, "Registry", STEEL);
-        text(x + 166, y + 414, nt_registry_loaded ? "HKLM / Software / Cinmix" : "Available on D:", INK);
+        text(x + 166, y + 414, nt_registry_loaded ? "HKLM / Software / Quartzie" : "Available on D:", INK);
 #ifdef __i386__
         if (ch >= 472) {
             text(x + 24, y + 443, "User processes", STEEL);
@@ -2035,7 +2099,7 @@ static void window_content(int app, const Window *w) {
             text(x + 55, yy + 9, pages[k], settings_page == k ? INK : INK2);
         }
         rect(x + 22, y + ch - 75, nw - 20, 1, HAIR);
-        text(x + 27, y + ch - 57, "Cinmix 0.23", STEEL);
+        text(x + 27, y + ch - 57, "Quartzie 0.24", STEEL);
         text(x + 27, y + ch - 37, "1920 x 1080", STEEL);
         big_text(mx, y + 18, pages[settings_page], INK);
         if (settings_page == 1) {
@@ -2101,8 +2165,8 @@ static void window_content(int app, const Window *w) {
             number(tmp, (uint32_t)volume_level); text(mx + 295, y + 301, tmp, INK);
             rounded(mx, y + 390, mw, 109, 12, UI_CARD);
             text(mx + 22, y + 409, "Storage", INK);
-            text(mx + 22, y + 440, storage_ready ? "Disk D: / CinmixFS / ATA IDE" : "RAM R: / temporary session", STEEL);
-            text(mx + 22, y + 466, storage_ready ? "Notes and documents survive reboot" : "Attach Cinmix disk image for persistence", STEEL);
+            text(mx + 22, y + 440, storage_ready ? "Disk D: / QuartzieFS / ATA IDE" : "RAM R: / temporary session", STEEL);
+            text(mx + 22, y + 466, storage_ready ? "Notes and documents survive reboot" : "Attach Quartzie disk image for persistence", STEEL);
         } else if (settings_page == 2) {
             text(mx + 2, y + 61, "Installed applications", STEEL);
             for (int k = 0; k < APPS; k++) {
@@ -2127,9 +2191,9 @@ static void window_content(int app, const Window *w) {
             rounded(mx + mw - 142, y + 232, 121, 33, 9, UI_HOVER);
             text(mx + mw - 127, y + 240, "Clear all", INK);
         } else {
-            text(mx + 2, y + 61, "About Cinmix", STEEL);
+            text(mx + 2, y + 61, "About Quartzie", STEEL);
             rounded(mx, y + 93, mw, 222, 12, UI_CARD);
-            big_text(mx + 20, y + 116, "Cinmix 0.23", INK);
+            big_text(mx + 20, y + 116, "Quartzie 0.24", INK);
             text(mx + 23, y + 162, "32-bit i386 operating system", STEEL);
             text(mx + 23, y + 193, "Legacy BIOS / El Torito boot", STEEL);
             text(mx + 23, y + 224, "Aero desktop with Dark Aero", STEEL);
@@ -2338,7 +2402,7 @@ static void draw_menu(void) {
     glass(mx + 6, my + 68, mw - 12, mh - 127, NIGHT ? 0x19283c : 0xf6fbff, 246);
     rounded(mx + 16, my + 15, 38, 38, 10, 0x1673ae);
     draw_mark(mx + 23, my + 23, WHITE);
-    text(mx + 66, my + 14, "Cinmix", WHITE);
+    text(mx + 66, my + 14, "Quartzie", WHITE);
     text(mx + 66, my + 35, "Programs", 0xd9efff);
     int list_width = mh < 420 ? mw - 18 : 289;
     int row_h = mh < 420 ? 24 : 29;
@@ -2979,11 +3043,40 @@ static void repaint(void) {
         if (quick_anim > 0) quick_anim--;
         if (notification_anim > 0) notification_anim--;
         if (run_anim > 0) run_anim--;
+        for (int i = 0; i < APPS; i++) if (icon_motion[i]) {
+            if (++icon_frame[i] >= TASK_ICON_FRAMES) { icon_frame[i] = 0; icon_motion[i] = 0; }
+            taskbar_dirty = 1;
+            dirty = 1;
+        }
     }
 }
 
 static int inside(int px, int py, int x, int y, int w, int h) {
     return px >= x && px < x + w && py >= y && py < y + h;
+}
+
+static int accept_double_click(int category, int item, int x, int y) {
+    int dx = x - click_x, dy = y - click_y;
+    if (click_wait && click_class == category && click_item == item &&
+        dx >= -6 && dx <= 6 && dy >= -6 && dy <= 6) {
+        click_wait = 0;
+        click_class = -1;
+        return 1;
+    }
+    click_class = category;
+    click_item = item;
+    click_x = x;
+    click_y = y;
+    click_wait = CLICK_WINDOW_TICKS;
+    return 0;
+}
+
+static void icon_kick(int app, int mode) {
+    if (app < 0 || app >= APPS) return;
+    icon_motion[app] = (uint8_t)mode;
+    icon_frame[app] = 0;
+    taskbar_dirty = 1;
+    dirty = 1;
 }
 
 static int sketch_coordinates(int px, int py, int *xx, int *yy) {
@@ -3208,7 +3301,15 @@ static void handle_click(void) {
                     if (inside(mouse_x, mouse_y, xx + 20 + (k % 4) * 66, yy + 113 + (k / 4) * 47, 57, 39)) calc_press(keys[k]);
                 }
             } else if (i == FILES) {
-                files_action(w, mouse_x, mouse_y);
+                int item = files_row_hit(w, mouse_x, mouse_y);
+                if (item >= 0) {
+                    selected_file = item;
+                    file_search_focus = 0;
+                    if (accept_double_click(1, item, mouse_x, mouse_y)) files_open_selected();
+                } else {
+                    click_wait = 0;
+                    files_action(w, mouse_x, mouse_y);
+                }
             } else if (i == APPEAR) {
                 settings_action(w, mouse_x, mouse_y);
             } else if (i == CALENDAR) {
@@ -3280,7 +3381,16 @@ static void handle_click(void) {
         }
     }
     int slot = desktop_slot_hit(mouse_x, mouse_y);
-    if (slot >= 0) { open_window(desk_shortcuts[slot]); return; }
+    if (slot >= 0) {
+        desktop_focus = slot;
+        if (accept_double_click(2, slot, mouse_x, mouse_y)) {
+            desktop_focus = -1;
+            open_window(desk_shortcuts[slot]);
+        }
+        dirty = 1;
+        return;
+    }
+    click_wait = 0;
 }
 
 static void handle_right_click(void) {
@@ -3385,6 +3495,10 @@ static void cm_ui_dispatch(int app, const struct CmMessage *event) {
     if (app != NOTES && app != CONSOLE) return;
     int key = event->wparam;
     int ch = event->lparam;
+    if (app == NOTES && notes_select_all) {
+        if (key == 0x0e) { notes_len = 0; notes[0] = 0; notes_dirty = 1; notes_select_all = 0; dirty = 1; return; }
+        if (ch || key == 0x1c) { notes_len = 0; notes[0] = 0; notes_select_all = 0; notes_dirty = 1; }
+    }
     if (key == 0x0e) {
         if (app == NOTES && notes_len > 0) { notes[--notes_len] = 0; notes_dirty = 1; }
         if (app == CONSOLE && console_len > 0) console_input[--console_len] = 0;
@@ -3398,9 +3512,72 @@ static void cm_ui_dispatch(int app, const struct CmMessage *event) {
     dirty = 1;
 }
 
+static int clipboard_copy_file(int cut) {
+    if (selected_file < 0 || selected_file >= files_count() || !storage_ready) return 0;
+    const char *name = files_name(selected_file);
+    if (storage_slot(name) < 0) return 0;
+    copy(clipboard_filename, name, sizeof(clipboard_filename));
+    clipboard_type = cut ? 2 : 1;
+    return 1;
+}
+
+static int clipboard_paste_file(void) {
+    if (!storage_ready || (clipboard_type != 1 && clipboard_type != 2)) return 0;
+    if (storage_slot(clipboard_filename) < 0) return 0;
+    if (clipboard_type == 2) { clipboard_type = 0; return 1; }
+    char content[STORAGE_MAX_BYTES + 1];
+    int n = storage_load(clipboard_filename, content, sizeof(content));
+    if (n < 0) return 0;
+    char filename[24] = "Copy_";
+    int len = size(filename);
+    for (int i = 0; clipboard_filename[i] && len < 18; i++) filename[len++] = clipboard_filename[i];
+    filename[len] = 0;
+    int suffix = 1;
+    while (storage_slot(filename) >= 0 && suffix < 10) {
+        filename[len] = (char)('0' + suffix++);
+        filename[len + 1] = 0;
+    }
+    if (storage_slot(filename) >= 0 || !storage_save(filename, content, (uint32_t)n)) return 0;
+    files_restore();
+    for (int i = FILE_COUNT; i < files_count(); i++) if (same(files_name(i), filename)) selected_file = i;
+    file_location = 6;
+    return 1;
+}
+
+static void clipboard_notes_copy(int cut) {
+    clipboard_text_len = notes_len;
+    for (int i = 0; i < notes_len; i++) clipboard_text[i] = notes[i];
+    clipboard_text[clipboard_text_len] = 0;
+    clipboard_type = 3;
+    if (cut) { notes_len = 0; notes[0] = 0; notes_dirty = 1; }
+    notes_select_all = 0;
+    dirty = 1;
+}
+
+static void clipboard_notes_paste(void) {
+    if (clipboard_type != 3) return;
+    if (notes_select_all) { notes_len = 0; notes[0] = 0; notes_select_all = 0; }
+    for (int i = 0; i < clipboard_text_len && notes_len < (int)sizeof(notes) - 1; i++) notes[notes_len++] = clipboard_text[i];
+    notes[notes_len] = 0;
+    notes_dirty = 1;
+    dirty = 1;
+}
+
 static void handle_key(uint8_t code) {
+    if (code == 0xe0) { keyboard_extended = 1; return; }
+    int extended = keyboard_extended;
+    keyboard_extended = 0;
     int released = (code & 0x80) != 0;
     uint8_t key = code & 0x7f;
+    if (extended && (key == 0x5b || key == 0x5c)) {
+        if (!released) {
+            start_open = !start_open;
+            if (start_open) { start_anim = PANEL_STEPS; menu_query_len = 0; menu_query[0] = 0; }
+            context_open = 0; quick_open = 0; notification_open = 0;
+            dirty = 1;
+        }
+        return;
+    }
     if (key == 0x2a || key == 0x36) { shift_down = !released; return; }
     if (key == 0x1d) { control_down = !released; return; }
     if (key == 0x38) {
@@ -3416,6 +3593,22 @@ static void handle_key(uint8_t code) {
         run_open = 0;
         start_open = 0; context_open = 0; quick_open = 0; notification_open = 0;
         menu_query_len = 0; menu_query[0] = 0; dirty = 1; return;
+    }
+    if (control_down && !alt_down && key == 0x12) { open_window(FILES); return; }
+    if (control_down && !alt_down && (key == 0x2e || key == 0x2f || key == 0x2d)) {
+        int app = active_window();
+        if (app == FILES) {
+            int ok = key == 0x2f ? clipboard_paste_file() : clipboard_copy_file(key == 0x2d);
+            if (!ok) notify(key == 0x2f ? "Paste failed: attach a writable disk" : "Copy requires a file on disk");
+        } else if (app == NOTES) {
+            if (key == 0x2f) clipboard_notes_paste();
+            else clipboard_notes_copy(key == 0x2d);
+        }
+        dirty = 1;
+        return;
+    }
+    if (control_down && !alt_down && key == 0x1e && active_window() == NOTES) {
+        notes_select_all = 1; dirty = 1; return;
     }
     if (control_down && alt_down && key == 0x32) { toggle_dark_aero(); return; }
     if (alt_down && key == 0x0f) { start_or_cycle_switcher(); return; }
@@ -3627,7 +3820,7 @@ static void update_hover_timer(int pulse) {
 static int animations_pending(void) {
     for (int i = 0; i < PANEL_COUNT; i++) if (panel_step[i] != panel_goal[i]) return 1;
     if (start_anim || context_anim || quick_anim || notification_anim || run_anim) return 1;
-    for (int i = 0; i < APPS; i++) if (anim_ticks[i] > 0) return 1;
+    for (int i = 0; i < APPS; i++) if (anim_ticks[i] > 0 || icon_motion[i]) return 1;
     return 0;
 }
 
@@ -3719,13 +3912,13 @@ void kmain(void) {
         pinta_load_document();
         sketch_disk_loaded = 1;
         files_restore();
-        log_write("CinmixFS disk mounted at D: (ATA IDE)");
-    } else log_write("RAM only: attach Cinmix disk to enable persistence");
-    log_write("Cinmix kernel 0.23 / PE32 loader");
+        log_write("QuartzieFS disk mounted at D: (ATA IDE)");
+    } else log_write("RAM only: attach Quartzie disk to enable persistence");
+    log_write("Quartzie kernel 0.24 / PE32 loader");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Cinmix 0.23 is ready");
+    notify("Quartzie 0.24 is ready");
     repaint();
 #ifdef __i386__
     int cm_userspace_ready = cm_proc_initialize();
@@ -3757,10 +3950,12 @@ void kmain(void) {
             else handle_key(byte);
         }
         cm_pump(16, cm_ui_dispatch);
-        int need_pulse = animations_pending() || task_hover >= 0 || hover_visible || run_open;
+        int need_pulse = animations_pending() || task_hover >= 0 || hover_visible || run_open || click_wait;
         int animation_pulse = need_pulse ? frame_clock_tick() : 0;
-        if (animation_pulse) update_hover_timer(1);
-        else update_hover_timer(0);
+        if (animation_pulse) {
+            update_hover_timer(1);
+            if (click_wait) click_wait--;
+        } else update_hover_timer(0);
         if (dirty || (animation_pulse && animations_pending())) {
             animation_step_allowed = animation_pulse;
             repaint();

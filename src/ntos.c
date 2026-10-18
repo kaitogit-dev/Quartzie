@@ -233,6 +233,12 @@ static NTSTATUS nt_path_resolve(const OBJECT_ATTRIBUTES *attr, char *name, unsig
         while (device[prefix] && raw[prefix] == device[prefix]) prefix++;
         if (!device[prefix]) rest = raw + prefix;
     }
+    if (!rest) {
+        const char *alias = "\\Device\\QuartzieDisk";
+        prefix = 0;
+        while (alias[prefix] && raw[prefix] == alias[prefix]) prefix++;
+        if (!alias[prefix]) rest = raw + prefix;
+    }
     if (!rest || (*rest != '\\' && *rest != '/')) return STATUS_OBJECT_PATH_NOT_FOUND;
     rest++;
     if (!storage_name_valid(rest)) return STATUS_OBJECT_NAME_NOT_FOUND;
@@ -431,7 +437,8 @@ static NTSTATUS NtCreateKey(HANDLE *KeyHandle, ACCESS_MASK DesiredAccess, const 
     (void)DesiredAccess; (void)TitleIndex; (void)Class; (void)CreateOptions;
     char path[96];
     if (!KeyHandle || !ObjectAttributes || !nt_unicode_ascii(ObjectAttributes->ObjectName, path, sizeof(path))) return STATUS_INVALID_PARAMETER;
-    if (!nt_name_equal(path, "\\Registry\\Machine\\Software\\Cinmix")) return STATUS_OBJECT_PATH_NOT_FOUND;
+    if (!nt_name_equal(path, "\\Registry\\Machine\\Software\\Cinmix") &&
+        !nt_name_equal(path, "\\Registry\\Machine\\Software\\Quartzie")) return STATUS_OBJECT_PATH_NOT_FOUND;
     HANDLE h = nt_alloc_handle(2, 0);
     if (!h) return STATUS_INSUFFICIENT_RESOURCES;
     *KeyHandle = h;

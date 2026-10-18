@@ -1,5 +1,5 @@
-#ifndef CINMIX_PINTA_C
-#define CINMIX_PINTA_C
+#ifndef QUARTZIE_PINTA_C
+#define QUARTZIE_PINTA_C
 #include <stdint.h>
 #define PINTA_PENCIL 0
 #define PINTA_BRUSH 1

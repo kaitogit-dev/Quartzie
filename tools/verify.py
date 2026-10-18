@@ -42,7 +42,7 @@ def check(iso_path, boot_path, kernel_path, elf_path):
     assert len(boot) == 512 and boot[510:512] == b'\x55\xaa'
     assert sector(boot_lba)[:512] == boot
     dap_offset = boot.index(bytes.fromhex('10 00 01 00 00 00 00 10 21 00 00 00'))
-    message_offset = boot.index(b'Cinmix: CD read failed')
+    message_offset = boot.index(b'Quartzie: CD read failed')
     assert b'\xbe' + struct.pack('<H', 0x7c00 + dap_offset) in boot
     assert b'\xbe' + struct.pack('<H', 0x7c00 + message_offset) in boot
     assert b'\x8b\x36' + struct.pack('<H', 0x7c00 + dap_offset) not in boot
@@ -67,8 +67,8 @@ def check(iso_path, boot_path, kernel_path, elf_path):
     assert b'\xc7\x06\x14\x72\x00\x1e' in kernel
     assert b'\xb8\x80\x07' in kernel[:512]
     assert b'\xb8\x38\x04' in kernel[:512]
-    assert b'CINMIX_0_23' in sector(16)
-    assert b'CINMIX 0.23' in entry
+    assert b'QUARTZIE_0_24' in sector(16)
+    assert b'QUARTZIE 0.24' in entry
     assert b'KERNEL32.DLL' in kernel
     assert b'runpe ' in kernel
     for symbol in ('cm_pe_load', 'cm_proc_launch_pe', 'cm_pe_error',
@@ -94,7 +94,7 @@ def check(iso_path, boot_path, kernel_path, elf_path):
         names.append(folder[at + 33:at + 33 + name_len])
         at += entry_len
     assert b'BOOT.CAT;1' in names
-    assert b'CINMIX.BIN;1' in names
+    assert b'QUARTZIE.BIN;1' in names
     assert b'README.TXT;1' in names
     print('PASS: ISO 9660 filesystem and file records')
     print('PASS: SeaBIOS El Torito identifier and boot catalog checks')

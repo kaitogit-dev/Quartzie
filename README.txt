@@ -1,3 +1,4 @@
-Cinmix 0.23 | BIOS i386 | 1920x1080 preferred
-
-New: bounded PE32 console loader, KERNEL32 GetCurrentProcessId/GetTickCount/ExitProcess thunks, ring-3 launch and exit system call. Console: runpe hello.exe, then peinfo. Explorer can launch the selected hello.exe. Bundle has a preinstalled demo disk. Does not contain .NET 10, GTK4/libadwaita or general Win32 GUI application compatibility. Supports only a small fixed-base 32-bit PE console subset; existing CinmixFS disks remain compatible. See README.md.
+Quartzie 0.24 | BIOS i386 | Preferred 1920x1080
+Windows-style double-click, clipboard, taskbar bounce and keyboard shortcuts.
+Persistent disk retains legacy CINMIXFS format so your existing files remain accessible.
+PE32 console support is experimental; .NET 10, GTK4 and general Windows GUI compatibility are not included.

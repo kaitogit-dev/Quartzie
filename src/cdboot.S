@@ -64,6 +64,6 @@ remaining:
 drive:
     .byte 0
 failure_message:
-    .asciz "Cinmix: CD read failed\r\n"
+    .asciz "Quartzie: CD read failed\r\n"
 .org 510
 .word 0xaa55

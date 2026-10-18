@@ -1,5 +1,5 @@
-#ifndef CINMIX_PROC_H
-#define CINMIX_PROC_H
+#ifndef QUARTZIE_PROC_H
+#define QUARTZIE_PROC_H
 #include <stdint.h>
 #define CM_USER_BASE 0x40000000u
 #define CM_USER_CODE (CM_USER_BASE + 0x1000u)

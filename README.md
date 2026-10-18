@@ -1,47 +1,36 @@
-# Cinmix 0.23 — PE32 Loader and Minimal Win32 Console Compatibility
+# Quartzie 0.24 — First rebranded release
 
-Cinmix is a freestanding 32-bit x86 hobby OS that boots from a legacy BIOS El Torito CD, with a 1920×1080 Aero/Dark Aero desktop, NT-like kernel APIs and a persistent CinmixFS disk.
+Quartzie is the new name of the freestanding x86 OS previously called Cinmix. It boots by legacy BIOS El Torito CD, defaults to 1920×1080 where supported, and provides an Aero / Dark Aero desktop, persistent IDE disk, and a small PE32 console compatibility layer.
 
-## Real changes in 0.23
+## Desktop interaction and taskbar motion
 
-- **PE32 executable loading:** DOS MZ and PE/COFF header verification, Intel 386 machine/PE32 optional header validation, bounded section mapping, section entry checks, and import-address-table patching. The loader maps images at `0x40000000` in a ring-3 task, with an isolated 4 MiB paging mapping. It rejects malformed images, DLLs, unsupported architectures, missing imports and CLR/.NET executables rather than pretending they work.
-- **Tiny KERNEL32 bridge:** import resolution for `GetCurrentProcessId`, `GetTickCount`, and `ExitProcess`. In the protected user process, these functions use system-call trampolines and `int 0x80` to enter the kernel. `ExitProcess` terminates the user task and reports its exit code.
-- **Disk-backed Windows executable:** the bundled `hello.exe` is a small, valid PE32 console executable whose entry point imports the three KERNEL32 routines, writes two results to private process memory and exits with code `42`. It is *not* a normal full-featured Windows executable. The downloadable disk image includes it preinstalled. Other small supported PE32 executables may be added with `tools/install_pe.py`, subject to the strict limits below.
-- **Launch from the Console:** type `runpe hello.exe`, then `peinfo` to see the program exit code and launch counts. `compat` reports exactly what is and isn't available. File Explorer lists `hello.exe` under D:, identifies it as a Windows executable and launches a selected executable when you press Enter.
-- **Boot-loader capacity:** the El Torito loader now reads 80 two-kibibyte sectors, and the ISO verifier checks the corresponding kernel padding. All previous desktop, painter, protected-worker, and persistent-storage features remain.
+- **Single click selects; double click opens** desktop shortcuts and Explorer files, with a ~300 ms window and a 6-pixel location tolerance. Enter still opens keyboard-selected files, like Windows.
+- **Ctrl+E** opens Explorer; **Windows/Super key** (PS/2 extended scancodes 0x5B/0x5C) opens and closes Start; **Alt+F4** closes the active window.
+- **Ctrl+C**, **Ctrl+X**, and **Ctrl+V** operate on supported disk-backed files in Explorer. Copy creates a `Copy_` filename on D: and writes the contents to the signed CinmixFS volume. Cut then Paste in the same D: folder is a no-op, because Quartzie currently has only one writable root directory. Without a mounted disk, the UI explains why disk copy is unavailable.
+- In Notes, **Ctrl+A** selects the whole document, Ctrl+C/X copy or cut text, and Ctrl+V pastes into the note. The clipboard is shared through OS state but Notes has no rich partial selection yet.
+- The taskbar icon has a fast **shrink-and-overshoot** animation on first launch, **downward bounce** on minimize, and **upward bounce** on activation or restore. All motion is bounded and tied to the existing 120 Hz animation clock.
+- Every existing feature from Cinmix 0.23 is preserved, including protected ring-3 demo tasks, Pinta-style native painter, Notes, Settings, File Explorer, Dark Aero, and PE32 console loader.
 
-## .NET 10, GTK4/libadwaita, and arbitrary Windows apps
+## Disk compatibility and deliberate exceptions
 
-**Not installed and not supported.** .NET 10 requires a substantial managed-code runtime (CoreCLR, the class libraries, a JIT/interpreter, native platform interfaces, and support for its target architecture). GTK4/libadwaita requires a much larger graphics/windowing, fonts, internationalization and platform-services stack. These libraries do not themselves provide Win32 compatibility. Most Windows apps depend on extensive Win32 DLLs (USER32, GDI32, ADVAPI32, KERNEL32, COM, DirectX, etc.), filesystem behavior, and often Windows drivers. The existing PE32 loader is a narrow first step rather than a Windows emulator.
+Quartzie retains the on-disk `CINMIXFS` signature, the existing `\Device\CinmixDisk` device path, and `\Registry\Machine\Software\Cinmix` registry compatibility. **Do not reformat old volumes.** Your Cinmix 0.18+ IDE disk can be reused as-is. The included demo disk image contains `hello.exe`, a small PE32 console app.
 
-**Current executable constraints:** 32-bit x86 **PE32 console** images only; one ring-3 executable at a time (alongside the painting worker); **4 KiB or less per executable on CinmixFS v1**; fixed image base `0x40000000`; no relocation support; only the three imported KERNEL32 functions above; no CRT or heap API, no GUI, no DLL loading, no Win32 exceptions, no .NET CLR, no GTK, and no x64 support. An unsupported EXE is rejected with an error, not launched.
+The IDE driver requires a writable signed disk at the primary IDE master; without one, files are temporary. The filesystem supports 16 slots and up to 4096 bytes per file. Existing limitations still apply: no GUI Win32 app loader, no .NET 10, GTK4/libadwaita, or x64 Windows binaries; Pinta is a native painter port, not upstream Pinta.
 
-Pinta remains a **native Cinmix painter inspired by** Pinta's basic workflow; this is not the upstream .NET 10/GTK4 program. Attribution stays in `third_party/`.
-
-## Running the demo
-
-Attach **both** the ISO and writable disk image in QEMU or another BIOS x86 emulator. Example:
-
-```sh
-qemu-system-i386 -m 256 -vga std \
-  -cdrom Cinmix-0.23.iso -boot d \
-  -drive file=Cinmix-0.23-disk.img,format=raw,if=ide,index=0
-```
-
-Open Console, type `runpe hello.exe` and press Enter. Once it finishes, type `peinfo`. The expected exit code is `42`. The executable's imports use real loaded PE IAT entries and the ring-3 syscall interface. `hello.exe` can also be selected in Explorer and launched with Enter.
-
-Existing CinmixFS volumes from 0.18 onward remain **format compatible**. Use your previous disk image if it contains data rather than overwriting it with this demo disk. To install `hello.exe` onto an existing signed disk image after backing it up:
-
-```sh
-python3 tools/pe_sample.py hello.exe
-python3 tools/install_pe.py your-disk.img hello.exe
-```
-
-## Build and verification
+## Build and test
 
 ```sh
 make verify
-make Cinmix-0.23-disk.img
 ```
 
-The tests cover malformed images, unsupported CLR/GUI/x64 images, real PE import resolution, process exit/relaunch, persistent storage installation, ISO structure and all previous desktop/native storage regressions. **The protected execution path has not been boot-tested in a full BIOS emulator in this environment.** Keep backups of your writable disk images and test on a disposable copy first.
+This outputs `Quartzie-0.24.iso`. Use `make Quartzie-0.24-disk.img` for a new blank/demo disk; **back up your existing image** before testing.
+
+Example in QEMU:
+
+```sh
+qemu-system-i386 -m 256 -vga std \
+ -cdrom Quartzie-0.24.iso -boot d \
+ -drive file=Quartzie-0.24-disk.img,format=raw,if=ide,index=0
+```
+
+Native UI tests and ISO9660/El Torito structure tests run in Linux; this does not constitute an actual BIOS emulator boot verification. Pinta attribution remains in `third_party/`.

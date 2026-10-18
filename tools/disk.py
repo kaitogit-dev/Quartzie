@@ -26,7 +26,7 @@ def generate(path):
         struct.pack_into('<I', directory, 12, zlib.crc32(directory[16:]))
         disk.write(directory)
         disk.write(directory)
-    print(f'Created dedicated Cinmix persistent disk: {destination} ({SECTOR * SECTORS} bytes)')
+    print(f'Created dedicated Quartzie persistent disk: {destination} ({SECTOR * SECTORS} bytes)')
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
