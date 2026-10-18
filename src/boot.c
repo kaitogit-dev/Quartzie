@@ -96,7 +96,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     bs->LocateProtocol((EFI_GUID *)&MOUSE_GUID,0,(void **)&mouse);
     bs->LocateProtocol((EFI_GUID *)&ABS_MOUSE_GUID,0,(void **)&absolute);
     QPs2Mouse ps2={0};
-    int ps2_active=0,wait=0,ever_moved=0;
+    int ps2_active=0,wait=0,ever_moved=0,ps2_logged=0;
     if(!mouse&&!absolute){ps2_active=q_ps2_enable();serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");}
     uint8_t left=0;
     for(;;){
@@ -148,6 +148,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 left=(uint8_t)(buttons&1);
             }
         }
+        if(q_ps2_bytes_seen&&!ps2_logged){serial_text("QUARTZIE-PS2-RAW\n");ps2_logged=1;}
         if(table->ConIn){
             for(int n=0;n<12;n++){
                 EFI_INPUT_KEY key;

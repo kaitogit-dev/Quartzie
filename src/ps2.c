@@ -1,4 +1,5 @@
 #include "ps2.h"
+volatile uint32_t q_ps2_bytes_seen;
 static uint8_t in8(uint16_t port){uint8_t value;__asm__ volatile("inb %1,%0":"=a"(value):"Nd"(port));return value;}
 static void out8(uint16_t port,uint8_t value){__asm__ volatile("outb %0,%1"::"a"(value),"Nd"(port));}
 static int ready(void){for(int n=0;n<100000;n++)if(!(in8(0x64)&2))return 1;return 0;}
@@ -43,6 +44,7 @@ int q_ps2_poll(QPs2Mouse *mouse,int *dx,int *dy,int *buttons){
     for(int n=0;n<24;n++){
         uint8_t status=in8(0x64);
         if(!(status&1)||!(status&0x20u))return 0;
+        q_ps2_bytes_seen++;
         if(q_ps2_feed(mouse,in8(0x60),dx,dy,buttons))return 1;
     }
     return 0;

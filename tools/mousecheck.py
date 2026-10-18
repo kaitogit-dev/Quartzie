@@ -31,7 +31,7 @@ def verify_mouse(image, usb=False):
         qmp = root / 'qmp.sock'
         command = [
             'qemu-system-x86_64', '-machine', 'q35,accel=tcg',
-            '-m', '512', '-vga', 'std', '-display', 'none',
+            '-m', '512', '-vga', 'std', '-display', 'none', '-vnc', '127.0.0.1:9',
             '-nic', 'none', '-no-reboot',
             '-drive', f'if=pflash,format=raw,readonly=on,file={code}',
             '-drive', f'if=pflash,format=raw,file={nvram}',
@@ -77,6 +77,10 @@ def verify_mouse(image, usb=False):
                 response = sock.recv(4096)
                 if b'"return"' not in response:
                     raise RuntimeError(f'QMP mouse injection failed: {response!r}')
+                if not usb:
+                    extra = {'execute': 'human-monitor-command', 'arguments': {'command-line': 'mouse_move 60 25'}}
+                    sock.sendall(json.dumps(extra).encode('ascii') + b'\r\n')
+                    print('HMP mouse move:', sock.recv(4096))
             end = time.monotonic() + 6
             while time.monotonic() < end:
                 data = serial.read_bytes()
