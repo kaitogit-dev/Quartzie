@@ -2,6 +2,14 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.26 — Taskbar click freeze fix
+
+- Replace a window hit-test loop that counted down from an ever-increasing stacking-order counter with a bounded scan of at most ten actual open windows.
+- Compact window stacking orders before they grow indefinitely, with a bounded maximum of 48. Avoid repeatedly raising the already-active window.
+- Make redundant activations idempotent and avoid restarting an already-running taskbar icon bounce of the same kind.
+- Add a full-HD stress test that injects 24,000 real PS/2 taskbar click sequences and 15,000 window clicks. It checks that application restoration, event queues, framebuffer presentation and stacking orders stay valid, including near integer overflow.
+- Preserve all existing applications, disk format, panel timing, and prior optimizations. Native regression tests do not replace a real BIOS-emulator interaction test.
+
 ## Quartzie 0.25 — Responsiveness and stability
 
 ### Rendering and scheduling

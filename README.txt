@@ -13,3 +13,5 @@ It does not run ordinary Windows GUI applications, .NET 10, or GTK4 apps.
 
 For build instructions, current limitations, and project information see
 README.md in the source distribution. For release history see CHANGELOG.md.
+
+For release-specific fixes and changes, see CHANGELOG.md in the source archive.

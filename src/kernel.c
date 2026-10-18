@@ -1313,7 +1313,7 @@ static void execute_command(void) {
     log_write(linebuf);
     if (!console_len) return;
     if (same(console_input, "help")) print_info();
-    else if (same(console_input, "ver")) log_write("Quartzie 0.25  |  PE32 executable loader  |  i386");
+    else if (same(console_input, "ver")) log_write("Quartzie 0.26  |  PE32 executable loader  |  i386");
     else if (same(console_input, "clear")) log_count = 0;
     else if (same(console_input, "context")) log_write("Right click on desktop");
     else if (same(console_input, "dark")) { select_theme(3); log_write("Dark Aero enabled"); }
@@ -1326,7 +1326,7 @@ static void execute_command(void) {
         log_write("/ram/readme.txt");
         log_write("/ram/boot.log");
         log_write("/ram/notes.txt");
-    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.25; PE32/CUI; .NET/GTK not yet available");
+    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.26; PE32/CUI; .NET/GTK not yet available");
     else if (same(console_input, "cat boot.log")) log_write("El Torito -> kernel -> protected mode -> UI");
     else if (same(console_input, "cat notes.txt")) {
         char one[72] = "";
@@ -1465,6 +1465,25 @@ static int active_window(void) {
     return best;
 }
 
+static void raise_window(int app) {
+    if (app < 0 || app >= APPS) return;
+    if (next_order >= 48) {
+        int ranks[APPS];
+        for (int i = 0; i < APPS; i++) {
+            int rank = 1;
+            for (int j = 0; j < APPS; j++) {
+                if (j == i) continue;
+                if (windows[j].order < windows[i].order ||
+                    (windows[j].order == windows[i].order && j < i)) rank++;
+            }
+            ranks[i] = rank;
+        }
+        for (int i = 0; i < APPS; i++) windows[i].order = ranks[i];
+        next_order = APPS;
+    }
+    windows[app].order = ++next_order;
+}
+
 static void snap_window(int app, int side) {
     Window *w = &windows[app];
     if (!w->opened) return;
@@ -1490,7 +1509,7 @@ static void snap_window(int app, int side) {
         w->h = sh - 59;
     }
     w->minimized = 0;
-    w->order = ++next_order;
+    raise_window(app);
     begin_window_animation(app, from_x, from_y, from_w, from_h, WINDOW_RESIZE_STEPS, 0);
     dirty = 1;
 }
@@ -1574,6 +1593,14 @@ static void open_window(int app) {
     int was_minimized = windows[app].minimized;
     int was_closed = !windows[app].opened;
     int first = was_closed || was_minimized;
+    if (was_active && !first && !anim_exit[app]) {
+        start_open = 0;
+        context_open = 0;
+        quick_open = 0;
+        notification_open = 0;
+        dirty = 1;
+        return;
+    }
     int new_object = !cm_window_handle(app);
     uint32_t handle = cm_window_open(app);
     if (handle && new_object) cm_post(handle, CM_MSG_CREATE, app, 0);
@@ -1583,7 +1610,7 @@ static void open_window(int app) {
     if (reversing) animated_window_rect(app, &reverse_x, &reverse_y, &reverse_w, &reverse_h);
     windows[app].opened = 1;
     windows[app].minimized = 0;
-    windows[app].order = ++next_order;
+    raise_window(app);
     start_open = 0;
     context_open = 0;
     quick_open = 0;
@@ -2052,10 +2079,10 @@ static void window_content(int app, const Window *w) {
     } else if (app == SYSTEM) {
         rect(x, y, cw, 4, BLUE);
         big_text(x + 21, y + 22, "QUARTZIE", INK);
-        text(x + 24, y + 62, "RELEASE 0.25", STEEL);
+        text(x + 24, y + 62, "RELEASE 0.26", STEEL);
         rect(x + 21, y + 91, cw - 42, 1, HAIR);
         text(x + 24, y + 106, "Kernel", STEEL);
-        text(x + 166, y + 106, "Quartzie 0.25", INK);
+        text(x + 166, y + 106, "Quartzie 0.26", INK);
         text(x + 24, y + 134, "Target", STEEL);
         text(x + 166, y + 134, "i386 protected", INK);
         text(x + 24, y + 162, "Firmware", STEEL);
@@ -2116,7 +2143,7 @@ static void window_content(int app, const Window *w) {
             text(x + 55, yy + 9, pages[k], settings_page == k ? INK : INK2);
         }
         rect(x + 22, y + ch - 75, nw - 20, 1, HAIR);
-        text(x + 27, y + ch - 57, "Quartzie 0.25", STEEL);
+        text(x + 27, y + ch - 57, "Quartzie 0.26", STEEL);
         text(x + 27, y + ch - 37, "1920 x 1080", STEEL);
         big_text(mx, y + 18, pages[settings_page], INK);
         if (settings_page == 1) {
@@ -2210,7 +2237,7 @@ static void window_content(int app, const Window *w) {
         } else {
             text(mx + 2, y + 61, "About Quartzie", STEEL);
             rounded(mx, y + 93, mw, 222, 12, UI_CARD);
-            big_text(mx + 20, y + 116, "Quartzie 0.25", INK);
+            big_text(mx + 20, y + 116, "Quartzie 0.26", INK);
             text(mx + 23, y + 162, "32-bit i386 operating system", STEEL);
             text(mx + 23, y + 193, "Legacy BIOS / El Torito boot", STEEL);
             text(mx + 23, y + 224, "Aero desktop with Dark Aero", STEEL);
@@ -3093,6 +3120,7 @@ static int accept_double_click(int category, int item, int x, int y) {
 
 static void icon_kick(int app, int mode) {
     if (app < 0 || app >= APPS) return;
+    if (icon_motion[app] == mode) return;
     icon_motion[app] = (uint8_t)mode;
     icon_frame[app] = 0;
     taskbar_dirty = 1;
@@ -3284,14 +3312,24 @@ static void handle_click(void) {
             return;
         }
     }
-    for (int z = next_order; z >= 0; z--) {
-        for (int i = 0; i < APPS; i++) {
+    int stack[APPS], stack_count = 0;
+    for (int i = 0; i < APPS; i++) {
+        if (!windows[i].opened || windows[i].minimized) continue;
+        int at = stack_count;
+        while (at > 0 && windows[stack[at - 1]].order < windows[i].order) {
+            stack[at] = stack[at - 1];
+            at--;
+        }
+        stack[at] = i;
+        stack_count++;
+    }
+    for (int layer = 0; layer < stack_count; layer++) {
+            int i = stack[layer];
             Window *w = &windows[i];
-            if (!w->opened || w->minimized || w->order != z) continue;
             int hit_x, hit_y, hit_w, hit_h;
             animated_window_rect(i, &hit_x, &hit_y, &hit_w, &hit_h);
             if (!inside(mouse_x, mouse_y, hit_x, hit_y, hit_w, hit_h) && !inside(mouse_x, mouse_y, w->x, w->y, w->w, w->h)) continue;
-            w->order = ++next_order;
+            if (active_window() != i) raise_window(i);
             if (cm_window_handle(i)) cm_post(cm_window_handle(i), CM_MSG_MOUSE, mouse_x - hit_x, mouse_y - hit_y);
             if (inside(mouse_x, mouse_y, hit_x + hit_w - 31, hit_y + 4, 27, 25) || inside(mouse_x, mouse_y, w->x + w->w - 31, w->y + 4, 27, 25)) close_window(i, 0);
             else if (inside(mouse_x, mouse_y, hit_x + hit_w - 61, hit_y + 4, 27, 25) || inside(mouse_x, mouse_y, w->x + w->w - 61, w->y + 4, 27, 25)) toggle_maximize(i);
@@ -3398,7 +3436,6 @@ static void handle_click(void) {
             }
             dirty = 1;
             return;
-        }
     }
     int slot = desktop_slot_hit(mouse_x, mouse_y);
     if (slot >= 0) {
@@ -3935,11 +3972,11 @@ void kmain(void) {
         files_restore();
         log_write("QuartzieFS disk mounted at D: (ATA IDE)");
     } else log_write("RAM only: attach Quartzie disk to enable persistence");
-    log_write("Quartzie kernel 0.25 / stable compositor");
+    log_write("Quartzie kernel 0.26 / stable taskbar input");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.25 is ready");
+    notify("Quartzie 0.26 is ready");
     repaint();
 #ifdef __i386__
     int cm_userspace_ready = cm_proc_initialize();

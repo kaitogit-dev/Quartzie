@@ -5,7 +5,7 @@ OBJCOPY = objcopy
 CFLAGS = -m32 -std=c11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector -fno-builtin -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -O2 -Wall -Wextra -Werror
 LDFLAGS = -m elf_i386 -T src/link.ld -nostdlib --build-id=none
 
-all: Quartzie-0.25.iso Quartzie-0.25-disk.img
+all: Quartzie-0.26.iso Quartzie-0.26-disk.img
 
 build:
 	mkdir -p build
@@ -41,18 +41,18 @@ build/kernel.bin: build/kernel.elf
 	$(OBJCOPY) -O binary $< $@
 	@test $$(stat -c%s $@) -le 163840 || (echo 'Kernel exceeds CD loader capacity' && exit 1)
 
-Quartzie-0.25.iso: build/cdboot.bin build/kernel.bin README.txt tools/iso.py
+Quartzie-0.26.iso: build/cdboot.bin build/kernel.bin README.txt tools/iso.py
 	python3 tools/iso.py build/cdboot.bin build/kernel.bin README.txt $@
 
-Quartzie-0.25-disk.img: tools/disk.py tools/install_pe.py build/hello.exe
+Quartzie-0.26-disk.img: tools/disk.py tools/install_pe.py build/hello.exe
 	python3 tools/disk.py $@
 	python3 tools/install_pe.py $@ build/hello.exe
 
-verify: Quartzie-0.25.iso
+verify: Quartzie-0.26.iso
 	python3 tools/verify.py $< build/cdboot.bin build/kernel.bin build/kernel.elf
 	$(MAKE) smoke
 
-NATIVE_TESTS = build/smoke build/ui11 build/compositor build/controls build/ui12 build/ui13 build/ui131 build/animations build/ui133 build/fullhd build/ui15 build/ui16 build/ui17 build/storage build/ui18 build/objects build/ui19 build/ntos build/ui20 build/proc-test build/pinta-user-test build/pe-test build/pe-disk-test build/ui22 build/ui24 build/stability25
+NATIVE_TESTS = build/smoke build/ui11 build/compositor build/controls build/ui12 build/ui13 build/ui131 build/animations build/ui133 build/fullhd build/ui15 build/ui16 build/ui17 build/storage build/ui18 build/objects build/ui19 build/ntos build/ui20 build/proc-test build/pinta-user-test build/pe-test build/pe-disk-test build/ui22 build/ui24 build/stability25 build/taskbar26
 
 build/%: tests/%.c src/kernel.c src/storage.c src/objects.c src/ntos.c src/pinta.c src/font.c src/pe.c | build
 	$(CC) -std=gnu11 -O1 -o $@ $< src/font.c src/pe.c
@@ -116,6 +116,7 @@ smoke: $(NATIVE_TESTS) | build
 	python3 tools/install_pe.py build/ui24-test.img build/hello.exe
 	./build/ui24 build/ui24-test.img
 	./build/stability25
+	./build/taskbar26
 
 build/pe-test: tests/pe.c src/pe.c src/pe.h src/proc.c src/proc.h build/hello.exe | build
 	$(CC) -std=gnu11 -O1 -no-pie -o $@ tests/pe.c src/pe.c
@@ -131,6 +132,6 @@ bench: | build
 	./build/bench
 
 clean:
-	rm -rf build Quartzie-0.25.iso
+	rm -rf build Quartzie-0.26.iso
 
 .PHONY: all verify smoke bench clean
