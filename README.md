@@ -18,7 +18,7 @@ make verify
 
 Artifacts:
 
-- `Quartzie-x64.iso`: UEFI optical image.
+- `Quartzie-x64.iso`: compact UEFI optical image containing a 4 MiB FAT16 EFI boot image.
 - `Quartzie-x64-uefi.img`: GPT disk image containing a FAT32 EFI System Partition.
 - `build/BOOTX64.EFI`: PE32+ EFI application.
 
@@ -31,6 +31,10 @@ qemu-system-x86_64 -machine q35 -m 512 -vga std -bios /usr/share/OVMF/OVMF_CODE.
 ```
 
 OVMF paths vary between Linux distributions. Disable Secure Boot for this unsigned test image. Do not write this preview disk image to a real drive containing data. Use a fresh virtual machine.
+
+## Browser-based emulators
+
+Use the QEMU-Wasm x86-64 runtime, UEFI firmware, and ISO optical media. The compact ISO is preferable to the GPT IMG in browser-only QEMU because it does not require a writable snapshot overlay. If QEMU reports that `/var/tmp/vl.*` cannot be created, its temporary filesystem or snapshot implementation failed before the guest booted; switching guest images cannot fix that host error. Browser tabs may still become unresponsive under software emulation. Native QEMU with OVMF is the supported verification target.
 
 ## UI
 
