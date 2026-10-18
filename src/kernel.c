@@ -3620,11 +3620,11 @@ static void handle_right_click(void) {
 }
 
 static void handle_mouse_byte(uint8_t b) {
-    if (mouse_index == 0 && (b & 0x08u) == 0) return;
+    if (mouse_index == 0 && (b & 0xc8u) != 0x08u) return;
     mouse_packet[mouse_index++] = b;
     if (mouse_index != 3) return;
     mouse_index = 0;
-    if ((mouse_packet[0] & 0x08u) == 0 || (mouse_packet[0] & 0xc0u)) return;
+    if ((mouse_packet[0] & 0xc8u) != 0x08u) return;
     int dx = (int8_t)mouse_packet[1];
     int dy = (int8_t)mouse_packet[2];
     int nx = mouse_x + dx;
