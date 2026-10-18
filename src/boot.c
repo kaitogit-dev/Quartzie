@@ -108,7 +108,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 uint64_t scale_y=mouse->Mode?mouse->Mode->ResolutionY:0;
                 if(scale_x>100)dx=(int)((int64_t)dx*100/(int64_t)scale_x);
                 if(scale_y>100)dy=(int)((int64_t)dy*100/(int64_t)scale_y);
-                if(dx||dy){q_move(&desktop,desktop.mouse_x+dx,desktop.mouse_y+dy);ever_moved=1;}
+                if(dx||dy){q_move(&desktop,desktop.mouse_x+dx,desktop.mouse_y+dy);if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
                 if(s.LeftButton&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
                 if(!s.LeftButton&&left)q_release(&desktop);
                 left=s.LeftButton;
@@ -120,7 +120,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 if(m->AbsoluteMaxX>m->AbsoluteMinX&&m->AbsoluteMaxY>m->AbsoluteMinY){
                     int x=(int)((s.CurrentX-m->AbsoluteMinX)*(uint64_t)(w-1)/(m->AbsoluteMaxX-m->AbsoluteMinX));
                     int y=(int)((s.CurrentY-m->AbsoluteMinY)*(uint64_t)(h-1)/(m->AbsoluteMaxY-m->AbsoluteMinY));
-                    if(x!=desktop.mouse_x||y!=desktop.mouse_y)ever_moved=1;
+                    if(x!=desktop.mouse_x||y!=desktop.mouse_y){if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
                     q_move(&desktop,x,y);
                 }
                 int pressed=(s.ActiveButtons&1)!=0;
