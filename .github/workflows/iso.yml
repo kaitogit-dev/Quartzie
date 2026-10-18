@@ -13,6 +13,8 @@ jobs:
         run: make verify -j2
       - name: Build persistent disk
         run: make Quartzie-0.31-disk.img
+      - name: Package source
+        run: git archive --format=zip --prefix=Quartzie-0.31/ -o Quartzie-0.31-source.zip HEAD
       - name: Upload ISO, disk and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -22,4 +24,5 @@ jobs:
           path: |
             Quartzie-0.31.iso
             Quartzie-0.31-disk.img
+            Quartzie-0.31-source.zip
             build/kernel.elf
