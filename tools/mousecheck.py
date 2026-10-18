@@ -53,7 +53,7 @@ def verify_mouse(image, usb=False):
                 response = sock.recv(4096)
                 if b'"return"' not in response:
                     raise RuntimeError(f'QMP capabilities failed: {response!r}')
-                sock.sendall(b'{"execute":"query-mice"}\\r\\n')
+                sock.sendall(b'{"execute":"query-mice"}\r\n')
                 print('QMP mice:', sock.recv(4096))
                 events = ([
                     {'type': 'abs', 'data': {'axis': 'x', 'value': 24000}},
