@@ -1,5 +1,0 @@
-Upstream project: https://github.com/PintaProject/Pinta
-Original Pinta copyright 2010 Jonathan Pobst and contributors. MIT licensed code, with additional attribution requirements for artwork.
-Pinta for Linux, macOS and Windows requires .NET 10, GTK4 and libadwaita.
-Cinmix provides a smaller native paint tool port reimplementing the basic Pinta pencil, brush, bucket, shapes, and history workflow using freestanding C. This is not upstream Pinta or its full GUI and does not bundle upstream artwork.
-Port modules: src/pinta.c and kernel painter UI, using Pinta.Core and Pinta.Tools as behavioral references.

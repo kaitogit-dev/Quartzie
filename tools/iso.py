@@ -1,108 +1,104 @@
+import math
 import pathlib
 import struct
 import sys
 
-BLOCK = 2048
-BOOT_LBA = 32
-KERNEL_BLOCKS = 160
+SECTOR = 2048
 CATALOG_LBA = 20
-ROOT_LBA = 22
-README_LBA = BOOT_LBA + 1 + KERNEL_BLOCKS
+ROOT_LBA = 21
+PATH_L_LBA = 22
+PATH_M_LBA = 23
+ESP_LBA = 32
 
 
-def dual16(value):
+def both16(value):
     return struct.pack('<H', value) + struct.pack('>H', value)
 
 
-def dual32(value):
+def both32(value):
     return struct.pack('<I', value) + struct.pack('>I', value)
 
 
-def datetime7():
-    return bytes([126, 10, 14, 0, 0, 0, 0])
+def record(lba, size, name, flags=0):
+    encoded = name.encode('ascii') if isinstance(name, str) else name
+    length = 33 + len(encoded) + (len(encoded) % 2 == 0)
+    result = bytearray(length)
+    result[0] = length
+    result[2:10] = both32(lba)
+    result[10:18] = both32(size)
+    result[18:25] = bytes([126, 10, 19, 0, 0, 0, 0])
+    result[25] = flags
+    result[28:32] = both16(1)
+    result[32] = len(encoded)
+    result[33:33+len(encoded)] = encoded
+    return result
 
 
-def record(name, extent, length, flags=0):
-    identifier = name if isinstance(name, bytes) else name.encode('ascii')
-    pad = b'\0' if not len(identifier) % 2 else b''
-    size = 33 + len(identifier) + len(pad)
-    return bytes([size, 0]) + dual32(extent) + dual32(length) + datetime7() + bytes([flags, 0, 0]) + dual16(1) + bytes([len(identifier)]) + identifier + pad
+def descriptor(kind, ident=b'CD001'):
+    result = bytearray(SECTOR)
+    result[0] = kind
+    result[1:6] = ident
+    result[6] = 1
+    return result
 
 
-def padded(content, blocks=1):
-    if len(content) > blocks * BLOCK:
-        raise ValueError('Sector capacity exceeded')
-    return content.ljust(blocks * BLOCK, b'\0')
-
-
-def create(bootpath, kernelpath, readmepath, destination):
-    boot = pathlib.Path(bootpath).read_bytes()
-    kernel = pathlib.Path(kernelpath).read_bytes()
-    readme = pathlib.Path(readmepath).read_bytes()
-    if len(boot) != 512 or boot[510:512] != b'\x55\xaa':
-        raise ValueError('Invalid CD boot sector')
-    if len(kernel) > KERNEL_BLOCKS * BLOCK:
-        raise ValueError('Kernel is too large')
-    if len(readme) > BLOCK:
-        raise ValueError('README is too large')
-    sectors = README_LBA + 1
-    image = bytearray(sectors * BLOCK)
-
-    def setblock(index, data):
-        if len(data) > BLOCK:
-            raise ValueError('Block overflow')
-        image[index * BLOCK:index * BLOCK + len(data)] = data
-
-    entries = [record(b'\0', ROOT_LBA, BLOCK, 2), record(b'\1', ROOT_LBA, BLOCK, 2), record('BOOT.CAT;1', CATALOG_LBA, BLOCK), record('QUARTZIE.BIN;1', BOOT_LBA, (1 + KERNEL_BLOCKS) * BLOCK), record('README.TXT;1', README_LBA, len(readme))]
-    directory = b''.join(entries)
-    setblock(ROOT_LBA, directory)
-
-    pvd = bytearray(BLOCK)
-    pvd[0:7] = b'\x01CD001\x01'
-    pvd[8:40] = b'QUARTZIE'.ljust(32, b' ')
-    pvd[40:72] = b'QUARTZIE_0_32'.ljust(32, b' ')
-    pvd[80:88] = dual32(sectors)
-    pvd[120:124] = dual16(1)
-    pvd[124:128] = dual16(1)
-    pvd[128:132] = dual16(BLOCK)
-    pvd[132:140] = dual32(10)
-    struct.pack_into('<I', pvd, 140, 19)
-    struct.pack_into('>I', pvd, 148, 21)
-    pvd[156:190] = record(b'\0', ROOT_LBA, BLOCK, 2)
-    pvd[881] = 1
-    setblock(16, pvd)
-
-    boot_record = bytearray(BLOCK)
-    boot_record[0:7] = b'\x00CD001\x01'
-    boot_record[7:39] = b'EL TORITO SPECIFICATION'.ljust(32, b'\0')
-    struct.pack_into('<I', boot_record, 71, CATALOG_LBA)
-    setblock(17, boot_record)
-    setblock(18, b'\xffCD001\x01')
-
-    path_l = bytes([1, 0]) + struct.pack('<I', ROOT_LBA) + struct.pack('<H', 1) + b'\0\0'
-    path_b = bytes([1, 0]) + struct.pack('>I', ROOT_LBA) + struct.pack('>H', 1) + b'\0\0'
-    setblock(19, path_l)
-    setblock(21, path_b)
-
-    validation = bytearray(32)
-    validation[0] = 1
-    validation[4:28] = b'QUARTZIE 0.32'.ljust(24, b' ')
-    validation[30:32] = b'\x55\xaa'
-    checksum = -sum(struct.unpack('<16H', validation)) & 0xffff
-    struct.pack_into('<H', validation, 28, checksum)
-    initial = bytearray(32)
-    initial[0] = 0x88
-    struct.pack_into('<H', initial, 6, 4)
-    struct.pack_into('<I', initial, 8, BOOT_LBA)
-    setblock(CATALOG_LBA, validation + initial)
-
-    setblock(BOOT_LBA, padded(boot))
-    offset = (BOOT_LBA + 1) * BLOCK
-    image[offset:offset + KERNEL_BLOCKS * BLOCK] = padded(kernel, KERNEL_BLOCKS)
-    setblock(README_LBA, readme)
-    pathlib.Path(destination).write_bytes(image)
-    print(f'Created {destination}: {len(image)} bytes, {len(kernel)} kernel bytes')
+def create(esp):
+    if len(esp) % SECTOR:
+        esp += bytes(SECTOR - len(esp) % SECTOR)
+    esp_sectors = len(esp) // SECTOR
+    sectors = ESP_LBA + esp_sectors
+    iso = bytearray(sectors * SECTOR)
+    main = descriptor(1)
+    main[8:40] = b'QUARTZIE'.ljust(32, b' ')
+    main[40:72] = b'QUARTZIE_X64_UEFI'.ljust(32, b' ')
+    main[80:88] = both32(sectors)
+    main[120:124] = both16(1)
+    main[124:128] = both16(1)
+    main[128:132] = both16(SECTOR)
+    main[132:140] = both32(10)
+    struct.pack_into('<I', main, 140, PATH_L_LBA)
+    struct.pack_into('>I', main, 148, PATH_M_LBA)
+    main[156:190] = record(ROOT_LBA, SECTOR, b'\x00', 2)
+    main[881] = 1
+    boot = descriptor(0)
+    boot[7:30] = b'EL TORITO SPECIFICATION'
+    struct.pack_into('<I', boot, 71, CATALOG_LBA)
+    iso[16*SECTOR:17*SECTOR] = main
+    iso[17*SECTOR:18*SECTOR] = boot
+    iso[18*SECTOR:19*SECTOR] = descriptor(255)
+    catalog = bytearray(SECTOR)
+    catalog[0] = 1
+    catalog[1] = 0xef
+    catalog[4:4+18] = b'QUARTZIE UEFI BOOT'
+    catalog[30:32] = b'\x55\xaa'
+    validation = struct.unpack('<16H', catalog[:32])
+    struct.pack_into('<H', catalog, 28, (-sum(validation)) & 0xffff)
+    catalog[32] = 0x88
+    catalog[33] = 0
+    struct.pack_into('<H', catalog, 38, 4)
+    struct.pack_into('<I', catalog, 40, ESP_LBA)
+    iso[CATALOG_LBA*SECTOR:(CATALOG_LBA+1)*SECTOR] = catalog
+    root = bytearray(SECTOR)
+    parts = [record(ROOT_LBA, SECTOR, b'\x00', 2),
+             record(ROOT_LBA, SECTOR, b'\x01', 2),
+             record(CATALOG_LBA, SECTOR, 'BOOT.CAT;1'),
+             record(ESP_LBA, len(esp), 'EFI.IMG;1')]
+    offset = 0
+    for part in parts:
+        root[offset:offset+len(part)] = part
+        offset += len(part)
+    iso[ROOT_LBA*SECTOR:(ROOT_LBA+1)*SECTOR] = root
+    path = bytearray(10)
+    path[0] = 1
+    struct.pack_into('<I', path, 2, ROOT_LBA)
+    struct.pack_into('<H', path, 6, 1)
+    iso[PATH_L_LBA*SECTOR:PATH_L_LBA*SECTOR+10] = path
+    struct.pack_into('>I', path, 2, ROOT_LBA)
+    struct.pack_into('>H', path, 6, 1)
+    iso[PATH_M_LBA*SECTOR:PATH_M_LBA*SECTOR+10] = path
+    iso[ESP_LBA*SECTOR:] = esp
+    return iso
 
 
 if __name__ == '__main__':
-    create(*sys.argv[1:])
+    pathlib.Path(sys.argv[2]).write_bytes(create(pathlib.Path(sys.argv[1]).read_bytes()))

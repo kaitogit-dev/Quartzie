@@ -1,0 +1,34 @@
+#ifndef QUARTZIE_UI_H
+#define QUARTZIE_UI_H
+#include <stdint.h>
+#define Q_MAX_W 1920
+#define Q_MAX_H 1080
+#define Q_APPS 6
+#define Q_FILES 0
+#define Q_NOTES 1
+#define Q_TERMINAL 2
+#define Q_CALCULATOR 3
+#define Q_SETTINGS 4
+#define Q_ABOUT 5
+typedef struct {
+    int x,y,w,h,open,z;
+} QWindow;
+typedef struct {
+    int width,height,mouse_x,mouse_y,dirty,theme,accent;
+    int menu,notifications,quick,active,drag,drag_x,drag_y;
+    int pressed,last_button,frame_count;
+    int note_length,command_length,calc_length;
+    char notes[2048],command[128],calc[64],answer[64],status[96];
+    QWindow windows[Q_APPS];
+    uint32_t *pixels,*wallpaper,*blurred;
+} QDesktop;
+void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
+void q_draw(QDesktop *q);
+void q_click(QDesktop *q,int x,int y);
+void q_press(QDesktop *q,int x,int y);
+void q_release(QDesktop *q);
+void q_move(QDesktop *q,int x,int y);
+void q_key(QDesktop *q,uint16_t ch,uint16_t scan);
+void q_open(QDesktop *q,int app);
+int q_dock_hit(QDesktop *q,int x,int y);
+#endif
