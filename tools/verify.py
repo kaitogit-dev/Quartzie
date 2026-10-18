@@ -67,14 +67,14 @@ def check(iso_path, boot_path, kernel_path, elf_path):
     assert b'\xc7\x06\x14\x72\x00\x1e' in kernel
     assert b'\xb8\x80\x07' in kernel[:512]
     assert b'\xb8\x38\x04' in kernel[:512]
-    assert b'QUARTZIE_0_24' in sector(16)
-    assert b'QUARTZIE 0.24' in entry
+    assert b'QUARTZIE_0_25' in sector(16)
+    assert b'QUARTZIE 0.25' in entry
     assert b'KERNEL32.DLL' in kernel
     assert b'runpe ' in kernel
     for symbol in ('cm_pe_load', 'cm_proc_launch_pe', 'cm_pe_error',
                    'cm_enter_userspace', 'cm_irq0_stub', 'cm_syscall_stub',
                    'cm_gp_stub', 'cm_pf_stub', 'cm_proc_initialize',
-                   'cm_proc_interrupt', 'cm_user_binary_start', 'cm_user_binary_end'):
+                   'cm_proc_interrupt', 'cm_proc_has_work', 'cm_irq_unexpected_stub', 'cm_user_binary_start', 'cm_user_binary_end'):
         assert symbol in symbols, f'Missing protected-mode process symbol: {symbol}'
     user_binary_start = symbols['cm_user_binary_start'] - 0x10000
     user_binary_end = symbols['cm_user_binary_end'] - 0x10000
@@ -101,7 +101,7 @@ def check(iso_path, boot_path, kernel_path, elf_path):
     print('PASS: BIOS CD boot stage and DAP address operand')
     print('PASS: Protected mode kernel entry and BSS initialization operands')
     print('PASS: 1920x1080x32 VBE/Bochs mode-selection instructions and 7680-byte pitch')
-    print('PASS: ring-3 IRET, CR3 switching, syscall gate, timer IRQ and protection-fault stubs')
+    print('PASS: ring-3 IRET, CR3 switching, syscall gate, timer IRQ, unexpected-IRQ recovery and protection-fault stubs')
     print(f'ISO: {len(iso)} bytes')
     print(f'KERNEL: {len(kernel)} bytes')
 

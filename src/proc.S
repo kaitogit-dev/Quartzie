@@ -3,6 +3,7 @@
 .section .text
 .global cm_enter_userspace
 .global cm_irq0_stub
+.global cm_irq_unexpected_stub
 .global cm_syscall_stub
 .global cm_gp_stub
 .global cm_pf_stub
@@ -28,6 +29,14 @@ cm_enter_userspace:
     mov cr3, eax
     mov esp, dword ptr [cm_run_frame]
     jmp cm_restore_trap
+cm_irq_unexpected_stub:
+    pushad
+    push ds
+    push es
+    push fs
+    push gs
+    mov eax, 3
+    jmp cm_dispatch_trap
 cm_irq0_stub:
     pushad
     push ds

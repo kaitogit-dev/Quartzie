@@ -51,7 +51,7 @@ static void open_and_close(int *state, int panel, const char *preview) {
     check(panel_step[panel] == PANEL_STEPS);
     *state = 0;
     dirty = 1;
-    frames(9);
+    frames(PANEL_STEPS + 1);
     check(panel_step[panel] == 0 && !panel_visible(panel) && panel_goal[panel] == 0);
     assert_clean();
 }
@@ -73,7 +73,7 @@ int main(void) {
     memcpy(clean_canvas,canvas,(size_t)sw * sh * sizeof(uint32_t));
     start_open = 1;
     dirty = 1;
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < PANEL_STEPS + 2; i++) {
         char filename[48];
         frame();
         snprintf(filename, sizeof(filename), "build/tween-%02d.ppm", i);
@@ -81,7 +81,7 @@ int main(void) {
     }
     start_open = 0;
     dirty = 1;
-    for (int i = 9; i < 18; i++) {
+    for (int i = PANEL_STEPS + 2; i < 2 * (PANEL_STEPS + 2); i++) {
         char filename[48];
         frame();
         snprintf(filename, sizeof(filename), "build/tween-%02d.ppm", i);

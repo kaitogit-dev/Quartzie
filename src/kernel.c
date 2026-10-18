@@ -180,7 +180,7 @@ static int last_tab_selected;
 #define PANEL_SWITCHER 5
 #define PANEL_TOOLTIP 6
 #define PANEL_COUNT 7
-#define PANEL_STEPS 6
+#define PANEL_STEPS 18
 static uint8_t panel_step[PANEL_COUNT];
 static uint8_t panel_goal[PANEL_COUNT];
 static uint8_t panel_was_visible[PANEL_COUNT];
@@ -492,18 +492,23 @@ static void rect(int x, int y, int w, int h, uint32_t color) {
     if (y0 < 0) y0 = 0;
     if (x1 > sw) x1 = sw;
     if (y1 > sh) y1 = sh;
+    int width = x1 - x0;
+    if (width <= 0) return;
     for (int py = y0; py < y1; py++) {
-        uint32_t *line = canvas + (size_t)py * (size_t)sw;
-        for (int px = x0; px < x1; px++) line[px] = color;
+        uint32_t *line = canvas + (size_t)py * (size_t)sw + x0;
+        if (width >= 64) {
+            uint32_t *dst = line;
+            size_t count = (size_t)width;
+            __asm__ volatile("cld; rep stosl" : "+D"(dst), "+c"(count) : "a"(color) : "memory");
+        } else for (int px = 0; px < width; px++) line[px] = color;
     }
 }
 
 static uint32_t blend(uint32_t a, uint32_t b, int weight) {
     int inv = 256 - weight;
-    uint32_t r = (((a >> 16) & 255) * inv + ((b >> 16) & 255) * weight) >> 8;
-    uint32_t g = (((a >> 8) & 255) * inv + ((b >> 8) & 255) * weight) >> 8;
-    uint32_t c = ((a & 255) * inv + (b & 255) * weight) >> 8;
-    return (r << 16) | (g << 8) | c;
+    uint32_t rb = ((((a & 0x00ff00ffu) * (uint32_t)inv) + ((b & 0x00ff00ffu) * (uint32_t)weight)) >> 8) & 0x00ff00ffu;
+    uint32_t g = ((((a & 0x0000ff00u) * (uint32_t)inv) + ((b & 0x0000ff00u) * (uint32_t)weight)) >> 8) & 0x0000ff00u;
+    return rb | g;
 }
 
 static int ease(int now, int total) {
@@ -545,10 +550,14 @@ static void panel_sync(void) {
 }
 
 static void panel_advance(void) {
+    int steps = animation_step_allowed > 0 ? animation_step_allowed : 1;
     for (int i = 0; i < PANEL_COUNT; i++) {
-        if (panel_step[i] < panel_goal[i]) panel_step[i]++;
-        else if (panel_step[i] > panel_goal[i]) {
-            panel_step[i]--;
+        if (panel_step[i] < panel_goal[i]) {
+            int next = panel_step[i] + steps;
+            panel_step[i] = (uint8_t)(next > panel_goal[i] ? panel_goal[i] : next);
+        } else if (panel_step[i] > panel_goal[i]) {
+            int next = panel_step[i] - steps;
+            panel_step[i] = (uint8_t)(next < panel_goal[i] ? panel_goal[i] : next);
             if (!panel_step[i]) dirty = 1;
         }
     }
@@ -804,13 +813,13 @@ static void glass_button(int x, int y, int w, int h, uint32_t tint, int strength
 
 static void soft_shadow(int x, int y, int w, int h, int radius, int depth) {
     if (w <= 0 || h <= 0) return;
-    for (int d = 16; d >= 1; d--) {
+    for (int d = 16; d >= 2; d -= 2) {
         int rr = radius + d;
         int xx = x - d;
         int yy = y - d + depth;
         int ww = w + d * 2;
         int hh = h + d * 2;
-        int strength = 4 + (17 - d) * 2;
+        int strength = 7 + (17 - d) * 3;
         glass(xx + rr, yy, ww - rr * 2, 1, 0x091321, strength);
         glass(xx + rr, yy + hh - 1, ww - rr * 2, 1, 0x091321, strength);
         glass(xx, yy + rr, 1, hh - rr * 2, 0x091321, strength);
@@ -1304,7 +1313,7 @@ static void execute_command(void) {
     log_write(linebuf);
     if (!console_len) return;
     if (same(console_input, "help")) print_info();
-    else if (same(console_input, "ver")) log_write("Quartzie 0.24  |  PE32 executable loader  |  i386");
+    else if (same(console_input, "ver")) log_write("Quartzie 0.25  |  PE32 executable loader  |  i386");
     else if (same(console_input, "clear")) log_count = 0;
     else if (same(console_input, "context")) log_write("Right click on desktop");
     else if (same(console_input, "dark")) { select_theme(3); log_write("Dark Aero enabled"); }
@@ -1317,7 +1326,7 @@ static void execute_command(void) {
         log_write("/ram/readme.txt");
         log_write("/ram/boot.log");
         log_write("/ram/notes.txt");
-    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.24; PE32/CUI; .NET/GTK not yet available");
+    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.25; PE32/CUI; .NET/GTK not yet available");
     else if (same(console_input, "cat boot.log")) log_write("El Torito -> kernel -> protected mode -> UI");
     else if (same(console_input, "cat notes.txt")) {
         char one[72] = "";
@@ -1397,6 +1406,14 @@ static void execute_command(void) {
         log_write(cm_proc_fault_demo() ? "Ring 3 privilege fault queued" : "Privilege fault test unavailable");
     }
 #endif
+    else if (same(console_input, "renderstat")) {
+        char line[72] = "Compositor frames (full / partial / cursor): ", n[12];
+        number(n, full_frames); append(line, n, 72); append(line, " / ", 72);
+        number(n, damage_frames); append(line, n, 72); append(line, " / ", 72);
+        number(n, pointer_frames); append(line, n, 72); log_write(line);
+        line[0] = 0; append(line, "Pixels sent to display: ", 72);
+        number(n, presented_pixels); append(line, n, 72); log_write(line);
+    }
     else if (same(console_input, "cpu")) log_write(cpu_vendor);
     else if (same(console_input, "date")) { log_write(clock_date); log_write(clock_time); }
     else if (same(console_input, "screen")) {
@@ -2035,10 +2052,10 @@ static void window_content(int app, const Window *w) {
     } else if (app == SYSTEM) {
         rect(x, y, cw, 4, BLUE);
         big_text(x + 21, y + 22, "QUARTZIE", INK);
-        text(x + 24, y + 62, "RELEASE 0.24", STEEL);
+        text(x + 24, y + 62, "RELEASE 0.25", STEEL);
         rect(x + 21, y + 91, cw - 42, 1, HAIR);
         text(x + 24, y + 106, "Kernel", STEEL);
-        text(x + 166, y + 106, "Quartzie 0.24", INK);
+        text(x + 166, y + 106, "Quartzie 0.25", INK);
         text(x + 24, y + 134, "Target", STEEL);
         text(x + 166, y + 134, "i386 protected", INK);
         text(x + 24, y + 162, "Firmware", STEEL);
@@ -2099,7 +2116,7 @@ static void window_content(int app, const Window *w) {
             text(x + 55, yy + 9, pages[k], settings_page == k ? INK : INK2);
         }
         rect(x + 22, y + ch - 75, nw - 20, 1, HAIR);
-        text(x + 27, y + ch - 57, "Quartzie 0.24", STEEL);
+        text(x + 27, y + ch - 57, "Quartzie 0.25", STEEL);
         text(x + 27, y + ch - 37, "1920 x 1080", STEEL);
         big_text(mx, y + 18, pages[settings_page], INK);
         if (settings_page == 1) {
@@ -2193,7 +2210,7 @@ static void window_content(int app, const Window *w) {
         } else {
             text(mx + 2, y + 61, "About Quartzie", STEEL);
             rounded(mx, y + 93, mw, 222, 12, UI_CARD);
-            big_text(mx + 20, y + 116, "Quartzie 0.24", INK);
+            big_text(mx + 20, y + 116, "Quartzie 0.25", INK);
             text(mx + 23, y + 162, "32-bit i386 operating system", STEEL);
             text(mx + 23, y + 193, "Legacy BIOS / El Torito boot", STEEL);
             text(mx + 23, y + 224, "Aero desktop with Dark Aero", STEEL);
@@ -2320,6 +2337,7 @@ static void window_content(int app, const Window *w) {
     if ((!w->opened || w->minimized) && !anim_visible[i]) return;
     int x, y, ww, hh;
     animated_window_rect(i, &x, &y, &ww, &hh);
+    if (x >= clip_right + 40 || y >= clip_bottom + 40 || x + ww + 40 <= clip_left || y + hh + 40 <= clip_top) return;
     int focused = active_window() == i;
     soft_shadow(x, y, ww, hh, 16, 7);
     round_capture(x + 8, y + 12, ww, hh, 18);
@@ -2758,8 +2776,10 @@ static void present_region(int x, int y, int w, int h) {
     uint8_t *base = (uint8_t *)(uintptr_t)boot_fb;
     for (int yy = y; yy < y + h; yy++) {
         if (boot_bpp == 32) {
-            volatile uint32_t *dst = (volatile uint32_t *)(base + (uint32_t)yy * boot_pitch);
-            for (int xx = x; xx < x + w; xx++) dst[xx] = canvas[(size_t)yy * sw + xx];
+            uint32_t *dst = (uint32_t *)(base + (uint32_t)yy * boot_pitch) + x;
+            const uint32_t *src = canvas + (size_t)yy * sw + x;
+            size_t count = (size_t)w;
+            __asm__ volatile("cld; rep movsl" : "+D"(dst), "+S"(src), "+c"(count) : : "memory");
         } else {
             volatile uint8_t *dst = base + (uint32_t)yy * boot_pitch;
             for (int xx = x; xx < x + w; xx++) {
@@ -2801,9 +2821,10 @@ static void present(void) {
     uint8_t *base = (uint8_t *)(uintptr_t)boot_fb;
     if (boot_bpp == 32) {
         for (int y = 0; y < sh; y++) {
-            volatile uint32_t *dst = (volatile uint32_t *)(base + (uint32_t)y * boot_pitch);
+            uint32_t *dst = (uint32_t *)(base + (uint32_t)y * boot_pitch);
             const uint32_t *src = canvas + (size_t)y * (size_t)sw;
-            for (int x = 0; x < sw; x++) dst[x] = src[x];
+            size_t count = (size_t)sw;
+            __asm__ volatile("cld; rep movsl" : "+D"(dst), "+S"(src), "+c"(count) : : "memory");
         }
     } else {
         for (int y = 0; y < sh; y++) {
@@ -3028,23 +3049,22 @@ static void repaint(void) {
     taskbar_dirty = 0;
     dirty = 0;
     if (animation_step_allowed) {
+        int steps = animation_step_allowed;
         panel_advance();
         for (int i = 0; i < APPS; i++) {
             if (anim_ticks[i] > 0) {
-                anim_ticks[i]--;
-                if (!anim_ticks[i]) {
-                    anim_visible[i] = 0;
-                    dirty = 1;
-                }
+                anim_ticks[i] = anim_ticks[i] > steps ? anim_ticks[i] - steps : 0;
+                if (!anim_ticks[i]) { anim_visible[i] = 0; dirty = 1; }
             }
         }
-        if (start_anim > 0) start_anim--;
-        if (context_anim > 0) context_anim--;
-        if (quick_anim > 0) quick_anim--;
-        if (notification_anim > 0) notification_anim--;
-        if (run_anim > 0) run_anim--;
+        if (start_anim > 0) start_anim = start_anim > steps ? start_anim - steps : 0;
+        if (context_anim > 0) context_anim = context_anim > steps ? context_anim - steps : 0;
+        if (quick_anim > 0) quick_anim = quick_anim > steps ? quick_anim - steps : 0;
+        if (notification_anim > 0) notification_anim = notification_anim > steps ? notification_anim - steps : 0;
+        if (run_anim > 0) run_anim = run_anim > steps ? run_anim - steps : 0;
         for (int i = 0; i < APPS; i++) if (icon_motion[i]) {
-            if (++icon_frame[i] >= TASK_ICON_FRAMES) { icon_frame[i] = 0; icon_motion[i] = 0; }
+            icon_frame[i] = (uint8_t)(icon_frame[i] + steps);
+            if (icon_frame[i] >= TASK_ICON_FRAMES) { icon_frame[i] = 0; icon_motion[i] = 0; }
             taskbar_dirty = 1;
             dirty = 1;
         }
@@ -3845,8 +3865,9 @@ static int advance_frame_counter(uint16_t sample) {
     timer_unchanged = 0;
     timer_accum += elapsed;
     if (timer_accum < 9943) return 0;
+    int pulses = (int)(timer_accum / 9943);
     timer_accum %= 9943;
-    return 1;
+    return pulses > 6 ? 6 : pulses;
 }
 
 static void init_frame_clock(void) {
@@ -3914,11 +3935,11 @@ void kmain(void) {
         files_restore();
         log_write("QuartzieFS disk mounted at D: (ATA IDE)");
     } else log_write("RAM only: attach Quartzie disk to enable persistence");
-    log_write("Quartzie kernel 0.24 / PE32 loader");
+    log_write("Quartzie kernel 0.25 / stable compositor");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.24 is ready");
+    notify("Quartzie 0.25 is ready");
     repaint();
 #ifdef __i386__
     int cm_userspace_ready = cm_proc_initialize();
@@ -3929,7 +3950,7 @@ void kmain(void) {
     for (;;) {
         if ((++cycles & 16383u) == 0) refresh_clock();
 #ifdef __i386__
-        if (cm_userspace_ready && ((cycles & 65535u) == 0 || cm_paint_pending())) {
+        if (cm_userspace_ready && (cm_paint_pending() || (!(cycles & 65535u) && cm_proc_has_work()))) {
             cm_proc_run();
             if (cm_paint_collect(&sketch_pixels[0][0], SKETCH_W * SKETCH_H)) dirty = 1;
             if (pe_reported_exits != cm_pe_completed) {

@@ -66,7 +66,7 @@ static void storage_delay(void) {
 }
 
 static int storage_wait(int need_data) {
-    for (uint32_t i = 0; i < 1000000; i++) {
+    for (uint32_t i = 0; i < 100000; i++) {
         uint8_t status = in8(0x1f7);
         if (status == 0 || status == 0xff || (status & 0x21)) return 0;
         if (!(status & 0x80) && (!need_data || (status & 8))) return 1;

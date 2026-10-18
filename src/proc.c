@@ -183,6 +183,11 @@ static uint32_t cm_interrupt_policy(CmInterruptFrame *frame, int reason) {
 
 uint32_t cm_proc_interrupt(CmInterruptFrame *frame, int reason) {
 #ifndef CINMIX_HOST_TEST
+    if (reason == 3) {
+        __asm__ volatile ("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0xa0));
+        __asm__ volatile ("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0x20));
+        return 0;
+    }
     if (reason == 0) {
         __asm__ volatile ("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0x20));
         cm_timer_acks++;
@@ -282,6 +287,12 @@ int cm_paint_pending(void) {
     return cm_paint_mailbox()->command == CM_PAINT_STAMP;
 }
 
+int cm_proc_has_work(void) {
+    if (!cm_proc_ready) return 0;
+    if (cm_paint_pending()) return 1;
+    return cm_pe_launches != cm_pe_completed && cm_user_tasks[1].state == CM_THREAD_READY;
+}
+
 int cm_paint_submit(int x, int y, uint32_t color, uint32_t radius) {
     if (!cm_proc_ready || cm_user_tasks[0].state != CM_THREAD_READY || x < 0 || y < 0 ||
         x >= (int)CM_PAINT_WIDTH || y >= (int)CM_PAINT_HEIGHT || color > 255 || radius > 12) return 0;
@@ -343,6 +354,7 @@ void cm_proc_reset_stats(void) {
 #ifndef CINMIX_HOST_TEST
 extern void cm_enter_userspace(void);
 extern void cm_irq0_stub(void);
+extern void cm_irq_unexpected_stub(void);
 extern void cm_syscall_stub(void);
 extern void cm_gp_stub(void);
 extern void cm_pf_stub(void);
@@ -379,6 +391,7 @@ static void cm_prepare_tables(void) {
     cm_fill_gate(13u, (uintptr_t)cm_gp_stub, 0x8eu);
     cm_fill_gate(14u, (uintptr_t)cm_pf_stub, 0x8eu);
     cm_fill_gate(32u, (uintptr_t)cm_irq0_stub, 0x8eu);
+    for (uint32_t irq = 33u; irq <= 47u; irq++) cm_fill_gate(irq, (uintptr_t)cm_irq_unexpected_stub, 0x8eu);
     cm_fill_gate(128u, (uintptr_t)cm_syscall_stub, 0xeeu);
     CmRegisterDescriptor gdt_descriptor = {(uint16_t)(sizeof(cm_gdt) - 1u), (uint32_t)(uintptr_t)cm_gdt};
     CmRegisterDescriptor idt_descriptor = {(uint16_t)(sizeof(cm_idt) - 1u), (uint32_t)(uintptr_t)cm_idt};
@@ -442,6 +455,8 @@ void cm_proc_run(void) {
         volatile uint32_t *preemptive = (volatile uint32_t *)(uintptr_t)(cm_user_tasks[1].physical_base + 0x2004u);
         *preemptive = 1;
     }
+    if (cm_paint_pending()) cm_last_selected = CM_USER_COUNT - 1u;
+    else if (cm_pe_launches != cm_pe_completed && cm_user_tasks[1].state == CM_THREAD_READY) cm_last_selected = 0;
     if (!cm_select_next()) return;
     cm_user_slices++;
     cm_program_pit((uint16_t)CM_PIT_DIVISOR);

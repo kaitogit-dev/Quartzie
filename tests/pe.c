@@ -17,6 +17,7 @@ int main(void) {
     REQUIRE(cm_pe_launches==0);
     REQUIRE(cm_proc_launch_pe(pe,(uint32_t)size)==CM_PE_OK);
     REQUIRE(cm_pe_launches==1);
+    REQUIRE(cm_proc_has_work());
     REQUIRE(cm_user_tasks[1].state==CM_THREAD_READY && cm_user_tasks[1].pid==201);
     REQUIRE(((CmInterruptFrame *)(uintptr_t)cm_user_tasks[1].frame)->eip==CM_PE_BASE+0x1000);
     uint8_t *space=(uint8_t *)(uintptr_t)cm_user_tasks[1].physical_base;
@@ -56,6 +57,8 @@ int main(void) {
     REQUIRE(cm_proc_interrupt(second,1)==cm_user_tasks[0].frame);
     REQUIRE(cm_user_tasks[1].state==CM_THREAD_STOPPED);
     REQUIRE(cm_pe_completed==1 && cm_pe_last_exit==42);
+    REQUIRE(cm_proc_has_work()==0);
+
     REQUIRE(cm_proc_active_tasks()==1);
     REQUIRE(cm_proc_launch_pe(pe,(uint32_t)size)==CM_PE_OK);
     REQUIRE(cm_user_tasks[1].pid==203 && cm_pe_launches==3);

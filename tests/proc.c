@@ -14,6 +14,7 @@ int main(void) {
     CHECK(sizeof(CmInterruptFrame) == 68);
     CHECK(cm_proc_initialize());
     CHECK(cm_proc_enabled());
+    CHECK(!cm_proc_has_work());
     CHECK(cm_proc_active_tasks() == 2);
     CHECK((cm_kernel_address_space & 0xfffu) == 0);
     CHECK((cm_page_directories[0][CM_USER_PAGE_INDEX] & CM_PAGE_USER) == 0);
@@ -38,6 +39,11 @@ int main(void) {
     *(uint32_t *)(uintptr_t)(cm_user_tasks[1].physical_base + 0x2000) = 99;
     CHECK(cm_proc_counter(0) == 17);
     CHECK(cm_proc_counter(1) == 99);
+    CmPaintMailbox *pending = (CmPaintMailbox *)(uintptr_t)(cm_user_tasks[0].physical_base + 0x2100u);
+    pending->command = CM_PAINT_STAMP;
+    CHECK(cm_proc_has_work());
+    pending->command = 0;
+    CHECK(!cm_proc_has_work());
     cm_proc_run();
     CHECK(cm_current == 0);
     CmInterruptFrame *first = (CmInterruptFrame *)(uintptr_t)cm_user_tasks[0].frame;
