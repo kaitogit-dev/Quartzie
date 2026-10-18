@@ -24,7 +24,7 @@ int q_ps2_enable(void){
     if(cfg<0)return 0;
     if(!command(0x60)||!data((uint8_t)(cfg&~0x22u)))return 0;
     if(!mouse_command(0xf6))return 0;
-    return mouse_command(0xf4);
+    return mouse_command(0xf0);
 }
 int q_ps2_feed(QPs2Mouse *mouse,uint8_t value,int *dx,int *dy,int *buttons){
     if(mouse->index==0){
@@ -41,11 +41,14 @@ int q_ps2_feed(QPs2Mouse *mouse,uint8_t value,int *dx,int *dy,int *buttons){
     return 1;
 }
 int q_ps2_poll(QPs2Mouse *mouse,int *dx,int *dy,int *buttons){
-    for(int n=0;n<24;n++){
-        uint8_t status=in8(0x64);
-        if(!(status&1)||!(status&0x20u))return 0;
-        q_ps2_bytes_seen++;
-        if(q_ps2_feed(mouse,in8(0x60),dx,dy,buttons))return 1;
-    }
-    return 0;
+    if(!command(0xd4)||!data(0xeb))return 0;
+    if(read_aux()!=0xfa)return 0;
+    int status=read_aux(),mx=read_aux(),my=read_aux();
+    if(status<0||mx<0||my<0)return 0;
+    q_ps2_bytes_seen+=3;
+    mouse->index=0;
+    int a=q_ps2_feed(mouse,(uint8_t)status,dx,dy,buttons);
+    int b=q_ps2_feed(mouse,(uint8_t)mx,dx,dy,buttons);
+    int c=q_ps2_feed(mouse,(uint8_t)my,dx,dy,buttons);
+    return a||b||c;
 }
