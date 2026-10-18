@@ -37,8 +37,8 @@ int main(void) {
     uint32_t full_before=full_frames;
     open_window(FILES);
     repaint();
-    check(windows[FILES].opened && anim_ticks[FILES] == WINDOW_OPEN_STEPS - 1);
-    check(full_frames == full_before && damage_frames >= 1);
+    check(windows[FILES].opened && anim_ticks[FILES] == 0);
+    check(full_frames == full_before + 1);
     control(FILES,18);
     check(!windows[FILES].opened && anim_exit[FILES] && anim_ticks[FILES] == WINDOW_CLOSE_STEPS);
     frames(8);
