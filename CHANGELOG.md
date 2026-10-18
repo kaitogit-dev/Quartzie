@@ -2,6 +2,15 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.32 — Input dispatcher rewrite
+
+- Replace the old chained popup-first mouse handler with an explicit taskbar/Start/system-dock dispatcher that routes its click before dismissing any open popup.
+- Allow clicks outside notifications, Quick Panel, context menu, Run, and Start to reach their real targets after the popup is dismissed. App activation no longer consumes the click just to close notifications.
+- Immediately discard stale popup render layers when an application opens, preventing notifications from lingering over the active window after a slow frame.
+- Reject PS/2 mouse command ACK/RESEND and malformed overflow headers before building mouse packets.
+- Add end-to-end PS/2 click regression coverage for every pinned application, Start entries, notification-to-app transitions, active-window content, and 1080p framebuffer consistency.
+- Keep the existing writable CinmixFS disk format and all applications; this build is native regression tested, not yet proven inside official v86.
+
 ## Quartzie 0.31 — v86 palette repair
 
 - Replace indirect theme-palette data lookups with inline theme colors, preventing dark/black desktop icons and cursor colors when palette memory or theme state is invalid.

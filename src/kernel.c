@@ -1652,22 +1652,34 @@ static void toggle_desktop(void) {
     dirty = 1;
 }
 
+static void dismiss_popup_layers(void) {
+    start_open = 0;
+    context_open = 0;
+    quick_open = 0;
+    notification_open = 0;
+    run_open = 0;
+    for (int i = PANEL_START; i <= PANEL_NOTIFICATIONS; i++) {
+        panel_step[i] = 0;
+        panel_goal[i] = 0;
+    }
+    panel_step[PANEL_RUN] = 0;
+    panel_goal[PANEL_RUN] = 0;
+    hover_visible = 0;
+    dirty = 1;
+}
+
 static void open_window(int app) {
+    if (app < 0 || app >= APPS) return;
     if (app != FILES) file_search_focus=0;
     if (app != APPEAR) settings_search_focus=0;
     desktop_focus = -1;
     desktop_hidden = 0;
-    run_open = 0;
     int was_active = active_window() == app;
     int was_minimized = windows[app].minimized;
     int was_closed = !windows[app].opened;
     int first = was_closed || was_minimized;
     if (was_active && !first && !anim_exit[app]) {
-        start_open = 0;
-        context_open = 0;
-        quick_open = 0;
-        notification_open = 0;
-        dirty = 1;
+        dismiss_popup_layers();
         return;
     }
     int new_object = !cm_window_handle(app);
@@ -1677,10 +1689,7 @@ static void open_window(int app) {
     windows[app].opened = 1;
     windows[app].minimized = 0;
     raise_window(app);
-    start_open = 0;
-    context_open = 0;
-    quick_open = 0;
-    notification_open = 0;
+    dismiss_popup_layers();
     if (first) {
         anim_ticks[app] = 0;
         anim_visible[app] = 0;
@@ -3264,8 +3273,65 @@ static void sketch_finish(int px, int py) {
     dirty = 1;
 }
 
+static int handle_dock_click(int x, int y) {
+    if (y < sh - 53) return 0;
+    if (inside(x, y, 12, sh - 52, 52, 52)) {
+        int opening = !start_open;
+        dismiss_popup_layers();
+        if (opening) {
+            start_open = 1;
+            menu_query_len = 0;
+            menu_query[0] = 0;
+            start_anim = 8;
+        }
+        dirty = 1;
+        return 1;
+    }
+    if (x >= sw - 11) {
+        dismiss_popup_layers();
+        toggle_desktop();
+        return 1;
+    }
+    if (sw >= 700 && x >= sw - 177 && x < sw - 125) {
+        int opening = !notification_open;
+        dismiss_popup_layers();
+        if (opening) {
+            notification_open = 1;
+            notification_anim = 8;
+            notification_unread = 0;
+        }
+        dirty = 1;
+        return 1;
+    }
+    if (sw >= 520 && x >= sw - 124) {
+        int opening = !quick_open;
+        dismiss_popup_layers();
+        if (opening) {
+            quick_open = 1;
+            quick_anim = 8;
+        }
+        dirty = 1;
+        return 1;
+    }
+    int app = taskbar_hit(x, y);
+    if (app >= 0) {
+        if (windows[app].opened && !windows[app].minimized && active_window() == app) {
+            dismiss_popup_layers();
+            close_window(app, 1);
+        } else open_window(app);
+        dirty = 1;
+        return 1;
+    }
+    if (y >= sh - 52) {
+        dismiss_popup_layers();
+        return 1;
+    }
+    return 0;
+}
+
 static void handle_click(void) {
     if (tab_active) { finish_switcher(0); return; }
+    if (handle_dock_click(mouse_x, mouse_y)) return;
     if (desktop_focus >= 0) { desktop_focus = -1; dirty = 1; }
     if (run_open) {
         int rx = run_left(), ry = run_top();
@@ -3276,7 +3342,6 @@ static void handle_click(void) {
         }
         run_open = 0;
         dirty = 1;
-        return;
     }
     if (notification_open) {
         int nx = notification_left(), ny = notification_top();
@@ -3304,7 +3369,6 @@ static void handle_click(void) {
         }
         notification_open = 0;
         dirty = 1;
-        return;
     }
     if (quick_open) {
         int qx = sw - quick_width() - 16;
@@ -3325,28 +3389,22 @@ static void handle_click(void) {
         }
         quick_open = 0;
         dirty = 1;
-        return;
     }
     if (context_open) {
         if (inside(mouse_x, mouse_y, context_x, context_y, context_width(), context_height())) {
             int selected = (mouse_y - context_y - 13) / 38;
+            context_open = 0;
             if (mouse_y >= context_y + 13 && selected >= 0 && selected < 5) {
-                context_open = 0;
                 if (selected == 1) open_window(APPEAR);
                 else if (selected == 2) open_window(WINDOWS_APP);
                 else if (selected == 3) toggle_desktop();
                 else if (selected == 4) toggle_dark_aero();
             }
+            dirty = 1;
+            return;
         }
         context_open = 0;
         dirty = 1;
-        return;
-    }
-    if (inside(mouse_x, mouse_y, 12, sh - 52, 52, 52)) {
-        start_open = !start_open;
-        if (start_open) { menu_query_len = 0; menu_query[0] = 0; start_anim = 8; quick_open = 0; }
-        dirty = 1;
-        return;
     }
     if (start_open) {
         int my = menu_top();
@@ -3385,24 +3443,6 @@ static void handle_click(void) {
         }
         start_open = 0;
         dirty = 1;
-        return;
-    }
-    if (mouse_y >= sh - 52) {
-        if (mouse_x >= sw - 11) { toggle_desktop(); return; }
-        if (mouse_x >= sw - 177 && mouse_x < sw - 125 && sw >= 700) {
-            notification_open = !notification_open;
-            if (notification_open) { notification_anim = 8; notification_unread = 0; }
-            quick_open = 0; start_open = 0; context_open = 0; dirty = 1;
-            return;
-        }
-        if (mouse_x >= sw - 124 && sw >= 520) { quick_open = !quick_open; if (quick_open) quick_anim = 8; notification_open = 0; start_open = 0; context_open = 0; dirty = 1; return; }
-        int id = taskbar_hit(mouse_x, mouse_y);
-        if (id >= 0) {
-            if (windows[id].opened && active_window() == id) { close_window(id, 1); }
-            else open_window(id);
-            dirty = 1;
-            return;
-        }
     }
     int stack[APPS], stack_count = 0;
     for (int i = 0; i < APPS; i++) {
@@ -3565,11 +3605,11 @@ static void handle_right_click(void) {
 }
 
 static void handle_mouse_byte(uint8_t b) {
-    if (mouse_index == 0 && !(b & 8)) return;
+    if (mouse_index == 0 && (b & 0xc8u) != 0x08u) return;
     mouse_packet[mouse_index++] = b;
     if (mouse_index != 3) return;
     mouse_index = 0;
-    if (mouse_packet[0] & 0xc0) return;
+    if ((mouse_packet[0] & 0xc8u) != 0x08u) return;
     int dx = (int8_t)mouse_packet[1];
     int dy = (int8_t)mouse_packet[2];
     int nx = mouse_x + dx;
@@ -4067,11 +4107,11 @@ void kmain(void) {
     if (theme < 0 || theme > 3) theme = 0;
     if (previous_theme < 0 || previous_theme > 2) previous_theme = 0;
     if (accent_index < 0 || accent_index > 3) accent_index = 0;
-    log_write("Quartzie kernel 0.31 / palette-safe desktop");
+    log_write("Quartzie kernel 0.32 / rebuilt UI dispatch");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.31 is ready");
+    notify("Quartzie 0.32 is ready");
     repaint();
 #ifdef __i386__
     cm_userspace_ready = 0;

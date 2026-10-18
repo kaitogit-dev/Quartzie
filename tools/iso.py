@@ -60,7 +60,7 @@ def create(bootpath, kernelpath, readmepath, destination):
     pvd = bytearray(BLOCK)
     pvd[0:7] = b'\x01CD001\x01'
     pvd[8:40] = b'QUARTZIE'.ljust(32, b' ')
-    pvd[40:72] = b'QUARTZIE_0_31'.ljust(32, b' ')
+    pvd[40:72] = b'QUARTZIE_0_32'.ljust(32, b' ')
     pvd[80:88] = dual32(sectors)
     pvd[120:124] = dual16(1)
     pvd[124:128] = dual16(1)
@@ -86,7 +86,7 @@ def create(bootpath, kernelpath, readmepath, destination):
 
     validation = bytearray(32)
     validation[0] = 1
-    validation[4:28] = b'QUARTZIE 0.31'.ljust(24, b' ')
+    validation[4:28] = b'QUARTZIE 0.32'.ljust(24, b' ')
     validation[30:32] = b'\x55\xaa'
     checksum = -sum(struct.unpack('<16H', validation)) & 0xffff
     struct.pack_into('<H', validation, 28, checksum)
