@@ -54,7 +54,17 @@ def verify_mouse(image, usb=False):
                 if b'"return"' not in response:
                     raise RuntimeError(f'QMP capabilities failed: {response!r}')
                 sock.sendall(b'{"execute":"query-mice"}\r\n')
-                print('QMP mice:', sock.recv(4096))
+                devices = json.loads(sock.recv(4096).decode('ascii'))['return']
+                print('QMP mice:', devices)
+                if usb:
+                    tablet = next((item['index'] for item in devices if item['absolute']), None)
+                    if tablet is None:
+                        raise RuntimeError('QEMU did not register the USB tablet')
+                    selection = {'execute': 'human-monitor-command', 'arguments': {'command-line': f'mouse_set {tablet}'}}
+                    sock.sendall(json.dumps(selection).encode('ascii') + b'\r\n')
+                    print('Tablet selection:', sock.recv(4096))
+                    sock.sendall(b'{"execute":"query-mice"}\r\n')
+                    print('Selected mice:', sock.recv(4096))
                 events = ([
                     {'type': 'abs', 'data': {'axis': 'x', 'value': 24000}},
                     {'type': 'abs', 'data': {'axis': 'y', 'value': 33000}},
