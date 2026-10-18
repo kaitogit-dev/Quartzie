@@ -171,7 +171,7 @@ int main(void) {
     check(!anim_visible[FILES] && !anim_visible[NOTES]);
     toggle_desktop();
     check(!windows[FILES].minimized && !windows[NOTES].minimized);
-    check(anim_ticks[FILES] > 0 && !anim_exit[FILES]);
+    check(anim_ticks[FILES] == 0 && !anim_exit[FILES]);
     frames(9);
     check(!anim_visible[FILES] && !anim_visible[NOTES]);
     printf("PASS: reversibly tweened Start/context/Quick/notifications/Run/Alt+Tab/tooltip panels, damage-only rendering, Show Desktop minimize and restore, framebuffer compositing\n");

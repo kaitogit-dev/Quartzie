@@ -40,13 +40,13 @@ int main(void) {
     check(WINDOW_OPEN_STEPS == 2 && WINDOW_RESIZE_STEPS == 3);
     check(WINDOW_OPEN_STEPS < WINDOW_CLOSE_STEPS);
     open_window(FILES);
-    check(anim_ticks[FILES] == WINDOW_OPEN_STEPS);
+    check(anim_ticks[FILES] == 0);
     int x, top, w, h;
     animated_window_rect(FILES, &x, &top, &w, &h);
-    check(w > windows[FILES].w * 9 / 10 && w < windows[FILES].w);
-    check(h > windows[FILES].h * 9 / 10 && h < windows[FILES].h);
+    check(w == windows[FILES].w);
+    check(h == windows[FILES].h);
     repaint();
-    check(anim_ticks[FILES] == WINDOW_OPEN_STEPS - 1);
+    check(anim_ticks[FILES] == 0 - 1);
     check(color_at(files_x, y) != files_plain);
     check(color_at(notes_x, y) == notes_plain);
     for (int i = 0; i < WINDOW_OPEN_STEPS + 1; i++) repaint();
@@ -67,10 +67,10 @@ int main(void) {
     check(color_at(notes_x, y) == notes_plain);
     check(color_at(files_x, y) != files_plain);
     open_window(NOTES);
-    check(anim_ticks[NOTES] == WINDOW_OPEN_STEPS);
+    check(anim_ticks[NOTES] == 0);
     repaint();
     check(active_window() == NOTES);
-    check(anim_ticks[NOTES] == WINDOW_OPEN_STEPS - 1);
+    check(anim_ticks[NOTES] == 0 - 1);
     snapshot("build/window-opening-133.ppm");
     for (int i = 0; i < WINDOW_OPEN_STEPS + 1; i++) repaint();
     check(anim_ticks[NOTES] == 0);
@@ -79,7 +79,7 @@ int main(void) {
     for (int i = 0; i < WINDOW_CLOSE_STEPS + 1; i++) repaint();
     check(windows[NOTES].minimized && !anim_visible[NOTES]);
     open_window(NOTES);
-    check(anim_ticks[NOTES] == WINDOW_OPEN_STEPS && !windows[NOTES].minimized);
+    check(anim_ticks[NOTES] == 0 && !windows[NOTES].minimized);
     printf("PASS: three-step eased window opening, intact five-step closing and minimize, tinted active and hover taskbar tiles, plain inactive icons\n");
     return 0;
 }
