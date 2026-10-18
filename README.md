@@ -1,50 +1,84 @@
-# Quartzie 0.25 — Responsiveness & Stability
+# Quartzie
 
-Quartzie is the new name of the freestanding x86 OS previously called Cinmix. It boots by legacy BIOS El Torito CD, defaults to 1920×1080 where supported, and provides an Aero / Dark Aero desktop, persistent IDE disk, and a small PE32 console compatibility layer.
+Quartzie is an experimental desktop operating system for 32-bit x86 PCs and virtual machines. It boots from a **legacy BIOS / El Torito ISO** and provides a graphical desktop with Windows-like window management, File Explorer, Settings, Notes, Console, Calendar, Calculator, and a native painting app.
 
-## Stability and performance fixes in 0.25
+The project was previously called **Cinmix**. Its NT-style interfaces and limited PE32 console support are works in progress; Quartzie is **not Windows NT**, and it does not run arbitrary Windows programs.
 
-- **Idle ring-3 work no longer repeatedly interrupts the desktop.** Protected worker slices now run only when there is pending paint work or a running supported PE process; PE slices are rate-limited in the main loop. This avoids repeatedly resetting the PIT and PIC simply to run demonstration spin loops.
-- **Unexpected PIC IRQs are handled instead of entering a permanent halt loop** during a protected worker slice. Fault isolation and PE32 support are preserved. The default desktop remains the priority over background worker jobs.
-- **Faster 32-bit framebuffer copies** use x86 `rep movsl`; large solid UI fills use `rep stosl`, and translucent color mixing uses packed-channel arithmetic. Repeated shadow blending was reduced. Cursor movement continues using small damage rectangles, not whole-screen repaints.
-- **Maximize and Explorer remain interactive.** The existing damage compositor is preserved and window animation geometry is clipped before expensive drawing. Missed PIT frame pulses can advance several tween steps to avoid extending an animation by a full frame per missed tick.
-- **Notifications and glass panels now have a more visible tween** (18 nominal 120 Hz steps, about 150 ms under ideal timing), rather than the previous six-step / 50 ms flicker. Window resize retains its four-step target to avoid extra full-HD redraws.
-- **Reduced IDE polling timeout** helps avoid extended stalls when a controller does not respond. The existing signed CinmixFS disk format and saved files are unchanged.
-- **Console `renderstat` command** reports full redraws, partial redraws, cursor-only frames, and pixels copied to the display for diagnosing expensive UI operations.
+## Getting started
 
-**Native benchmark:** On this Linux host, median total measured render time across nine runs decreased by approximately 26% for Explorer opening and 27% for maximizing at 1920×1080, compared with 0.24. These numbers exclude actual virtualization overhead and do **not** predict the frame rate inside QEMU. Notification drawing performs more frames by design to produce a slower transition.
-
-**Important:** Native rendering, ISO structure and simulated interrupt/worker behavior have been tested, but this environment cannot run QEMU/Bochs. These changes reduce known causes of freezing; they cannot yet establish that a specific emulator's freeze is resolved. Report the VM's graphics adapter, RAM, CPU settings and whether a disk image is attached if the problem continues.
-
-## Desktop interaction and taskbar motion
-
-- **Single click selects; double click opens** desktop shortcuts and Explorer files, with a ~300 ms window and a 6-pixel location tolerance. Enter still opens keyboard-selected files, like Windows.
-- **Ctrl+E** opens Explorer; **Windows/Super key** (PS/2 extended scancodes 0x5B/0x5C) opens and closes Start; **Alt+F4** closes the active window.
-- **Ctrl+C**, **Ctrl+X**, and **Ctrl+V** operate on supported disk-backed files in Explorer. Copy creates a `Copy_` filename on D: and writes the contents to the signed CinmixFS volume. Cut then Paste in the same D: folder is a no-op, because Quartzie currently has only one writable root directory. Without a mounted disk, the UI explains why disk copy is unavailable.
-- In Notes, **Ctrl+A** selects the whole document, Ctrl+C/X copy or cut text, and Ctrl+V pastes into the note. The clipboard is shared through OS state but Notes has no rich partial selection yet.
-- The taskbar icon has a fast **shrink-and-overshoot** animation on first launch, **downward bounce** on minimize, and **upward bounce** on activation or restore. All motion is bounded and tied to the existing 120 Hz animation clock.
-- Every existing feature from Quartzie 0.24 is preserved, including protected ring-3 demo tasks, Pinta-style native painter, Notes, Settings, File Explorer, Dark Aero, and PE32 console loader.
-
-## Disk compatibility and deliberate exceptions
-
-Quartzie retains the on-disk `CINMIXFS` signature, the existing `\Device\CinmixDisk` device path, and `\Registry\Machine\Software\Cinmix` registry compatibility. **Do not reformat old volumes.** Your Cinmix 0.18+ IDE disk can be reused as-is. The included demo disk image contains `hello.exe`, a small PE32 console app.
-
-The IDE driver requires a writable signed disk at the primary IDE master; without one, files are temporary. The filesystem supports 16 slots and up to 4096 bytes per file. Existing limitations still apply: no GUI Win32 app loader, no .NET 10, GTK4/libadwaita, or x64 Windows binaries; Pinta is a native painter port, not upstream Pinta.
-
-## Build and test
-
-```sh
-make verify
-```
-
-This outputs `Quartzie-0.25.iso`. Use `make Quartzie-0.25-disk.img` for a new blank/demo disk; **back up your existing image** before testing.
-
-Example in QEMU:
+Download the ISO and the **separate writable disk image** from the current release, then boot them together in a legacy-BIOS emulator. For example, with QEMU:
 
 ```sh
 qemu-system-i386 -m 256 -vga std \
- -cdrom Quartzie-0.25.iso -boot d \
- -drive file=Quartzie-0.25-disk.img,format=raw,if=ide,index=0
+  -cdrom Quartzie-0.25.iso -boot d \
+  -drive file=Quartzie-0.25-disk.img,format=raw,if=ide,index=0
 ```
 
-Native UI tests and ISO9660/El Torito structure tests run in Linux; this does not constitute an actual BIOS emulator boot verification. Pinta attribution remains in `third_party/`.
+The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtual display supports it; otherwise the bootloader chooses a supported fallback. The IDE hard disk must be attached as the **primary master** to enable persistence. Quartzie does **not** automatically format unknown disks.
+
+**Keep your existing disk image** when updating Quartzie. The on-disk `CINMIXFS` signature remains compatible with older Cinmix/Quartzie disks. Make a backup before testing a new build; downloading a blank disk will not carry over your files.
+
+## Desktop and applications
+
+- **File Explorer:** Browse the CinmixFS volume, create and select documents, search, change view/sort settings, and open supported files. A double-click opens items; a single click selects them.
+- **Settings:** Switch light/Dark Aero themes, wallpaper, accent colors and glass strength; manage notification and software-volume settings.
+- **Notes:** Edit text and save it to the attached disk using `Ctrl+S`.
+- **Painter:** A native Pinta-style painting application with pencil, brush, eraser, shapes, fill, color selection, undo/redo and persistent saving. It is **not** the upstream Pinta GTK/.NET executable.
+- **Other desktop tools:** Console, System information, Calculator, Clock, Calendar, and a Windows-style taskbar with window animations.
+
+### Keyboard and mouse shortcuts
+
+| Input | Action |
+| --- | --- |
+| Single click / double-click | Select / open an item |
+| Windows/Super key | Toggle Start |
+| `Ctrl+E` | Open File Explorer |
+| `Alt+F4` | Close the active window |
+| `Alt+Tab` | Switch windows |
+| `Ctrl+C`, `Ctrl+X`, `Ctrl+V` | Copy, cut, paste in supported apps |
+| `Ctrl+S` | Save in Notes or Painter |
+| `Ctrl+R` | Open Run |
+
+Shortcuts depend on the focused application. File clipboard operations currently work within the single writable volume and are more limited than on Windows.
+
+## Building from source
+
+On Linux, install GCC with 32-bit compilation support, GNU binutils, Python 3, and `make`.
+
+```sh
+make                 # ISO and demo disk image
+make verify          # ISO/boot-image validation plus native regression tests
+make clean
+```
+
+The build creates `Quartzie-0.25.iso` and `Quartzie-0.25-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
+
+### Code layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/kernel.c` | Desktop, compositor, input, and built-in applications |
+| `src/proc.c`, `src/proc.S` | Paging, ring-3 workers, interrupts, and scheduler |
+| `src/ntos.c`, `src/objects.c` | Experimental NT-style native I/O and object handles |
+| `src/storage.c` | ATA PIO disk driver and persistent CinmixFS storage |
+| `src/pe.c` | Experimental 32-bit PE console executable loader |
+| `src/pinta.c` | Native painting functionality |
+| `src/cdboot.S`, `src/entry.S` | BIOS CD boot and protected-mode entry |
+| `tools/` | ISO, disk-image, and test utilities |
+| `tests/` | Native regression, storage, UI, and rendering tests |
+
+## Capabilities and limitations
+
+Quartzie is a **hobby OS**, not a Windows replacement. Current limitations include:
+
+- The signed CinmixFS volume supports **16 file slots** with a maximum of **4 KiB per file**; it is not FAT, NTFS, or a general-purpose filesystem.
+- The PE32 compatibility layer handles a narrow set of **32-bit console** executables and `KERNEL32` imports. It does not support general Windows GUI applications, x64 PE files, .NET 10, GTK4/libadwaita, or Windows DLL loading in general.
+- Some experimental work runs at ring 3, but most desktop applications still execute in the kernel's address space.
+- Audio volume is a software UI setting; there is no working audio device driver.
+- `make verify` exercises native tests and verifies the ISO structure. It does **not** prove successful boot or smooth performance inside QEMU/Bochs. A real emulator run is important before treating any hardware-level change as confirmed.
+
+## Documentation and history
+
+See [CHANGELOG.md](CHANGELOG.md) for changes between releases. See [the source repository](https://github.com/kaitogit-dev/quartzie) for the issue tracker, history, and development source.
+
+The bundled font license is in [FONT-LICENSE.txt](FONT-LICENSE.txt). Pinta-related attribution and licensing information are in [`third_party/`](third_party/).

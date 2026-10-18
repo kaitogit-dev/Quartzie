@@ -1,8 +1,15 @@
-Quartzie 0.25 | BIOS i386 | Preferred 1920x1080
-Windows-style double-click, clipboard, taskbar bounce and keyboard shortcuts.
-Persistent disk retains legacy CINMIXFS format so your existing files remain accessible.
-PE32 console support is experimental; .NET 10, GTK4 and general Windows GUI compatibility are not included.
+Quartzie - experimental 32-bit x86 graphical operating system
 
-0.25: on-demand protected worker scheduling, IRQ fail-safe, faster framebuffer copies, scanline fills and fewer shadow passes.
-Notifications use a less abrupt tween. Console command: renderstat.
-Old Quartzie/Cinmix disk images remain compatible. Back up persistent disks.
+Boot this El Torito CD using a legacy BIOS emulator. A compatible VBE
+adapter is recommended. Quartzie prefers 1920x1080x32 when available.
+
+To save documents, attach a writable CinmixFS/Quartzie persistent disk as
+the primary IDE master. Old signed CINMIXFS volumes are supported; keep
+backups and do not replace your existing disk with a blank one.
+
+Quartzie includes File Explorer, Settings, Notes, Console, and a native
+painting application. Windows PE32 console support is experimental.
+It does not run ordinary Windows GUI applications, .NET 10, or GTK4 apps.
+
+For build instructions, current limitations, and project information see
+README.md in the source distribution. For release history see CHANGELOG.md.
