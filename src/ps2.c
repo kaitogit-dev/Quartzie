@@ -24,7 +24,8 @@ int q_ps2_enable(void){
     if(cfg<0)return 0;
     if(!command(0x60)||!data((uint8_t)(cfg&~0x22u)))return 0;
     if(!mouse_command(0xf6))return 0;
-    return mouse_command(0xf0);
+    if(!mouse_command(0xf0))return 0;
+    return mouse_command(0xf4);
 }
 int q_ps2_feed(QPs2Mouse *mouse,uint8_t value,int *dx,int *dy,int *buttons){
     if(mouse->index==0){
