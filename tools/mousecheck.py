@@ -21,6 +21,47 @@ def wait_ready(process, serial, timeout):
     raise RuntimeError('Desktop did not boot before mouse test')
 
 
+def receive_exact(stream, length):
+    data = bytearray()
+    while len(data) < length:
+        fragment = stream.recv(length - len(data))
+        if not fragment:
+            raise RuntimeError('VNC connection closed unexpectedly')
+        data.extend(fragment)
+    return bytes(data)
+
+
+def send_vnc_mouse():
+    import struct
+    with socket.create_connection(('127.0.0.1', 5909), timeout=5) as stream:
+        stream.settimeout(5)
+        version = receive_exact(stream, 12)
+        if not version.startswith(b'RFB '):
+            raise RuntimeError(f'Invalid VNC banner: {version!r}')
+        stream.sendall(b'RFB 003.008\n')
+        count = receive_exact(stream, 1)[0]
+        if count == 0:
+            length = struct.unpack('>I', receive_exact(stream, 4))[0]
+            raise RuntimeError(receive_exact(stream, length).decode(errors='replace'))
+        methods = receive_exact(stream, count)
+        if 1 not in methods:
+            raise RuntimeError(f'VNC authentication required: {methods!r}')
+        stream.sendall(b'\x01')
+        if receive_exact(stream, 4) != b'\x00\x00\x00\x00':
+            raise RuntimeError('VNC rejected authentication')
+        stream.sendall(b'\x01')
+        header = receive_exact(stream, 24)
+        title_length = struct.unpack_from('>I', header, 20)[0]
+        receive_exact(stream, title_length)
+        width, height = struct.unpack_from('>HH', header, 0)
+        for x, y in ((width // 2, height // 2), (width // 3, height // 3),
+                     (width // 2 + 160, height // 2 + 90),
+                     (width // 2 + 210, height // 2 + 130)):
+            stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
+            time.sleep(0.2)
+        print('VNC pointer events sent at', width, height)
+
+
 def verify_mouse(image, usb=False):
     code, variables = choose_firmware()
     with tempfile.TemporaryDirectory() as folder:
@@ -81,6 +122,7 @@ def verify_mouse(image, usb=False):
                     extra = {'execute': 'human-monitor-command', 'arguments': {'command-line': 'mouse_move 60 25'}}
                     sock.sendall(json.dumps(extra).encode('ascii') + b'\r\n')
                     print('HMP mouse move:', sock.recv(4096))
+            send_vnc_mouse()
             end = time.monotonic() + 6
             while time.monotonic() < end:
                 data = serial.read_bytes()
