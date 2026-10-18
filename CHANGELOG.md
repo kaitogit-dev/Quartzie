@@ -2,6 +2,16 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.29 — Boot/input stabilization and PNG wallpaper
+
+- **Fix a boot-time kernel stack overlap.** The old protected-mode stack at `0x90000` was inside kernel BSS (`0x32030`–`0xB2000` in 0.28). Move the stack to `0x200000`, separate from kernel state, graphics buffers, and the fixed framebuffer. Verify the non-overlap and stack instruction during every ISO build. This explains a plausible cause of desktop corruption and the static cursor, but does not constitute hardware-level confirmation.
+- Disable experimental paging/ring-3 initialization during ordinary desktop startup. It previously ran immediately after drawing the first frame. Retain the functionality as an explicit Console experiment (`useron`, `useroff`, `userstat`). Native desktop apps do not depend on it.
+- Vertically center taskbar icons, their activation highlights and running indicators in the middle glass island; fix taskbar hit-test bounds accordingly.
+- Replace the CPU-generated wallpaper with one editable `assets/wallpaper.png`. Convert the PNG at build time (Python standard library, no runtime PNG decoder) to RGB565; draw an interpolated copy once and cache it for damage-only redraws. Settings color choices tint the same image.
+- Expand the ISO kernel load region from 80 to 160 sectors safely below the relocated stack, and make the ISO validator check the correct region and kernel BSS/stack separation.
+- Add a 1920×1080 regression for wallpaper source pixels, top-edge integrity, centered taskbar targets, and moving PS/2 cursor before and after Explorer opens. Preserve existing CinmixFS disk compatibility.
+- Native regressions, boot-image structure and code assertions pass. **A real BIOS-emulator boot and input test has not been performed in this environment.** USB HID is not supported.
+
 ## Quartzie 0.28 — Stability and Fluid Layers rebuild
 
 - **Fix a confirmed global-buffer overflow:** the old rounded-corner scratch array stored only 18-pixel radii, but the Start menu requested 20 pixels. An AddressSanitizer reproduction on 0.27 reported a global-buffer-overflow in `round_capture`. The replacement uses bounded, matched, nested corner layers.

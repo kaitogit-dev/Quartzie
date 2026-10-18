@@ -17,10 +17,15 @@ extern uint16_t boot_width;
 extern uint16_t boot_height;
 extern uint8_t boot_bpp;
 extern const uint8_t quartzie_font[96][16][8];
+extern const uint8_t _binary_build_wallpaper_bin_start[];
+extern const uint8_t _binary_build_wallpaper_bin_end[];
 
 static uint8_t pe_file_cache[4097];
 static uint32_t pe_reported_exits;
 static int pe_last_launch_status;
+#ifdef __i386__
+static int cm_userspace_ready;
+#endif
 static int theme;
 static int previous_theme;
 static int do_not_disturb;
@@ -1109,7 +1114,7 @@ static int taskbar_left(int count) {
 }
 
 static int taskbar_hit(int x, int y) {
-    if (y < sh - 47 || y >= sh - 6) return -1;
+    if (y < sh - 55 || y >= sh - 9) return -1;
     int apps[APPS];
     int count = taskbar_items(apps);
     int start = taskbar_left(count);
@@ -1223,43 +1228,40 @@ static void taskbar_mark(int cx, int cy) {
     rect(cx + 3, cy + 4, 9, 3, 0xeef7ff);
 }
 
+#define WALLPAPER_SOURCE_W 256
+#define WALLPAPER_SOURCE_H 144
+
+static uint32_t wallpaper_rgb(uint16_t color) {
+    uint32_t r = (color >> 11) & 31u;
+    uint32_t g = (color >> 5) & 63u;
+    uint32_t b = color & 31u;
+    return ((r * 255u / 31u) << 16) | ((g * 255u / 63u) << 8) | (b * 255u / 31u);
+}
+
 static void regenerate_wallpaper(void) {
-    static const uint32_t base_top[3] = {0x10152f,0x0d1b32,0x221332};
-    static const uint32_t base_bottom[3] = {0x263f75,0x135171,0x513e88};
-    static const uint32_t bloom_one[3] = {0x765dff,0x1f9fea,0xc15fe8};
-    static const uint32_t bloom_two[3] = {0x16b9de,0x62dcde,0x578df3};
-    static const uint32_t bloom_three[3] = {0xc66ad9,0x3578d4,0xec86b1};
-    uint32_t top = NIGHT ? 0x090d1d : base_top[wallpaper];
-    uint32_t bottom = NIGHT ? 0x152849 : base_bottom[wallpaper];
-    uint32_t one = bloom_one[wallpaper];
-    uint32_t two = bloom_two[wallpaper];
-    uint32_t three = bloom_three[wallpaper];
+    const uint8_t *resource = _binary_build_wallpaper_bin_start;
+    const uint32_t expected = WALLPAPER_SOURCE_W * WALLPAPER_SOURCE_H * 2u;
+    if ((uintptr_t)(_binary_build_wallpaper_bin_end - resource) != expected) return;
     for (int py = 0; py < sh; py++) {
-        int vy1 = ((py - sh * 55 / 100) * 256) / (sh * 64 / 100);
-        int vy2 = ((py - sh * 86 / 100) * 256) / (sh * 69 / 100);
-        int vy3 = ((py - sh * 28 / 100) * 256) / (sh * 76 / 100);
-        int cy1 = vy1 * vy1, cy2 = vy2 * vy2, cy3 = vy3 * vy3;
-        uint32_t row = blend(top, bottom, (py * 200) / sh);
+        int v = sh > 1 ? py * (WALLPAPER_SOURCE_H - 1) * 256 / (sh - 1) : 0;
+        int iy = v >> 8, fy = v & 255;
+        if (iy >= WALLPAPER_SOURCE_H - 1) { iy = WALLPAPER_SOURCE_H - 2; fy = 256; }
         for (int px = 0; px < sw; px++) {
-            int vx1 = ((px - sw * 69 / 100) * 256) / (sw * 45 / 100);
-            int vx2 = ((px - sw * 21 / 100) * 256) / (sw * 51 / 100);
-            int vx3 = ((px - sw * 47 / 100) * 256) / (sw * 66 / 100);
-            int d1 = vx1 * vx1 + cy1;
-            int d2 = vx2 * vx2 + cy2;
-            int d3 = vx3 * vx3 + cy3;
-            uint32_t color = row;
-            if (d1 < 65536) {
-                int strength = (65536 - d1) * (NIGHT ? 95 : 152) / 65536;
-                color = blend(color, one, strength * strength / (NIGHT ? 95 : 152));
-            }
-            if (d2 < 65536) {
-                int strength = (65536 - d2) * (NIGHT ? 76 : 126) / 65536;
-                color = blend(color, two, strength * strength / (NIGHT ? 76 : 126));
-            }
-            if (d3 < 65536) {
-                int strength = (65536 - d3) * (NIGHT ? 52 : 100) / 65536;
-                color = blend(color, three, strength * strength / (NIGHT ? 52 : 100));
-            }
+            int u = sw > 1 ? px * (WALLPAPER_SOURCE_W - 1) * 256 / (sw - 1) : 0;
+            int ix = u >> 8, fx = u & 255;
+            if (ix >= WALLPAPER_SOURCE_W - 1) { ix = WALLPAPER_SOURCE_W - 2; fx = 256; }
+            uint32_t a = (uint32_t)(iy * WALLPAPER_SOURCE_W + ix) * 2u;
+            uint32_t b = a + 2u;
+            uint32_t c = a + WALLPAPER_SOURCE_W * 2u;
+            uint32_t d = c + 2u;
+            uint32_t ca = wallpaper_rgb((uint16_t)(resource[a] | (resource[a + 1] << 8)));
+            uint32_t cb = wallpaper_rgb((uint16_t)(resource[b] | (resource[b + 1] << 8)));
+            uint32_t cc = wallpaper_rgb((uint16_t)(resource[c] | (resource[c + 1] << 8)));
+            uint32_t cd = wallpaper_rgb((uint16_t)(resource[d] | (resource[d + 1] << 8)));
+            uint32_t color = blend(blend(ca, cb, fx), blend(cc, cd, fx), fy);
+            if (wallpaper == 1) color = blend(color, 0x0a628a, 38);
+            else if (wallpaper == 2) color = blend(color, 0x8a397c, 38);
+            if (NIGHT) color = blend(color, 0x070e1d, 45);
             canvas[(size_t)py * sw + px] = color;
         }
     }
@@ -1341,19 +1343,19 @@ static void draw_desktop(void) {
         int running = windows[id].opened;
         int hovered = task_hover == id;
         if (active || hovered) {
-            round_capture(x + 2, sh - 46, taskbar_width() - 4, 39, 10);
-            frosted(x + 2, sh - 46, taskbar_width() - 4, 39,
+            round_capture(x + 2, sh - 53, taskbar_width() - 4, 39, 10);
+            frosted(x + 2, sh - 53, taskbar_width() - 4, 39,
                 active ? blend(BLUE, NIGHT ? 0x0b1727 : 0xffffff, NIGHT ? 108 : 86) : (NIGHT ? 0x1d2f45 : 0xf5f9fd),
                 active ? (NIGHT ? 124 : 138) : 102, active ? 88 : 56);
-            glass(x + 5, sh - 44, taskbar_width() - 10, 11, 0xffffff, active ? 64 : 38);
-            round_finish(x + 2, sh - 46, taskbar_width() - 4, 39, 10);
+            glass(x + 5, sh - 51, taskbar_width() - 10, 11, 0xffffff, active ? 64 : 38);
+            round_finish(x + 2, sh - 53, taskbar_width() - 4, 39, 10);
         }
-        draw_bouncing_icon(x + 7, sh - 41, id);
+        draw_bouncing_icon(x + 7, sh - 49, id);
         if (running) {
             if (active) {
-                rounded(x + 10, sh - 6, 26, 3, 1, 0xc5f5ff);
+                rounded(x + 10, sh - 11, 26, 3, 1, 0xc5f5ff);
             } else {
-                rounded(x + 19, sh - 6, 8, 3, 1, 0x79c2f4);
+                rounded(x + 19, sh - 11, 8, 3, 1, 0x79c2f4);
             }
         }
     }
@@ -1486,6 +1488,16 @@ static void execute_command(void) {
         }
     }
 #ifdef __i386__
+    else if (same(console_input, "useron")) {
+        if (!cm_userspace_ready) {
+            cm_userspace_ready = cm_proc_initialize();
+            log_write(cm_userspace_ready ? "Protected workers enabled (experimental)" : "Protected workers unavailable");
+        } else log_write("Protected workers already enabled");
+    }
+    else if (same(console_input, "useroff")) {
+        cm_userspace_ready = 0;
+        log_write("Protected worker scheduling paused");
+    }
     else if (same(console_input, "userstat")) {
         char line[72] = "Protected ring 3 tasks: ", n[12];
         number(n, cm_proc_active_tasks()); append(line, n, 72);
@@ -4101,16 +4113,15 @@ void kmain(void) {
         files_restore();
         log_write("QuartzieFS disk mounted at D: (ATA IDE)");
     } else log_write("RAM only: attach Quartzie disk to enable persistence");
-    log_write("Quartzie kernel 0.28 / Fluid Layers");
+    log_write("Quartzie kernel 0.29 / Fluid Layers");
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.28 is ready");
+    notify("Quartzie 0.29 is ready");
     repaint();
 #ifdef __i386__
-    int cm_userspace_ready = cm_proc_initialize();
-    if (cm_userspace_ready) log_write("Paged ring 3 tasks and PIT preemption enabled");
-    else log_write("PSE unavailable: ring 3 tasks disabled");
+    cm_userspace_ready = 0;
+    log_write("Safe desktop: protected workers disabled until useron");
 #endif
     uint32_t cycles = 0;
     for (;;) {

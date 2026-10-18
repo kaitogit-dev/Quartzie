@@ -200,7 +200,7 @@ pm_entry:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x90000
+    mov esp, 0x200000
     cld
     mov edi, offset __bss_start
     mov ecx, offset __bss_end

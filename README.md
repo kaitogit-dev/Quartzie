@@ -6,15 +6,15 @@ The project was previously called **Cinmix**. Its Modular Glassmorphism (Fluid L
 
 ## Getting started
 
-Download the ISO and the **separate writable disk image** from the current release, then boot them together in a legacy-BIOS emulator. For example, with QEMU:
+Download the ISO and the **separate writable disk image** from the current release, then boot them together in a legacy-BIOS emulator. For example, with QEMU (256 MiB RAM and PS/2 input):
 
 ```sh
 qemu-system-i386 -m 256 -vga std \
-  -cdrom Quartzie-0.28.iso -boot d \
-  -drive file=Quartzie-0.28-disk.img,format=raw,if=ide,index=0
+  -cdrom Quartzie-0.29.iso -boot d \
+  -drive file=Quartzie-0.29-disk.img,format=raw,if=ide,index=0
 ```
 
-The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtual display supports it; otherwise the bootloader chooses a supported fallback. The IDE hard disk must be attached as the **primary master** to enable persistence. Quartzie does **not** automatically format unknown disks.
+A PS/2 keyboard and mouse are required (there is no USB HID driver yet). The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtual display supports it; otherwise the bootloader chooses a supported fallback. The IDE hard disk must be attached as the **primary master** to enable persistence. Quartzie does **not** automatically format unknown disks.
 
 **Keep your existing disk image** when updating Quartzie. The on-disk `CINMIXFS` signature remains compatible with older Cinmix/Quartzie disks. Make a backup before testing a new build; downloading a blank disk will not carry over your files.
 
@@ -43,7 +43,7 @@ Shortcuts depend on the focused application. File clipboard operations currently
 
 ## Building from source
 
-On Linux, install GCC with 32-bit compilation support, GNU binutils, Python 3, and `make`.
+On Linux, install GCC with 32-bit compilation support, GNU binutils, Python 3, and `make`. The wallpaper PNG conversion uses only the Python standard library.
 
 ```sh
 make                 # ISO and demo disk image
@@ -51,7 +51,7 @@ make verify          # ISO/boot-image validation plus native regression tests
 make clean
 ```
 
-The build creates `Quartzie-0.28.iso` and `Quartzie-0.28-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
+The build creates `Quartzie-0.29.iso` and `Quartzie-0.29-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
 
 ### Code layout
 
@@ -63,7 +63,9 @@ The build creates `Quartzie-0.28.iso` and `Quartzie-0.28-disk.img`. The disk tar
 | `src/storage.c` | ATA PIO disk driver and persistent CinmixFS storage |
 | `src/pe.c` | Experimental 32-bit PE console executable loader |
 | `src/pinta.c` | Native painting functionality |
-| `src/cdboot.S`, `src/entry.S` | BIOS CD boot and protected-mode entry |
+| `src/cdboot.S`, `src/entry.S` | BIOS CD boot, protected-mode entry, and disjoint 2 MiB kernel stack |
+| `assets/wallpaper.png` | Single replaceable image used for the cached desktop wallpaper |
+| `tools/wallpaper.py` | Converts the PNG at build time into a small RGB565 resource |
 | `tools/` | ISO, disk-image, and test utilities |
 | `tests/` | Native regression, storage, UI, and rendering tests |
 
@@ -73,8 +75,8 @@ Quartzie is a **hobby OS**, not a Windows replacement. Current limitations inclu
 
 - The signed CinmixFS volume supports **16 file slots** with a maximum of **4 KiB per file**; it is not FAT, NTFS, or a general-purpose filesystem.
 - The PE32 compatibility layer handles a narrow set of **32-bit console** executables and `KERNEL32` imports. It does not support general Windows GUI applications, x64 PE files, .NET 10, GTK4/libadwaita, or Windows DLL loading in general.
-- Some experimental work runs at ring 3, but most desktop applications still execute in the kernel's address space.
-- Glass translucency and blur are CPU-rendered approximations sampled from the stable wallpaper cache; they are not CSS or GPU backdrop filtering. Full cross-window backdrop sampling is not implemented.
+- Experimental protected ring-3 workers are **off by default** for a safer desktop boot. In Console, `useron` enables the experimental subsystem, `useroff` pauses its scheduling, and `userstat` reports its state. Windows PE32 demos require `useron`; the desktop, Explorer, Notes, and Painter work without it. Most desktop applications still execute in the kernel's address space.
+- Glass translucency and blur are CPU-rendered approximations sampled from the cached PNG-derived wallpaper; they are not CSS or GPU backdrop filtering. Full cross-window backdrop sampling is not implemented.
 - Audio volume is a software UI setting; there is no working audio device driver.
 - `make verify` exercises native tests and verifies the ISO structure. It does **not** prove successful boot or smooth performance inside QEMU/Bochs. A real emulator run is important before treating any hardware-level change as confirmed.
 

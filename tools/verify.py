@@ -1,5 +1,6 @@
 import pathlib
 import struct
+from iso import KERNEL_BLOCKS
 import sys
 import subprocess
 
@@ -51,24 +52,28 @@ def check(iso_path, boot_path, kernel_path, elf_path):
         parts = row.split()
         if len(parts) == 3:
             symbols[parts[2]] = int(parts[0], 16)
+    kernel_stack_top = 0x200000
+    assert symbols['__bss_end'] + 0x20000 < kernel_stack_top, 'Kernel BSS overlaps kernel stack safety margin'
+    assert kernel_stack_top < 0x400000, 'Kernel stack overlaps compositor canvas'
     stage = symbols['pm_entry'] - 0x10000
     segment = kernel[stage:stage + 60]
+    assert b'\xbc' + struct.pack('<I', kernel_stack_top) in segment, 'Protected-mode stack not relocated'
     assert b'\xbf' + struct.pack('<I', symbols['__bss_start']) in segment
     assert b'\xb9' + struct.pack('<I', symbols['__bss_end']) in segment
     assert b'\x8b\x3d' + struct.pack('<I', symbols['__bss_start']) not in segment
     assert b'\x8b\x0d' + struct.pack('<I', symbols['__bss_end']) not in segment
     assert sector(boot_lba)[512:] == bytes(SECTOR - 512)
     assert iso[(boot_lba + 1) * SECTOR:(boot_lba + 1) * SECTOR + len(kernel)] == kernel
-    assert iso[(boot_lba + 1) * SECTOR + len(kernel):(boot_lba + 81) * SECTOR] == bytes(80 * SECTOR - len(kernel))
+    assert iso[(boot_lba + 1) * SECTOR + len(kernel):(boot_lba + 1 + KERNEL_BLOCKS) * SECTOR] == bytes(KERNEL_BLOCKS * SECTOR - len(kernel))
     assert b'\x21\x00\x00\x00\x00\x00\x00\x00' in boot
-    assert b'\x50\x00' in boot
+    assert b'\xa0\x00' in boot
     assert b'\xc7\x06\x16\x72\x80\x07' in kernel
     assert b'\xc7\x06\x18\x72\x38\x04' in kernel
     assert b'\xc7\x06\x14\x72\x00\x1e' in kernel
     assert b'\xb8\x80\x07' in kernel[:512]
     assert b'\xb8\x38\x04' in kernel[:512]
-    assert b'QUARTZIE_0_26' in sector(16)
-    assert b'QUARTZIE 0.28' in entry
+    assert b'QUARTZIE_0_29' in sector(16)
+    assert b'QUARTZIE 0.29' in entry
     assert b'KERNEL32.DLL' in kernel
     assert b'runpe ' in kernel
     for symbol in ('cm_pe_load', 'cm_proc_launch_pe', 'cm_pe_error',

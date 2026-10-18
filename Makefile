@@ -5,7 +5,7 @@ OBJCOPY = objcopy
 CFLAGS = -m32 -std=c11 -ffreestanding -fno-pie -fno-pic -fno-stack-protector -fno-builtin -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -O2 -Wall -Wextra -Werror
 LDFLAGS = -m elf_i386 -T src/link.ld -nostdlib --build-id=none
 
-all: Quartzie-0.28.iso Quartzie-0.28-disk.img
+all: Quartzie-0.29.iso Quartzie-0.29-disk.img
 
 build:
 	mkdir -p build
@@ -22,7 +22,7 @@ build/entry.o: src/entry.S | build
 build/font.o: src/font.c | build
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-build/kernel.o: src/kernel.c src/objects.c src/ntos.c src/storage.c src/pinta.c src/proc.h src/pe.h | build
+build/kernel.o: src/kernel.c build/wallpaper.bin src/objects.c src/ntos.c src/storage.c src/pinta.c src/proc.h src/pe.h | build
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 build/proc.o: src/proc.c src/proc.h src/pe.h | build
@@ -34,28 +34,37 @@ build/pe.o: src/pe.c src/pe.h | build
 build/proc-asm.o: src/proc.S | build
 	$(AS) --32 -o $@ $<
 
-build/kernel.elf: build/entry.o build/kernel.o build/font.o build/proc.o build/proc-asm.o build/pe.o src/link.ld
-	$(LD) $(LDFLAGS) -o $@ build/entry.o build/kernel.o build/font.o build/proc.o build/proc-asm.o build/pe.o
+build/wallpaper.bin: assets/wallpaper.png tools/wallpaper.py | build
+	python3 tools/wallpaper.py assets/wallpaper.png $@
+
+build/wallpaper.o: build/wallpaper.bin | build
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 $< $@
+
+build/kernel.elf: build/entry.o build/kernel.o build/font.o build/proc.o build/proc-asm.o build/pe.o build/wallpaper.o src/link.ld
+	$(LD) $(LDFLAGS) -o $@ build/entry.o build/kernel.o build/font.o build/proc.o build/proc-asm.o build/pe.o build/wallpaper.o
 
 build/kernel.bin: build/kernel.elf
 	$(OBJCOPY) -O binary $< $@
-	@test $$(stat -c%s $@) -le 163840 || (echo 'Kernel exceeds CD loader capacity' && exit 1)
+	@test $$(stat -c%s $@) -le 327680 || (echo 'Kernel exceeds CD loader capacity' && exit 1)
 
-Quartzie-0.28.iso: build/cdboot.bin build/kernel.bin README.txt tools/iso.py
+Quartzie-0.29.iso: build/cdboot.bin build/kernel.bin README.txt tools/iso.py
 	python3 tools/iso.py build/cdboot.bin build/kernel.bin README.txt $@
 
-Quartzie-0.28-disk.img: tools/disk.py tools/install_pe.py build/hello.exe
+Quartzie-0.29-disk.img: tools/disk.py tools/install_pe.py build/hello.exe
 	python3 tools/disk.py $@
 	python3 tools/install_pe.py $@ build/hello.exe
 
-verify: Quartzie-0.28.iso
+verify: Quartzie-0.29.iso
 	python3 tools/verify.py $< build/cdboot.bin build/kernel.bin build/kernel.elf
 	$(MAKE) smoke
 
-NATIVE_TESTS = build/smoke build/ui11 build/compositor build/controls build/ui12 build/ui13 build/ui131 build/animations build/ui133 build/fullhd build/ui15 build/ui16 build/ui17 build/storage build/ui18 build/objects build/ui19 build/ntos build/ui20 build/proc-test build/pinta-user-test build/pe-test build/pe-disk-test build/ui22 build/ui24 build/stability25 build/taskbar26 build/corners28 build/appopen28
+NATIVE_TESTS = build/smoke build/ui11 build/compositor build/controls build/ui12 build/ui13 build/ui131 build/animations build/ui133 build/fullhd build/ui15 build/ui16 build/ui17 build/storage build/ui18 build/objects build/ui19 build/ntos build/ui20 build/proc-test build/pinta-user-test build/pe-test build/pe-disk-test build/ui22 build/ui24 build/stability25 build/taskbar26 build/corners28 build/appopen28 build/input29
 
-build/%: tests/%.c src/kernel.c src/storage.c src/objects.c src/ntos.c src/pinta.c src/font.c src/pe.c | build
-	$(CC) -std=gnu11 -O1 -o $@ $< src/font.c src/pe.c
+build/%: tests/%.c build/wallpaper64.o src/kernel.c src/storage.c src/objects.c src/ntos.c src/pinta.c src/font.c src/pe.c | build
+	$(CC) -std=gnu11 -O1 -o $@ $< src/font.c src/pe.c build/wallpaper64.o
+
+build/wallpaper64.o: build/wallpaper.bin | build
+	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 $< $@
 
 build/proc-test: tests/proc.c src/proc.c src/proc.h src/pe.c src/pe.h | build
 	$(CC) -std=gnu11 -O1 -no-pie -o $@ $< src/pe.c
@@ -119,6 +128,7 @@ smoke: $(NATIVE_TESTS) | build
 	./build/taskbar26
 	./build/corners28
 	./build/appopen28
+	./build/input29
 
 build/pe-test: tests/pe.c src/pe.c src/pe.h src/proc.c src/proc.h build/hello.exe | build
 	$(CC) -std=gnu11 -O1 -no-pie -o $@ tests/pe.c src/pe.c
@@ -134,6 +144,6 @@ bench: | build
 	./build/bench
 
 clean:
-	rm -rf build Quartzie-0.28.iso
+	rm -rf build Quartzie-0.29.iso
 
 .PHONY: all verify smoke bench clean

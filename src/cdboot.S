@@ -19,7 +19,7 @@ _start:
     cmp bx, 0xaa55
     jne failure
     mov word ptr [dap_segment], 0x1000
-    mov word ptr [remaining], 80
+    mov word ptr [remaining], 160
 load_next:
     mov si, offset dap
     mov ah, 0x42
@@ -60,7 +60,7 @@ dap_lba:
     .long 33
     .long 0
 remaining:
-    .word 80
+    .word 160
 drive:
     .byte 0
 failure_message:
