@@ -10,8 +10,8 @@ Download the ISO and the **separate writable disk image** from the current relea
 
 ```sh
 qemu-system-i386 -m 256 -vga std \
-  -cdrom Quartzie-0.29.iso -boot d \
-  -drive file=Quartzie-0.29-disk.img,format=raw,if=ide,index=0
+  -cdrom Quartzie-0.30.iso -boot d \
+  -drive file=Quartzie-0.30-disk.img,format=raw,if=ide,index=0
 ```
 
 A PS/2 keyboard and mouse are required (there is no USB HID driver yet). The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtual display supports it; otherwise the bootloader chooses a supported fallback. The IDE hard disk must be attached as the **primary master** to enable persistence. Quartzie does **not** automatically format unknown disks.
@@ -51,7 +51,7 @@ make verify          # ISO/boot-image validation plus native regression tests
 make clean
 ```
 
-The build creates `Quartzie-0.29.iso` and `Quartzie-0.29-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
+The build creates `Quartzie-0.30.iso` and `Quartzie-0.30-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
 
 ### Code layout
 

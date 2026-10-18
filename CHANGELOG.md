@@ -2,6 +2,14 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.30 — v86 graphics stability
+
+- Render newly opened application windows at their final dimensions immediately, rather than showing intermediate window shells without usable content.
+- Reduce glass blur from 8×8 per-tile sampling to scanline color sampling and replace expensive full-area shadow distance calculations with bounded perimeter layers.
+- Repaint and present the full framebuffer on structural window/stacking changes to avoid fragmented window-open frames.
+- Replace the embedded 256×144 upscale wallpaper with a native-resolution procedural Fluid Layers wallpaper, with crisp geometry and smooth color gradients.
+- Keep the existing disk signature and native API compatibility; Windows GUI support remains experimental.
+
 ## Quartzie 0.29 — Boot/input stabilization and PNG wallpaper
 
 - **Fix a boot-time kernel stack overlap.** The old protected-mode stack at `0x90000` was inside kernel BSS (`0x32030`–`0xB2000` in 0.28). Move the stack to `0x200000`, separate from kernel state, graphics buffers, and the fixed framebuffer. Verify the non-overlap and stack instruction during every ISO build. This explains a plausible cause of desktop corruption and the static cursor, but does not constitute hardware-level confirmation.

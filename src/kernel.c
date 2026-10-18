@@ -541,51 +541,27 @@ static uint32_t saturate_color(uint32_t color, int amount) {
 
 static void frosted(int x, int y, int w, int h, uint32_t tint, int opacity, int sample_mix) {
     if (w <= 0 || h <= 0) return;
-    int left = x > clip_left ? x : clip_left;
-    int top = y > clip_top ? y : clip_top;
-    int right = x + w < clip_right ? x + w : clip_right;
-    int bottom = y + h < clip_bottom ? y + h : clip_bottom;
-    if (left < 0) left = 0;
-    if (top < 0) top = 0;
-    if (right > sw) right = sw;
-    if (bottom > sh) bottom = sh;
-    if (left >= right || top >= bottom) return;
-    const int tile = 8;
-    int begin_y = y + ((top - y) / tile) * tile;
-    int begin_x = x + ((left - x) / tile) * tile;
-    for (int py = begin_y; py < bottom; py += tile) {
-        int cy = py + tile / 2;
-        if (cy < 0) cy = 0;
-        if (cy >= sh) cy = sh - 1;
-        int y0 = py > top ? py : top;
-        int y1 = py + tile < bottom ? py + tile : bottom;
-        for (int px = begin_x; px < right; px += tile) {
-            int cx = px + tile / 2;
-            if (cx < 0) cx = 0;
-            if (cx >= sw) cx = sw - 1;
-            int x0 = px > left ? px : left;
-            int x1 = px + tile < right ? px + tile : right;
-            uint32_t sr = 0, sg = 0, sb = 0;
-            for (int sy = -20; sy <= 20; sy += 20) {
-                int yy = cy + sy;
-                if (yy < 0) yy = 0;
-                if (yy >= sh) yy = sh - 1;
-                for (int sx = -20; sx <= 20; sx += 20) {
-                    int xx = cx + sx;
-                    if (xx < 0) xx = 0;
-                    if (xx >= sw) xx = sw - 1;
-                    uint32_t c = desktop_cache[(size_t)yy * sw + xx];
-                    sr += (c >> 16) & 255;
-                    sg += (c >> 8) & 255;
-                    sb += c & 255;
-                }
-            }
-            uint32_t sample = ((sr / 9u) << 16) | ((sg / 9u) << 8) | (sb / 9u);
-            uint32_t under = desktop_cache[(size_t)cy * sw + cx];
-            uint32_t mixed = blend(sample, under, sample_mix);
-            uint32_t colored = blend(saturate_color(mixed, NIGHT ? 340 : 368), tint, opacity);
-            rect(x0, y0, x1 - x0, y1 - y0, colored);
-        }
+    int x0 = x > clip_left ? x : clip_left;
+    int y0 = y > clip_top ? y : clip_top;
+    int x1 = x + w < clip_right ? x + w : clip_right;
+    int y1 = y + h < clip_bottom ? y + h : clip_bottom;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > sw) x1 = sw;
+    if (y1 > sh) y1 = sh;
+    if (x0 >= x1 || y0 >= y1) return;
+    int cx = x0 + (x1 - x0) / 2;
+    int ox = x0 + (x1 - x0) / 4;
+    int tx = x1 - (x1 - x0) / 4 - 1;
+    for (int py = y0; py < y1; py++) {
+        size_t offset = (size_t)py * sw;
+        uint32_t a = desktop_cache[offset + ox];
+        uint32_t b = desktop_cache[offset + cx];
+        uint32_t c = desktop_cache[offset + tx];
+        uint32_t sample = blend(blend(a,b,128),c,85);
+        uint32_t color = blend(saturate_color(sample,NIGHT ? 320 : 352),tint,opacity);
+        uint32_t *line = canvas + offset;
+        for (int px = x0; px < x1; px++) line[px] = blend(line[px],color,sample_mix + (256 - sample_mix) / 2);
     }
 }
 
@@ -902,43 +878,18 @@ static __attribute__((unused)) void glass_button(int x, int y, int w, int h, uin
 
 static void soft_shadow(int x, int y, int w, int h, int radius, int depth) {
     if (w <= 0 || h <= 0) return;
-    int cy = y + depth;
-    int outer = radius + 25;
-    int x0 = x - 30 > clip_left ? x - 30 : clip_left;
-    int x1 = x + w + 30 < clip_right ? x + w + 30 : clip_right;
-    int y0 = cy - 30 > clip_top ? cy - 30 : clip_top;
-    int y1 = cy + h + 30 < clip_bottom ? cy + h + 30 : clip_bottom;
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 > sw) x1 = sw;
-    if (y1 > sh) y1 = sh;
-    if (x0 >= x1 || y0 >= y1) return;
-    int max_alpha = NIGHT ? 66 : 76;
-    for (int py = y0; py < y1; py++) {
-        int middle = py >= cy + radius && py < cy + h - radius;
-        uint32_t *row = canvas + (size_t)py * sw;
-        for (int px = x0; px < x1; px++) {
-            if (middle && px >= x + radius && px < x + w - radius) continue;
-            int nearx = px < x + radius ? x + radius : px >= x + w - radius ? x + w - radius - 1 : px;
-            int neary = py < cy + radius ? cy + radius : py >= cy + h - radius ? cy + h - radius - 1 : py;
-            int dx = px - nearx;
-            int dy = py - neary;
-            if (dx < 0) dx = -dx;
-            if (dy < 0) dy = -dy;
-            int largest = dx > dy ? dx : dy;
-            int smallest = dx < dy ? dx : dy;
-            int dist = largest + smallest * 3 / 8 - radius;
-            if (dist < 0) dist = 0;
-            if (dist >= 28) continue;
-            int fade = 28 - dist;
-            int alpha = max_alpha * fade * fade / 784;
-            if (alpha > 0) {
-                row[px] = blend(row[px], 0x05091a, alpha);
-                shadow_pixels++;
-            }
-        }
+    const int distances[4] = {21, 15, 9, 4};
+    const int strengths[4] = {22, 28, 35, 46};
+    for (int i = 0; i < 4; i++) {
+        int d = distances[i], alpha = strengths[i];
+        int yy = y + depth;
+        glass(x-d,yy-d,w+2*d,d,0x081222,alpha);
+        glass(x-d,yy+h,w+2*d,d,0x081222,alpha);
+        glass(x-d,yy,d,h,0x081222,alpha);
+        glass(x+w,yy,d,h,0x081222,alpha);
+        shadow_pixels += (uint32_t)((w+h)*2*d);
     }
-    (void)outer;
+    (void)radius;
 }
 
 static void outline(int x, int y, int w, int h, uint32_t color) {
@@ -1231,38 +1182,43 @@ static void taskbar_mark(int cx, int cy) {
 #define WALLPAPER_SOURCE_W 256
 #define WALLPAPER_SOURCE_H 144
 
-static uint32_t wallpaper_rgb(uint16_t color) {
-    uint32_t r = (color >> 11) & 31u;
-    uint32_t g = (color >> 5) & 63u;
-    uint32_t b = color & 31u;
-    return ((r * 255u / 31u) << 16) | ((g * 255u / 63u) << 8) | (b * 255u / 31u);
-}
-
 static void regenerate_wallpaper(void) {
-    const uint8_t *resource = _binary_build_wallpaper_bin_start;
-    const uint32_t expected = WALLPAPER_SOURCE_W * WALLPAPER_SOURCE_H * 2u;
-    if ((uintptr_t)(_binary_build_wallpaper_bin_end - resource) != expected) return;
     for (int py = 0; py < sh; py++) {
-        int v = sh > 1 ? py * (WALLPAPER_SOURCE_H - 1) * 256 / (sh - 1) : 0;
-        int iy = v >> 8, fy = v & 255;
-        if (iy >= WALLPAPER_SOURCE_H - 1) { iy = WALLPAPER_SOURCE_H - 2; fy = 256; }
+        int v = sh > 1 ? (py * 2048) / (sh-1) : 0;
+        int base_r = 9 + v * 7 / 2048;
+        int base_g = 24 + v * 32 / 2048;
+        int base_b = 56 + v * 52 / 2048;
         for (int px = 0; px < sw; px++) {
-            int u = sw > 1 ? px * (WALLPAPER_SOURCE_W - 1) * 256 / (sw - 1) : 0;
-            int ix = u >> 8, fx = u & 255;
-            if (ix >= WALLPAPER_SOURCE_W - 1) { ix = WALLPAPER_SOURCE_W - 2; fx = 256; }
-            uint32_t a = (uint32_t)(iy * WALLPAPER_SOURCE_W + ix) * 2u;
-            uint32_t b = a + 2u;
-            uint32_t c = a + WALLPAPER_SOURCE_W * 2u;
-            uint32_t d = c + 2u;
-            uint32_t ca = wallpaper_rgb((uint16_t)(resource[a] | (resource[a + 1] << 8)));
-            uint32_t cb = wallpaper_rgb((uint16_t)(resource[b] | (resource[b + 1] << 8)));
-            uint32_t cc = wallpaper_rgb((uint16_t)(resource[c] | (resource[c + 1] << 8)));
-            uint32_t cd = wallpaper_rgb((uint16_t)(resource[d] | (resource[d + 1] << 8)));
-            uint32_t color = blend(blend(ca, cb, fx), blend(cc, cd, fx), fy);
-            if (wallpaper == 1) color = blend(color, 0x0a628a, 38);
-            else if (wallpaper == 2) color = blend(color, 0x8a397c, 38);
-            if (NIGHT) color = blend(color, 0x070e1d, 45);
-            canvas[(size_t)py * sw + px] = color;
+            int u = sw > 1 ? (px * 2048) / (sw-1) : 0;
+            int glow = 540 - ((u > 1230 ? u-1230 : 1230-u) / 2 +
+                              (v > 980 ? v-980 : 980-v));
+            if (glow < 0) glow = 0;
+            int r = base_r + glow / 16;
+            int g = base_g + glow / 4;
+            int b = base_b + glow / 3;
+            if (g > 255) g = 255;
+            if (b > 255) b = 255;
+            uint32_t color = ((uint32_t)r<<16) | ((uint32_t)g<<8) | (uint32_t)b;
+            int curve = 1050 + ((v-940)*(v-940))/2350;
+            int ribbon = u-curve;
+            if (ribbon >= -110 && ribbon <= 155) {
+                int alpha = ribbon < 0 ? 170 + ribbon : 210-ribbon;
+                if (alpha > 0) color = blend(color,0x7cd7f5,alpha);
+            }
+            int beam = u - (290 + v*3/5);
+            if (beam >= -11 && beam <= 11) {
+                int alpha = 190-(beam<0?-beam:beam)*12;
+                if (alpha>0) color=blend(color,0x80edff,alpha);
+            }
+            int bend = u-(1610-(v-1150)*(v-1150)/2100);
+            if (bend >= -16 && bend <= 16) {
+                int alpha=130-(bend<0?-bend:bend)*7;
+                if (alpha>0) color=blend(color,0xa7e8ff,alpha);
+            }
+            if (wallpaper == 1) color = blend(color,0x105b8e,38);
+            else if (wallpaper == 2) color = blend(color,0x713b8f,48);
+            if (NIGHT) color = blend(color,0x050b16,64);
+            canvas[(size_t)py*sw+px]=color;
         }
     }
 }
@@ -1420,7 +1376,7 @@ static void execute_command(void) {
     log_write(linebuf);
     if (!console_len) return;
     if (same(console_input, "help")) print_info();
-    else if (same(console_input, "ver")) log_write("Quartzie 0.28  |  PE32 executable loader  |  i386");
+    else if (same(console_input, "ver")) log_write("Quartzie 0.30  |  PE32 executable loader  |  i386");
     else if (same(console_input, "clear")) log_count = 0;
     else if (same(console_input, "context")) log_write("Right click on desktop");
     else if (same(console_input, "dark")) { select_theme(3); log_write("Dark Glass enabled"); }
@@ -1433,7 +1389,7 @@ static void execute_command(void) {
         log_write("/ram/readme.txt");
         log_write("/ram/boot.log");
         log_write("/ram/notes.txt");
-    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.28; PE32/CUI; .NET/GTK not yet available");
+    } else if (same(console_input, "cat readme.txt")) log_write("Quartzie 0.30; PE32/CUI; .NET/GTK not yet available");
     else if (same(console_input, "cat boot.log")) log_write("El Torito -> kernel -> protected mode -> UI");
     else if (same(console_input, "cat notes.txt")) {
         char one[72] = "";
@@ -1724,9 +1680,6 @@ static void open_window(int app) {
     uint32_t handle = cm_window_open(app);
     if (handle && new_object) cm_post(handle, CM_MSG_CREATE, app, 0);
     if (handle) cm_post(handle, CM_MSG_ACTIVATE, app, 0);
-    int reversing = first && anim_ticks[app] > 0 && anim_exit[app] && anim_visible[app];
-    int reverse_x = 0, reverse_y = 0, reverse_w = 0, reverse_h = 0;
-    if (reversing) animated_window_rect(app, &reverse_x, &reverse_y, &reverse_w, &reverse_h);
     windows[app].opened = 1;
     windows[app].minimized = 0;
     raise_window(app);
@@ -1735,8 +1688,9 @@ static void open_window(int app) {
     quick_open = 0;
     notification_open = 0;
     if (first) {
-        if (reversing) begin_window_animation(app, reverse_x, reverse_y, reverse_w, reverse_h, WINDOW_OPEN_STEPS, 0);
-        else begin_window_animation(app, windows[app].x + windows[app].w / 24, windows[app].y + 12, windows[app].w * 11 / 12, windows[app].h * 11 / 12, WINDOW_OPEN_STEPS, 0);
+        anim_ticks[app] = 0;
+        anim_visible[app] = 0;
+        anim_exit[app] = 0;
     }
     if (was_closed) icon_kick(app, 1);
     else if (was_minimized || !was_active) icon_kick(app, 3);
@@ -3161,6 +3115,7 @@ static void repaint(void) {
             damage[0] = (DamageRect){min_x, min_y, max_x - min_x, max_y - min_y};
         }
     }
+    if (changed_window || order_changed) entire = 1;
     if (entire) {
         clip_full();
         draw_scene();
@@ -4117,7 +4072,7 @@ void kmain(void) {
     init_mouse();
     init_frame_clock();
     refresh_clock();
-    notify("Quartzie 0.29 is ready");
+    notify("Quartzie 0.30 is ready");
     repaint();
 #ifdef __i386__
     cm_userspace_ready = 0;
