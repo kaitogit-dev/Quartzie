@@ -41,9 +41,9 @@ def verify(iso_path, disk_path, esp_path, efi_path, iso_esp_path):
     root_offset = (1 + 2 * 32) * 512
     assert optical[root_offset:root_offset + 11] == b'EFI        '
     data_start = (1 + 2 * 32 + 32) * 512
-    assert optical[data_start + 2 * 512 + 64:data_start + 2 * 512 + 75] == b'BOOTX64 EFI'
-    assert optical[data_start + 2 * 512: data_start + 2 * 512 + 11] == b'.          '
-    assert optical[data_start + 3 * 512:data_start + 3 * 512 + len(efi)] == efi
+    assert optical[data_start + 512 + 64:data_start + 512 + 75] == b'BOOTX64 EFI'
+    assert optical[data_start + 512: data_start + 512 + 11] == b'.          '
+    assert optical[data_start + 2 * 512:data_start + 2 * 512 + len(efi)] == efi
     assert esp[:3] == b'\xeb\x58\x90' and esp[510:512] == b'\x55\xaa'
     assert esp[82:90] == b'FAT32   '
     reserved = struct.unpack_from('<H', esp, 14)[0]
