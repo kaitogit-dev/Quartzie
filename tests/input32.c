@@ -15,6 +15,22 @@ static void click(int x,int y) {
     packet(9,0,0);packet(8,0,0);
     CHECK(!left_down);
 }
+static void move_to(int x, int y) {
+    while (mouse_x != x || mouse_y != y) {
+        int dx = x - mouse_x;
+        int dy = mouse_y - y;
+        if (dx > 100) dx = 100;
+        if (dx < -100) dx = -100;
+        if (dy > 100) dy = 100;
+        if (dy < -100) dy = -100;
+        packet((uint8_t)(8 | (dx < 0 ? 16 : 0) | (dy < 0 ? 32 : 0)), (uint8_t)dx, (uint8_t)dy);
+    }
+}
+static void click_current(void) {
+    packet(9, 0, 0);
+    packet(8, 0, 0);
+    CHECK(!left_down);
+}
 static void render(void) {
     repaint();
     CHECK(!memcmp(canvas,(void*)(uintptr_t)boot_fb,1920u*1080u*4));
@@ -87,5 +103,25 @@ int main(void) {
     handle_mouse_byte(0xfa);handle_mouse_byte(0xfe);handle_mouse_byte(0x88);
     CHECK(mouse_index==0);
     packet(8,5,0);CHECK(mouse_x>=0);
+    reset_apps();render();
+    mouse_x=sw/2;mouse_y=sh/2;
+    move_to(sw-156,sh-32);
+    click_current();
+    CHECK(notification_open&&!start_open);
+    move_to(taskbar_left(7)+taskbar_width()/2,sh-33);
+    click_current();
+    CHECK(windows[FILES].opened&&active_window()==FILES);
+    CHECK(!notification_open);
+    move_to(sw-156,sh-32);
+    click_current();
+    CHECK(notification_open);
+    move_to(37,sh-32);
+    click_current();
+    CHECK(start_open&&!notification_open);
+    move_to(menu_left()+23+41,menu_top()+139+39);
+    click_current();
+    CHECK(!start_open&&!notification_open);
+    CHECK(windows[FILES].opened&&active_window()==FILES);
+    render();
     puts("PASS: 7 distinct taskbar apps, all 10 Start pinned launches, notification isolation, popup dismissal, PS/2 ACK rejection, 1080p framebuffer");
 }
