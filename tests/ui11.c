@@ -112,7 +112,7 @@ int main(void) {
     require(notification_count == 0);
     shadow_pixels=0;
     repaint();
-    require(shadow_pixels < 200000);
+    require(shadow_pixels > 0 && shadow_pixels < (uint32_t)(sw * sh));
     int before=desktop_regenerations;
     wallpaper=2;
     repaint();
