@@ -4,11 +4,12 @@ import sys
 import zlib
 
 
-def verify(iso_path, disk_path, esp_path, efi_path):
+def verify(iso_path, disk_path, esp_path, efi_path, iso_esp_path):
     efi = pathlib.Path(efi_path).read_bytes()
     iso = pathlib.Path(iso_path).read_bytes()
     disk = pathlib.Path(disk_path).read_bytes()
     esp = pathlib.Path(esp_path).read_bytes()
+    optical = pathlib.Path(iso_esp_path).read_bytes()
     assert efi[:2] == b'MZ'
     pe = struct.unpack_from('<I', efi, 0x3c)[0]
     assert efi[pe:pe+4] == b'PE\0\0'
@@ -31,7 +32,18 @@ def verify(iso_path, disk_path, esp_path, efi_path):
         if catalog[offset] in (0x90, 0x91) and catalog[offset+1] == 0xef and catalog[offset+32] == 0x88:
             candidates.append(struct.unpack_from('<I', catalog, offset+40)[0])
     assert candidates
-    assert any(iso[lba*2048:lba*2048+len(esp)] == esp for lba in candidates)
+    assert any(iso[lba*2048:lba*2048+len(optical)] == optical for lba in candidates)
+    assert len(optical) == 8192 * 512
+    assert optical[510:512] == b'\x55\xaa'
+    assert optical[54:62] == b'FAT16   '
+    assert struct.unpack_from('<H', optical, 17)[0] == 512
+    assert struct.unpack_from('<H', optical, 22)[0] == 32
+    root_offset = (1 + 2 * 32) * 512
+    assert optical[root_offset:root_offset + 11] == b'EFI        '
+    data_start = (1 + 2 * 32 + 32) * 512
+    assert optical[data_start + 2 * 512 + 64:data_start + 2 * 512 + 75] == b'BOOTX64 EFI'
+    assert optical[data_start + 2 * 512: data_start + 2 * 512 + 11] == b'.          '
+    assert optical[data_start + 3 * 512:data_start + 3 * 512 + len(efi)] == efi
     assert esp[:3] == b'\xeb\x58\x90' and esp[510:512] == b'\x55\xaa'
     assert esp[82:90] == b'FAT32   '
     reserved = struct.unpack_from('<H', esp, 14)[0]
@@ -50,7 +62,7 @@ def verify(iso_path, disk_path, esp_path, efi_path):
     crc=struct.unpack_from('<I', disk, 512+16)[0]
     hdr=bytearray(disk[512:512+92]);hdr[16:20]=b'\0'*4
     assert zlib.crc32(hdr)==crc
-    print('PASS: PE32+ AMD64, EFI application, FAT32 ESP, GPT, UEFI El Torito ISO')
+    print('PASS: PE32+ AMD64, EFI application, FAT16 optical image, FAT32 GPT partition, UEFI El Torito ISO')
 
 
 if __name__ == '__main__':
