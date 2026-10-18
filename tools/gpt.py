@@ -14,7 +14,7 @@ def write_gpt(esp_file, destination):
     sectors = start + count + 34
     disk = bytearray(sectors * 512)
     mbr = memoryview(disk)[:512]
-    mbr[446:462] = bytes.fromhex('000200eeffffff00') + struct.pack('<II', 1, min(sectors-1, 0xffffffff))
+    mbr[446:462] = bytes.fromhex('00000200eeffffff') + struct.pack('<II', 1, min(sectors-1, 0xffffffff))
     mbr[510:512] = b'\x55\xaa'
     entries = bytearray(128 * 128)
     entries[0:16] = uuid.UUID('c12a7328-f81f-11d2-ba4b-00a0c93ec93b').bytes_le

@@ -10,7 +10,7 @@ UEFI is the modern PC firmware interface used by current Windows installations. 
 
 ## Build
 
-On Linux, install Clang, LLD (`lld-link`), Python 3, GCC and Make.
+On Linux, install Clang, LLD (`lld-link`), Python 3, GCC, Make and xorriso.
 
 ```sh
 make verify

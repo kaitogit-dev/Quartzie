@@ -16,12 +16,22 @@ def verify(iso_path, disk_path, esp_path, efi_path):
     assert struct.unpack_from('<H', efi, pe+24)[0] == 0x20b
     assert struct.unpack_from('<H', efi, pe+24+68)[0] == 10
     assert iso[16*2048+1:16*2048+6] == b'CD001'
-    assert iso[17*2048+7:17*2048+30] == b'EL TORITO SPECIFICATION'
-    catalog = iso[20*2048:21*2048]
-    assert catalog[1] == 0xef and catalog[32] == 0x88
+    catalogs = []
+    for sector in range(16, 40):
+        data = iso[sector*2048:(sector+1)*2048]
+        if data[0] == 0 and data[1:6] == b'CD001' and data[7:30] == b'EL TORITO SPECIFICATION':
+            catalogs.append(struct.unpack_from('<I', data, 71)[0])
+    assert len(catalogs) == 1
+    catalog = iso[catalogs[0]*2048:(catalogs[0]+1)*2048]
     assert sum(struct.unpack('<16H', catalog[:32])) % 65536 == 0
-    boot_lba = struct.unpack_from('<I', catalog, 40)[0]
-    assert iso[boot_lba*2048:boot_lba*2048+len(esp)] == esp
+    candidates = []
+    if catalog[1] == 0xef and catalog[32] == 0x88:
+        candidates.append(struct.unpack_from('<I', catalog, 40)[0])
+    for offset in range(64, 2048-32, 32):
+        if catalog[offset] in (0x90, 0x91) and catalog[offset+1] == 0xef and catalog[offset+32] == 0x88:
+            candidates.append(struct.unpack_from('<I', catalog, offset+40)[0])
+    assert candidates
+    assert any(iso[lba*2048:lba*2048+len(esp)] == esp for lba in candidates)
     assert esp[:3] == b'\xeb\x58\x90' and esp[510:512] == b'\x55\xaa'
     assert esp[82:90] == b'FAT32   '
     reserved = struct.unpack_from('<H', esp, 14)[0]
@@ -35,6 +45,7 @@ def verify(iso_path, disk_path, esp_path, efi_path):
     assert bootdir[64:75] == b'BOOTX64 EFI'
     assert esp[(data_start+3)*512:(data_start+3)*512+len(efi)] == efi
     assert disk[510:512] == b'\x55\xaa' and disk[512:520] == b'EFI PART'
+    assert disk[450] == 0xee and struct.unpack_from('<I',disk,454)[0] == 1
     assert disk[2048*512:2048*512+len(esp)] == esp
     crc=struct.unpack_from('<I', disk, 512+16)[0]
     hdr=bytearray(disk[512:512+92]);hdr[16:20]=b'\0'*4
