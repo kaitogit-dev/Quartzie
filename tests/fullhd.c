@@ -52,9 +52,9 @@ int main(void) {
     screenshot("build/fullhd-desktop.ppm");
     uint32_t full = full_frames;
     open_window(FILES);
-    require(anim_ticks[FILES] == WINDOW_OPEN_STEPS);
+    require(anim_ticks[FILES] == 0);
     for (int i = 0; i < WINDOW_OPEN_STEPS + 1; i++) frame();
-    require(full_frames == full && damage_frames >= WINDOW_OPEN_STEPS);
+    require(full_frames == full + 1 && damage_frames >= WINDOW_OPEN_STEPS);
     require(windows[FILES].opened && !windows[FILES].minimized);
     screenshot("build/fullhd-files.ppm");
     mouse_x = windows[FILES].x + windows[FILES].w - 77;
