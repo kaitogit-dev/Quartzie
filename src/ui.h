@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
     int menu,notifications,quick,active,drag,drag_x,drag_y;
-    int pressed,last_button,frame_count;
+    int pressed,last_button,frame_count,hover;
     int note_length,command_length,calc_length;
     char notes[2048],command[128],calc[64],answer[64],status[96];
     QWindow windows[Q_APPS];

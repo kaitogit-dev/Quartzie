@@ -1,47 +1,39 @@
-# Quartzie x64
-
-Quartzie x64 is a newly written experimental graphical desktop for x86-64 machines using UEFI firmware. It is not a port of the former 32-bit kernel. The old BIOS boot sector, protected-mode entry, window compositor and PS/2 packet handling have been replaced with a freestanding PE32+ UEFI application, native GOP framebuffer renderer and UEFI keyboard/pointer input.
-
-## Important architecture note
-
-This is a **UEFI-hosted desktop prototype**, not yet an independent kernel that calls `ExitBootServices`. It does not provide kernel isolation, a process model, persistent filesystem access, network access, native hardware drivers or general executable loading. The Files window is a placeholder and scratchpad changes remain in memory. It is not Windows and does not include Microsoft code.
-
-UEFI is the modern PC firmware interface used by current Windows installations. Optical UEFI bootable ISO images still require an El Torito EFI boot catalog; Quartzie includes one for ISO compatibility. The GPT disk image instead boots through a FAT32 EFI System Partition and `EFI/BOOT/BOOTX64.EFI`.
+# Quartzie
 
 ## Build
 
-On Linux, install Clang, LLD (`lld-link`), Python 3, GCC, Make and xorriso.
+Requires Clang, LLD, xorriso, Python 3 with Pillow, and Inter fonts. On Ubuntu:
 
 ```sh
+sudo apt-get install clang lld xorriso python3-pil fonts-inter make gcc
 make verify
 ```
 
-Artifacts:
+## Run
 
-- `Quartzie-x64.iso`: compact UEFI optical image containing a 4 MiB FAT16 EFI boot image.
-- `Quartzie-x64-uefi.img`: GPT disk image containing a FAT32 EFI System Partition.
-- `build/BOOTX64.EFI`: PE32+ EFI application.
-
-## Run in QEMU
-
-Use OVMF (UEFI firmware), a display with GOP and a supported UEFI mouse implementation.
+Boot `Quartzie-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
-qemu-system-x86_64 -machine q35 -m 512 -vga std -bios /usr/share/OVMF/OVMF_CODE.fd -cdrom Quartzie-x64.iso
+qemu-system-x86_64 -machine q35 -m 512 -vga std \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+  -cdrom Quartzie-x64.iso -usb -device usb-tablet
 ```
 
-OVMF paths vary between Linux distributions. Disable Secure Boot for this unsigned test image. Do not write this preview disk image to a real drive containing data. Use a fresh virtual machine.
+For Windows QEMU, use `qemu-system-x86_64.exe` and the firmware files provided by the QEMU installer. Add `-usb -device usb-tablet` for UEFI tablet input; Quartzie also includes a PS/2 mouse fallback.
 
-## Browser-based emulators
+## Controls
 
-Use the QEMU-Wasm x86-64 runtime, UEFI firmware, and ISO optical media. The compact ISO is preferable to the GPT IMG in browser-only QEMU because it does not require a writable snapshot overlay. If QEMU reports that `/var/tmp/vl.*` cannot be created, its temporary filesystem or snapshot implementation failed before the guest booted; switching guest images cannot fix that host error. Browser tabs may still become unresponsive under software emulation. Native QEMU with OVMF is the supported verification target.
+- F1–F6: Applications
+- F7: App launcher
+- F8: Notifications
+- F9: Control center
+- Escape: Dismiss overlays
+- Drag title bars to move windows
 
-## UI
+## Current limits
 
-The new interface has an independent click router for Start, six application shortcuts, notifications and quick settings. Windows can be opened, focused, dragged and closed. The desktop renders glass layers with softened cached backdrops, rounded edges and distance-falloff shadows. Pointer-only movement updates just the cursor pixels instead of repainting the whole screen.
+The EFI application retains firmware services during operation. Notes are volatile, Files has no mounted filesystem, and process isolation, sound and networking are not implemented. Native QEMU with OVMF is the supported testing environment. The unsigned EFI image requires Secure Boot to be disabled.
 
-F1 through F6 open Files, Notes, Terminal, Calculator, Settings and About. F7 toggles Start, F8 toggles notifications, F9 toggles quick settings, and Escape closes popups. These shortcuts provide navigation if the firmware does not expose a mouse protocol.
+## Fonts
 
-## Verification
-
-`make verify` checks x64 PE/COFF EFI properties, FAT32 directory placement, ISO EFI boot catalog, GPT checksums, and desktop/input logic in native unit tests. Static verification is not a substitute for an OVMF boot test on the desired emulator or hardware.
+The UI font is rendered at build time from Inter. License and attribution are in `FONT-LICENSE.txt`.
