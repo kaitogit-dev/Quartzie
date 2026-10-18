@@ -1,8 +1,8 @@
 # Quartzie
 
-Quartzie is an experimental desktop operating system for 32-bit x86 PCs and virtual machines. It boots from a **legacy BIOS / El Torito ISO** and provides a graphical desktop with Windows-like window management, File Explorer, Settings, Notes, Console, Calendar, Calculator, and a native painting app.
+Quartzie is an experimental desktop operating system for 32-bit x86 PCs and virtual machines. It boots from a **legacy BIOS / El Torito ISO** and provides a **Modular Glassmorphism (Fluid Layers)** desktop with Windows 11–inspired floating panels, software-sampled glass, and window management, File Explorer, Settings, Notes, Console, Calendar, Calculator, and a native painting app.
 
-The project was previously called **Cinmix**. Its NT-style interfaces and limited PE32 console support are works in progress; Quartzie is **not Windows NT**, and it does not run arbitrary Windows programs.
+The project was previously called **Cinmix**. Its Modular Glassmorphism (Fluid Layers) interface and limited PE32 console support are works in progress; Quartzie is **not Windows NT**, and it does not run arbitrary Windows programs.
 
 ## Getting started
 
@@ -10,8 +10,8 @@ Download the ISO and the **separate writable disk image** from the current relea
 
 ```sh
 qemu-system-i386 -m 256 -vga std \
-  -cdrom Quartzie-0.26.iso -boot d \
-  -drive file=Quartzie-0.26-disk.img,format=raw,if=ide,index=0
+  -cdrom Quartzie-0.28.iso -boot d \
+  -drive file=Quartzie-0.28-disk.img,format=raw,if=ide,index=0
 ```
 
 The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtual display supports it; otherwise the bootloader chooses a supported fallback. The IDE hard disk must be attached as the **primary master** to enable persistence. Quartzie does **not** automatically format unknown disks.
@@ -21,10 +21,10 @@ The preferred desktop resolution is **1920×1080 at 32-bit color** if the virtua
 ## Desktop and applications
 
 - **File Explorer:** Browse the CinmixFS volume, create and select documents, search, change view/sort settings, and open supported files. A double-click opens items; a single click selects them.
-- **Settings:** Switch light/Dark Aero themes, wallpaper, accent colors and glass strength; manage notification and software-volume settings.
+- **Settings:** Switch Light Glass / Dark Glass themes, wallpaper, accent colors and glass strength; manage notification and software-volume settings.
 - **Notes:** Edit text and save it to the attached disk using `Ctrl+S`.
 - **Painter:** A native Pinta-style painting application with pencil, brush, eraser, shapes, fill, color selection, undo/redo and persistent saving. It is **not** the upstream Pinta GTK/.NET executable.
-- **Other desktop tools:** Console, System information, Calculator, Clock, Calendar, and a Windows-style taskbar with window animations.
+- **Other desktop tools:** Console, System information, Calculator, Clock, Calendar, and a floating glass taskbar with window animations.
 
 ### Keyboard and mouse shortcuts
 
@@ -51,7 +51,7 @@ make verify          # ISO/boot-image validation plus native regression tests
 make clean
 ```
 
-The build creates `Quartzie-0.26.iso` and `Quartzie-0.26-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
+The build creates `Quartzie-0.28.iso` and `Quartzie-0.28-disk.img`. The disk target creates a **new** image—do not overwrite one containing data. You can run the ISO in a compatible legacy-BIOS emulator using the command above.
 
 ### Code layout
 
@@ -74,6 +74,7 @@ Quartzie is a **hobby OS**, not a Windows replacement. Current limitations inclu
 - The signed CinmixFS volume supports **16 file slots** with a maximum of **4 KiB per file**; it is not FAT, NTFS, or a general-purpose filesystem.
 - The PE32 compatibility layer handles a narrow set of **32-bit console** executables and `KERNEL32` imports. It does not support general Windows GUI applications, x64 PE files, .NET 10, GTK4/libadwaita, or Windows DLL loading in general.
 - Some experimental work runs at ring 3, but most desktop applications still execute in the kernel's address space.
+- Glass translucency and blur are CPU-rendered approximations sampled from the stable wallpaper cache; they are not CSS or GPU backdrop filtering. Full cross-window backdrop sampling is not implemented.
 - Audio volume is a software UI setting; there is no working audio device driver.
 - `make verify` exercises native tests and verifies the ISO structure. It does **not** prove successful boot or smooth performance inside QEMU/Bochs. A real emulator run is important before treating any hardware-level change as confirmed.
 

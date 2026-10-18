@@ -2,6 +2,33 @@
 
 Release-specific changes belong here. See [README.md](README.md) for the project overview, getting started, usage, and build instructions.
 
+## Quartzie 0.28 — Stability and Fluid Layers rebuild
+
+- **Fix a confirmed global-buffer overflow:** the old rounded-corner scratch array stored only 18-pixel radii, but the Start menu requested 20 pixels. An AddressSanitizer reproduction on 0.27 reported a global-buffer-overflow in `round_capture`. The replacement uses bounded, matched, nested corner layers.
+- Fix further unbalanced corner captures in window buttons, Start, Quick Panel, notifications, and tooltips. Retain the outer window mask until *after* its child content is painted; avoid the old stray second mask operation that used an unrelated buffer.
+- Replace striped rectangular shadow outlines with continuous feathered distance-based shadow falloff and subtle refraction borders.
+- Replace expensive per-pixel glass saturation with clipped 8-pixel backdrop sampling and stable wallpaper-sourced 3-by-3 averaging; this is a CPU-oriented approximation, **not a hardware-accelerated CSS backdrop-filter**.
+- Replace the old blue Aero wallpaper with a violet/cyan ambient gradient, separate the taskbar into floating glass islands, center the new Start menu, and present pinned apps in a modern grid with search and recommendations.
+- Preserve the disk format, installed tools, focus behaviors, and native PE32/ring-3 experiments.
+- Add `corners28`, `appopen28`, `screens28` and `renderbench28` native tests. `appopen28` exercises 30 cross-application open/maximize/minimize/restore/close cycles and redraw equality. Rounded layer errors are now visible through `renderstat`.
+- Native 1920-by-1080 benchmark: across repeated cycles, opening Explorer is roughly four times faster and maximizing about four to five times faster than the previous 0.27 renderer on the development host. **Emulator performance and a real BIOS boot remain unverified**.
+
+## Quartzie 0.27 — Fluid Layers rebuild
+
+### Stability and performance
+
+- Shorten window open and resize animations so app launches feel snappier and repeated activation is less likely to look like a stall.
+- Coalesce many small compositor damage rectangles into one bounded redraw region when the desktop is under heavy churn, reducing repeated scene re-rendering during rapid window state changes.
+- Replace the previous many-pass perimeter shadow routine with a lighter layered shadow model that keeps depth cues while cutting redundant pixel work.
+- Keep the bounded stacking-order and rapid-click safeguards from 0.26.
+
+### Design language
+
+- Replace the Windows 7–style Aero treatment with a Windows 11–inspired **Modular Glassmorphism (Fluid Layers)** look.
+- Restyle windows, Start, Quick Panel, notifications, Run, tooltips, Alt+Tab, desktop selection states, and the taskbar as floating polished-glass surfaces.
+- Add deeper frosted backdrop treatment, stronger background color sampling, high-saturation glass tinting, finer refractive borders, and richer layered shadows.
+- Make focused windows lift more clearly off the canvas while inactive surfaces recede.
+
 ## Quartzie 0.26 — Taskbar click freeze fix
 
 - Replace a window hit-test loop that counted down from an ever-increasing stacking-order counter with a bounded scan of at most ten actual open windows.

@@ -68,7 +68,7 @@ def check(iso_path, boot_path, kernel_path, elf_path):
     assert b'\xb8\x80\x07' in kernel[:512]
     assert b'\xb8\x38\x04' in kernel[:512]
     assert b'QUARTZIE_0_26' in sector(16)
-    assert b'QUARTZIE 0.26' in entry
+    assert b'QUARTZIE 0.28' in entry
     assert b'KERNEL32.DLL' in kernel
     assert b'runpe ' in kernel
     for symbol in ('cm_pe_load', 'cm_proc_launch_pe', 'cm_pe_error',

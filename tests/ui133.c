@@ -37,7 +37,7 @@ int main(void) {
     int notes_x = bar + taskbar_step() + 5;
     uint32_t files_plain = color_at(files_x, y);
     uint32_t notes_plain = color_at(notes_x, y);
-    check(WINDOW_OPEN_STEPS == 3 && WINDOW_RESIZE_STEPS == 4);
+    check(WINDOW_OPEN_STEPS == 2 && WINDOW_RESIZE_STEPS == 3);
     check(WINDOW_OPEN_STEPS < WINDOW_CLOSE_STEPS);
     open_window(FILES);
     check(anim_ticks[FILES] == WINDOW_OPEN_STEPS);
