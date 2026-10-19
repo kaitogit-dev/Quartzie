@@ -25,6 +25,7 @@ typedef struct {
     int drag_cache_valid,drag_cache_app,drag_prev_x,drag_prev_y;
     int clip_left,clip_top,clip_right,clip_bottom;
     int damage_valid,damage_x,damage_y,damage_w,damage_h;
+    int render_app,glass_cached_app,render_topbar;
 } QDesktop;
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
