@@ -546,7 +546,7 @@ void q_move(QDesktop *q,int x,int y){
     if(q->pressed&&q->drag>=0){
         QWindow *w=&q->windows[q->drag];
         w->x=clamp(q->mouse_x-q->drag_x,0,q->width-w->w);
-        w->y=clamp(q->mouse_y-q->drag_y,61,q->height-w->h-92);
+        w->y=clamp(q->mouse_y-q->drag_y,61,q->height-44);
         q->dirty=1;
     }
     int hover=-1;
