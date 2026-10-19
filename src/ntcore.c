@@ -215,7 +215,11 @@ int64_t qnt_syscall(QNtKernel *k,uint32_t pid,uint32_t operation,uint64_t a,uint
         case QNT_SC_TICKS:return (int64_t)k->clock_ticks;
         case QNT_SC_GETPID:return (int64_t)pid;
         case QNT_SC_OPEN:return qnt_file_open(k,pid,(const char *)(uintptr_t)a,(uint64_t *)(uintptr_t)b);
-        case QNT_SC_READ:return qnt_file_read(k,pid,a,(uint32_t)b,(void *)(uintptr_t)c,(size_t)d,(size_t *)(uintptr_t)0);
+        case QNT_SC_READ:{
+            size_t read=0;
+            int status=qnt_file_read(k,pid,a,(uint32_t)b,(void *)(uintptr_t)c,(size_t)d,&read);
+            return status==QNT_OK?(int64_t)read:status;
+        }
         case QNT_SC_WRITE:{
             size_t written=0;
             int status=qnt_file_write(k,pid,a,(uint32_t)b,(const void *)(uintptr_t)c,(size_t)d,&written);
