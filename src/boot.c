@@ -4,6 +4,8 @@
 static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
+static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
+static uint32_t drag_sprite_buffer[900*640];
 static QDesktop desktop;
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
 static uint32_t *screen;
@@ -31,19 +33,51 @@ static uint32_t bg_for_pixel(int x,int y){
     if(pixel_format==0)return ((c&255)<<16)|(c&0x00ff00)|((c>>16)&255);
     return c;
 }
+static uint32_t mix(uint32_t a,uint32_t b,int alpha){
+    int inv=256-alpha;
+    return (((((a>>16)&255)*inv+((b>>16)&255)*alpha)>>8)<<16)|(((((a>>8)&255)*inv+((b>>8)&255)*alpha)>>8)<<8)|((((a&255)*inv)+((b&255)*alpha))>>8);
+}
+static int pointer_poly(int x,int y,int inner){
+    static const int outer[7][2]={{1,1},{1,23},{6,18},{11,27},{15,25},{10,16},{20,16}};
+    static const int white[7][2]={{3,4},{3,18},{7,14},{12,24},{13,23},{8,14},{15,14}};
+    const int (*points)[2]=inner?white:outer;
+    int inside=0;
+    for(int i=0,j=6;i<7;j=i++){
+        int xa=points[i][0]*16,xb=points[j][0]*16;
+        int ya=points[i][1]*16,yb=points[j][1]*16;
+        if((ya>y)==(yb>y))continue;
+        int64_t left=(int64_t)(x-xa)*(yb-ya);
+        int64_t right=(int64_t)(xb-xa)*(y-ya);
+        if((yb>ya&&left<right)||(yb<ya&&left>right))inside=!inside;
+    }
+    return inside;
+}
+static int pointer_cover(int px,int py,int inner){
+    int count=0;
+    for(int iy=0;iy<2;iy++)for(int ix=0;ix<2;ix++){
+        if(pointer_poly(px*16+4+ix*8,py*16+4+iy*8,inner))count++;
+    }
+    return count*64;
+}
 static void cursor_reset(void){cursor_old_x=-100;cursor_old_y=-100;}
 static void cursor_draw(int x,int y){
+    const int cw=27,ch=31;
     if(cursor_old_x>=0){
-        for(int yy=0;yy<20;yy++)for(int xx=0;xx<16;xx++){
+        for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
             int px=cursor_old_x+xx,py=cursor_old_y+yy;
             if((unsigned)px<(unsigned)desktop.width&&(unsigned)py<(unsigned)desktop.height)screen[(size_t)py*scanline+px]=bg_for_pixel(px,py);
         }
     }
-    for(int yy=0;yy<20;yy++)for(int xx=0;xx<16;xx++){
-        if(xx>yy/2||(yy>17&&xx>7))continue;
+    for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
         int px=x+xx,py=y+yy;
         if((unsigned)px>=(unsigned)desktop.width||(unsigned)py>=(unsigned)desktop.height)continue;
-        uint32_t col=(xx==0||xx==yy/2||yy==17)?0x16324e:0xe8ffff;
+        uint32_t col=desktop.pixels[(size_t)py*desktop.width+px];
+        int shadow=pointer_cover(xx-2,yy-2,0);
+        int edge=pointer_cover(xx,yy,0);
+        int fill=pointer_cover(xx,yy,1);
+        if(shadow)col=mix(col,0x091526,shadow/4);
+        if(edge)col=mix(col,0x15273a,edge);
+        if(fill)col=mix(col,0xffffff,fill);
         if(pixel_format==0)col=((col&255)<<16)|(col&0x00ff00)|((col>>16)&255);
         screen[(size_t)py*scanline+px]=col;
     }
@@ -60,6 +94,21 @@ static void present(void){
         }
     }
     cursor_reset();cursor_draw(desktop.mouse_x,desktop.mouse_y);
+}
+static void present_damage(int x,int y,int width,int height){
+    int x0=x<0?0:x,y0=y<0?0:y;
+    int x1=x+width>desktop.width?desktop.width:x+width;
+    int y1=y+height>desktop.height?desktop.height:y+height;
+    for(int py=y0;py<y1;py++){
+        size_t offset=(size_t)py*desktop.width;
+        volatile uint32_t *dst=(volatile uint32_t *)(screen+(size_t)py*scanline);
+        for(int px=x0;px<x1;px++){
+            uint32_t c=desktop.pixels[offset+px];
+            if(pixel_format==0)c=((c&255)<<16)|(c&0x00ff00)|((c>>16)&255);
+            dst[px]=c;
+        }
+    }
+    cursor_draw(desktop.mouse_x,desktop.mouse_y);
 }
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     (void)image;
@@ -89,6 +138,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     scanline=mode->PixelsPerScanLine;pixel_format=(int)mode->PixelFormat;
     screen=(uint32_t *)(uintptr_t)video->Mode->FrameBufferBase;
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
+    q_drag_buffers(&desktop,drag_base_buffer,drag_sprite_buffer);
     q_draw(&desktop);present();
     serial_text("QUARTZIE-DESKTOP-READY\n");
     EFI_SIMPLE_POINTER_PROTOCOL *mouse=0;
@@ -156,8 +206,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 q_key(&desktop,key.UnicodeChar,key.ScanCode);
             }
         }
-        if(desktop.dirty){q_draw(&desktop);present();}
-        else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
-        bs->Stall(8000);
+        if(desktop.dirty){
+            q_draw(&desktop);
+            if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
+            else present();
+        }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+        bs->Stall(desktop.drag>=0?2000:7000);
     }
 }

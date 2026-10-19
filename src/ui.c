@@ -24,29 +24,59 @@ static void rectangle(QDesktop *q,int x,int y,int w,int h,uint32_t color){
         for(int xx=x0;xx<x1;xx++)*p++=color;
     }
 }
-static int round_inside(int x,int y,int w,int h,int radius){
-    if(x<0||y<0||x>=w||y>=h)return 0;
-    int cx=x<radius?radius:x>=w-radius?w-radius-1:x;
-    int cy=y<radius?radius:y>=h-radius?h-radius-1:y;
-    int dx=x-cx,dy=y-cy;
-    return dx*dx+dy*dy<=radius*radius;
+static int round_sample16(int sx,int sy,int w,int h,int r){
+    int rw=w*16,rh=h*16,rr=r*16;
+    if(sx<0||sy<0||sx>=rw||sy>=rh)return 0;
+    if(r<=0)return 1;
+    int cx=sx<rr?rr:sx>=rw-rr?rw-rr-1:sx;
+    int cy=sy<rr?rr:sy>=rh-rr?rh-rr-1:sy;
+    int dx=sx-cx,dy=sy-cy;
+    return dx*dx+dy*dy<=rr*rr;
 }
-static void circular(QDesktop *q,int cx,int cy,int r,uint32_t c,int a){
+static int round_cover(int x,int y,int w,int h,int r){
+    return (round_sample16(x*16+4,y*16+4,w,h,r)+
+            round_sample16(x*16+12,y*16+4,w,h,r)+
+            round_sample16(x*16+4,y*16+12,w,h,r)+
+            round_sample16(x*16+12,y*16+12,w,h,r))*64;
+}
+static void circular(QDesktop *q,int cx,int cy,int r,uint32_t color,int alpha){
     if(r<=0)return;
     int x0=clamp(cx-r-1,0,q->width),x1=clamp(cx+r+2,0,q->width);
     int y0=clamp(cy-r-1,0,q->height),y1=clamp(cy+r+2,0,q->height);
+    const int rr=r*16;
     for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++){
-        int dx=x-cx,dy=y-cy,d=dx*dx+dy*dy;
-        if(d>(r+1)*(r+1))continue;
-        int alpha=d<=(r-1)*(r-1)?a:a*((r+1)*(r+1)-d)/(4*r);
-        if(alpha<1)continue;
+        int cover=0;
+        for(int j=0;j<2;j++)for(int i=0;i<2;i++){
+            int dx=x*16+4+i*8-cx*16,dy=y*16+4+j*8-cy*16;
+            if(dx*dx+dy*dy<=rr*rr)cover+=64;
+        }
+        if(!cover)continue;
         uint32_t *p=q->pixels+(size_t)y*q->width+x;
-        *p=blend(*p,c,clamp(alpha,0,256));
+        *p=blend(*p,color,cover*alpha/256);
     }
 }
-static void segment(QDesktop *q,int ax,int ay,int bx,int by,uint32_t c){
-    int dx=absval(bx-ax),dy=absval(by-ay),sx=ax<bx?1:-1,sy=ay<by?1:-1,err=dx-dy;
-    for(;;){pixel(q,ax,ay,c);if(ax==bx&&ay==by)break;int e=2*err;if(e>-dy){err-=dy;ax+=sx;}if(e<dx){err+=dx;ay+=sy;}}
+static void segment(QDesktop *q,int ax,int ay,int bx,int by,uint32_t color){
+    int dx=bx-ax,dy=by-ay;
+    int x0=clamp((ax<bx?ax:bx)-2,0,q->width);
+    int x1=clamp((ax>bx?ax:bx)+3,0,q->width);
+    int y0=clamp((ay<by?ay:by)-2,0,q->height);
+    int y1=clamp((ay>by?ay:by)+3,0,q->height);
+    int64_t length=(int64_t)dx*dx+(int64_t)dy*dy;
+    if(!length){pixel(q,ax,ay,color);return;}
+    for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++){
+        int cover=0;
+        for(int sy=0;sy<2;sy++)for(int sx=0;sx<2;sx++){
+            int64_t px=(int64_t)x*4+1+sx*2-(int64_t)ax*4;
+            int64_t py=(int64_t)y*4+1+sy*2-(int64_t)ay*4;
+            int64_t t=(px*dx+py*dy);
+            if(t<0)t=0;
+            if(t>length*4)t=length*4;
+            int64_t cross=px*4*length-t*4*dx;
+            int64_t other=py*4*length-t*4*dy;
+            if(cross*cross+other*other<=length*length*64)cover+=64;
+        }
+        if(cover){uint32_t *p=q->pixels+(size_t)y*q->width+x;*p=blend(*p,color,cover);}
+    }
 }
 static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int intensity){
     int x0=clamp(x-spread,0,q->width),x1=clamp(x+w+spread,0,q->width);
@@ -71,9 +101,9 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     if(x0>=x1||y0>=y1)return;
     int bw=q->width;
     for(int py=y0;py<y1;py++){
-        int up=clamp(py-12,0,q->height-1),down=clamp(py+12,0,q->height-1);
+        int up=clamp(py-8,0,q->height-1),down=clamp(py+8,0,q->height-1);
         for(int px=x0;px<x1;px++){
-            int left=clamp(px-12,0,q->width-1),right=clamp(px+12,0,q->width-1);
+            int left=clamp(px-8,0,q->width-1),right=clamp(px+8,0,q->width-1);
             uint32_t a=q->pixels[(size_t)up*bw+px];
             uint32_t b=q->pixels[(size_t)py*bw+left];
             uint32_t c=q->pixels[(size_t)py*bw+px];
@@ -86,16 +116,21 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     }
     for(int py=y0;py<y1;py++)for(int px=x0;px<x1;px++){
         int dx=px-x,dy=py-y;
-        if(!round_inside(dx,dy,w,h,radius))continue;
+        int cover=round_cover(dx,dy,w,h,radius);
+        if(!cover)continue;
         int sheen=dy<h/2?24*(h/2-dy)/(h/2+1):0;
         int grain=((px*13+py*23)^(px*3+py*7))&7;
         int material=clamp(alpha+sheen+grain-4,0,235);
         size_t at=(size_t)py*bw+px;
-        uint32_t frosted=blend(q->pixels[at],q->blurred[at],184);
+        uint32_t frosted=blend(q->pixels[at],q->blurred[at],176);
         uint32_t c=blend(frosted,tint,material);
-        if(dx==1||dy==1)c=blend(c,0xf7fbff,q->theme?38:73);
-        if(dx==w-2||dy==h-2)c=blend(c,q->theme?0x8baad8:0x486284,q->theme?45:38);
-        q->pixels[at]=c;
+        int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
+        int rim=cover-inner;
+        if(dy<2)c=blend(c,0xf7fbff,q->theme?28:56);
+        if(dx<2||dy<2)c=blend(c,0xffffff,(cover-inner/2)/8);
+        if(dx>w-3||dy>h-3)c=blend(c,q->theme?0x86a7d0:0x557099,q->theme?20:16);
+        if(rim>0)c=blend(c,q->theme?0xf4fbff:0xffffff,clamp(rim/4,0,34));
+        q->pixels[at]=blend(q->pixels[at],c,cover);
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
@@ -399,7 +434,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie",ink,2);
+        text(q,x,y,"Quartzie 0.33.0",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -423,15 +458,14 @@ static void draw_window(QDesktop *q,int app){
     segment(q,w->x+w->w-35,w->y+20,w->x+w->w-48,w->y+33,0x71475d);
     window_content(q,app,w);
 }
-void q_draw(QDesktop *q){
-    if(!q->dirty)return;
+static void draw_scene(QDesktop *q,int skip){
     size_t total=(size_t)q->width*q->height;
     for(size_t i=0;i<total;i++)q->pixels[i]=q->wallpaper[i];
     draw_desktop(q);
     int drawn[Q_APPS]={0};
     for(int layer=0;layer<Q_APPS;layer++){
         int app=-1;
-        for(int i=0;i<Q_APPS;i++)if(!drawn[i]&&q->windows[i].open&&(app<0||q->windows[i].z<q->windows[app].z))app=i;
+        for(int i=0;i<Q_APPS;i++)if(i!=skip&&!drawn[i]&&q->windows[i].open&&(app<0||q->windows[i].z<q->windows[app].z))app=i;
         if(app<0)break;
         drawn[app]=1;draw_window(q,app);
     }
@@ -440,6 +474,68 @@ void q_draw(QDesktop *q){
     draw_menu(q);
     draw_notifications(q);
     draw_quick(q);
+}
+void q_drag_buffers(QDesktop *q,uint32_t *background,uint32_t *sprite){
+    q->drag_base=background;q->drag_sprite=sprite;
+}
+static void drag_capture(QDesktop *q){
+    int app=q->drag;
+    QWindow *w=&q->windows[app];
+    draw_scene(q,app);
+    size_t total=(size_t)q->width*q->height;
+    for(size_t i=0;i<total;i++)q->drag_base[i]=q->pixels[i];
+    draw_scene(q,-1);
+    for(int y=0;y<w->h;y++)for(int x=0;x<w->w;x++){
+        q->drag_sprite[(size_t)y*w->w+x]=q->pixels[(size_t)(w->y+y)*q->width+w->x+x];
+    }
+    q->drag_sprite_w=w->w;q->drag_sprite_h=w->h;
+    q->drag_prev_x=w->x;q->drag_prev_y=w->y;
+    q->drag_cache_app=app;q->drag_cache_valid=1;
+    q->damage_valid=0;
+}
+static void drag_redraw(QDesktop *q){
+    QWindow *w=&q->windows[q->drag];
+    int pad=44;
+    int x0=clamp((w->x<q->drag_prev_x?w->x:q->drag_prev_x)-pad,0,q->width);
+    int y0=clamp((w->y<q->drag_prev_y?w->y:q->drag_prev_y)-pad,0,q->height);
+    int x1=clamp((w->x>q->drag_prev_x?w->x:q->drag_prev_x)+w->w+pad,0,q->width);
+    int y1=clamp((w->y>q->drag_prev_y?w->y:q->drag_prev_y)+w->h+pad,0,q->height);
+    if(x0>=x1||y0>=y1){q->damage_valid=0;return;}
+    for(int y=y0;y<y1;y++){
+        size_t offset=(size_t)y*q->width+x0;
+        for(int x=x0;x<x1;x++)q->pixels[offset+(size_t)(x-x0)]=q->drag_base[offset+(size_t)(x-x0)];
+    }
+    soft_shadow(q,w->x,w->y+9,w->w,w->h,25,36,83);
+    int dx=dock_x(q)-6,dy=dock_y(q)-6;
+    for(int y=0;y<w->h;y++){
+        int py=w->y+y;
+        if(py<0||py>=q->height)continue;
+        for(int x=0;x<w->w;x++){
+            int px=w->x+x;
+            if(px<0||px>=q->width)continue;
+            if(hit(px,py,dx,dy,567,82))continue;
+            int coverage=round_cover(x,y,w->w,w->h,25);
+            if(!coverage)continue;
+            uint32_t *dst=q->pixels+(size_t)py*q->width+px;
+            *dst=blend(*dst,q->drag_sprite[(size_t)y*w->w+x],coverage);
+        }
+    }
+    q->drag_prev_x=w->x;q->drag_prev_y=w->y;
+    q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
+    q->damage_valid=1;
+}
+void q_draw(QDesktop *q){
+    if(!q->dirty)return;
+    if(q->drag>=0&&q->drag_base&&q->drag_sprite){
+        QWindow *w=&q->windows[q->drag];
+        int cached=q->drag_cache_valid&&q->drag_cache_app==q->drag&&q->drag_sprite_w==w->w&&q->drag_sprite_h==w->h;
+        if(cached)drag_redraw(q);
+        else if(w->x>=0&&w->y>=0&&w->x+w->w<=q->width&&w->y+w->h<=q->height)drag_capture(q);
+        else{q->damage_valid=0;draw_scene(q,-1);}
+    }else{
+        q->drag_cache_valid=0;q->damage_valid=0;
+        draw_scene(q,-1);
+    }
     q->frame_count++;
     q->dirty=0;
 }
@@ -541,14 +637,16 @@ void q_click(QDesktop *q,int x,int y){
     q->active=-1;q->dirty=1;
 }
 void q_press(QDesktop *q,int x,int y){q->pressed=1;q_click(q,x,y);}
-void q_release(QDesktop *q){q->pressed=0;q->drag=-1;}
+void q_release(QDesktop *q){q->pressed=0;if(q->drag>=0){q->dirty=1;q->drag_cache_valid=0;}q->drag=-1;}
 void q_move(QDesktop *q,int x,int y){
     q->mouse_x=clamp(x,0,q->width-1);q->mouse_y=clamp(y,0,q->height-1);
     if(q->pressed&&q->drag>=0){
         QWindow *w=&q->windows[q->drag];
-        w->x=clamp(q->mouse_x-q->drag_x,0,q->width-w->w);
-        w->y=clamp(q->mouse_y-q->drag_y,61,q->height-44);
-        q->dirty=1;
+        int new_x=clamp(q->mouse_x-q->drag_x,0,q->width-w->w);
+        int max_y=q->height-44;
+        if(max_y<61)max_y=61;
+        int new_y=clamp(q->mouse_y-q->drag_y,61,max_y);
+        if(new_x!=w->x||new_y!=w->y){w->x=new_x;w->y=new_y;q->dirty=1;}
     }
     int hover=-1;
     int dock=q_dock_hit(q,q->mouse_x,q->mouse_y);

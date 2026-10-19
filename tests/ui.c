@@ -5,6 +5,7 @@
 #include <string.h>
 static uint32_t framebuffer[1280*720],wall[1280*720],blur[1280*720];
 static QDesktop desktop;
+static uint32_t drag_back[1280*720],drag_sprite[900*640];
 #define check(x) do{if(!(x)){fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static void shot(const char *file){
     FILE *f=fopen(file,"wb");check(f!=0);
@@ -40,8 +41,6 @@ int main(void){
     check(desktop.drag==Q_NOTES);
     q_move(&desktop,desktop.mouse_x+90,desktop.mouse_y+30);
     check(desktop.windows[Q_NOTES].x!=w.x);
-    q_move(&desktop,desktop.mouse_x,719);
-    check(desktop.windows[Q_NOTES].y+desktop.windows[Q_NOTES].h>top);
     q_release(&desktop);check(desktop.drag==-1);
     q_click(&desktop,left+77+4*77+30,top+32);
     check(desktop.active==Q_SETTINGS);
@@ -68,6 +67,25 @@ int main(void){
     check(desktop.hover==Q_TERMINAL);
     q_draw(&desktop);
     check(framebuffer[0]!=0&&framebuffer[100*1280+100]!=0);
-    printf("PASS: antialiased desktop, routed dock and menu input, mouse hover, window focus and drag, settings, notes and calculator\n");
+    q_init(&desktop,1280,720,framebuffer,wall,blur);
+    q_drag_buffers(&desktop,drag_back,drag_sprite);
+    q_open(&desktop,Q_NOTES);
+    q_draw(&desktop);
+    QWindow original=desktop.windows[Q_NOTES];
+    q_press(&desktop,original.x+90,original.y+25);
+    check(desktop.drag==Q_NOTES);
+    q_draw(&desktop);
+    check(desktop.drag_cache_valid&&!desktop.damage_valid);
+    q_move(&desktop,original.x+130,original.y+60);
+    q_draw(&desktop);
+    check(desktop.damage_valid&&desktop.damage_w>0&&desktop.damage_h>0);
+    check(desktop.windows[Q_NOTES].x==original.x+40);
+    q_move(&desktop,original.x+130,719);
+    q_draw(&desktop);
+    check(desktop.windows[Q_NOTES].y+desktop.windows[Q_NOTES].h>720-89);
+    q_release(&desktop);
+    q_draw(&desktop);
+    check(!desktop.drag_cache_valid&&!desktop.damage_valid);
+    printf("PASS: antialiased desktop, routed dock and menu input, window focus, cached partial window dragging, settings, notes and calculator\n");
     return 0;
 }

@@ -20,14 +20,16 @@ jobs:
         run: python3 tools/mousecheck.py Quartzie-x64.iso
       - name: Boot GPT image in OVMF
         run: python3 tools/bootcheck.py Quartzie-x64-uefi.img disk
+      - name: Version builds
+        run: make release
       - name: Publish artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Quartzie-x64-UEFI
+          name: Quartzie-0.33.0-x64-UEFI
           if-no-files-found: error
           compression-level: 9
           path: |
-            Quartzie-x64.iso
-            Quartzie-x64-uefi.img
+            Quartzie-0.33.0-x64.iso
+            Quartzie-0.33.0-x64.img
             build/BOOTX64.EFI
             build/*-screen.ppm

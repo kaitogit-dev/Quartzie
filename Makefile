@@ -1,3 +1,4 @@
+VERSION = 0.33.0
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -6,6 +7,9 @@ FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
 OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img
+release: all
+	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
+	cp Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.img
 build:
 	mkdir -p build
 build/%.obj: src/%.c | build
@@ -34,5 +38,5 @@ test: build/ui-test build/ps2-test
 verify: all test
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 clean:
-	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img
-.PHONY: all test verify clean
+	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+.PHONY: all release test verify clean
