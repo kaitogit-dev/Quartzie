@@ -18,11 +18,13 @@ def entry(name, attributes, cluster, length=0):
     return item
 
 
-def create(path):
+def create(path, application):
     binary = pathlib.Path(path).read_bytes()
+    executable = pathlib.Path(application).read_bytes()
     count = math.ceil(len(binary) / 512)
-    if count > 8000:
-        raise ValueError('EFI executable exceeds compact image capacity')
+    app_count = math.ceil(len(executable) / 512)
+    if count + app_count > 8000:
+        raise ValueError('EFI image capacity exceeded')
     image = bytearray(SECTORS * 512)
     sector = memoryview(image)[:512]
     sector[:3] = b'\xeb\x3c\x90'
@@ -38,6 +40,9 @@ def create(path):
         struct.pack_into('<H', fat, n * 2, value)
     for i in range(count):
         struct.pack_into('<H', fat, (i + 4) * 2, i + 5 if i + 1 < count else 0xffff)
+    app_cluster = 4 + count
+    for i in range(app_count):
+        struct.pack_into('<H', fat, (app_cluster + i) * 2, app_cluster + i + 1 if i + 1 < app_count else 0xffff)
     image[512:(1 + FAT_SECTORS) * 512] = fat
     image[(1 + FAT_SECTORS) * 512:(1 + 2 * FAT_SECTORS) * 512] = fat
 
@@ -46,6 +51,7 @@ def create(path):
 
     root = (1 + 2 * FAT_SECTORS) * 512
     image[root:root + 32] = entry('EFI        ', 0x10, 2)
+    image[root + 32:root + 64] = entry('QSTART  EXE', 0x20, app_cluster, len(executable))
     image[cluster(2):cluster(2) + 32] = entry('.          ', 0x10, 2)
     image[cluster(2) + 32:cluster(2) + 64] = entry('..         ', 0x10, 0)
     image[cluster(2) + 64:cluster(2) + 96] = entry('BOOT       ', 0x10, 3)
@@ -53,8 +59,9 @@ def create(path):
     image[cluster(3) + 32:cluster(3) + 64] = entry('..         ', 0x10, 2)
     image[cluster(3) + 64:cluster(3) + 96] = entry('BOOTX64 EFI', 0x20, 4, len(binary))
     image[cluster(4):cluster(4) + len(binary)] = binary
+    image[cluster(app_cluster):cluster(app_cluster) + len(executable)] = executable
     return image
 
 
 if __name__ == '__main__':
-    pathlib.Path(sys.argv[2]).write_bytes(create(sys.argv[1]))
+    pathlib.Path(sys.argv[2]).write_bytes(create(sys.argv[1], sys.argv[3]))
