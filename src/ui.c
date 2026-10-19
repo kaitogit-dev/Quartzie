@@ -34,6 +34,8 @@ static int round_sample16(int sx,int sy,int w,int h,int r){
     return dx*dx+dy*dy<=rr*rr;
 }
 static int round_cover(int x,int y,int w,int h,int r){
+    if(x<0||y<0||x>=w||y>=h)return 0;
+    if(r<=0||(x>=r&&x<w-r)||(y>=r&&y<h-r))return 256;
     return (round_sample16(x*16+4,y*16+4,w,h,r)+
             round_sample16(x*16+12,y*16+4,w,h,r)+
             round_sample16(x*16+4,y*16+12,w,h,r)+
