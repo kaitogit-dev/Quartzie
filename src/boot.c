@@ -228,6 +228,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
         }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
-        bs->Stall(desktop.drag>=0?1000:3000);
+        bs->Stall(desktop.drag>=0?1000:(desktop.scene_tween_active?9000:3000));
     }
 }
