@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $qemu = Join-Path $env:ProgramFiles "qemu"
 $executable = Join-Path $qemu "qemu-system-x86_64.exe"
-$iso = Join-Path $PSScriptRoot "..\Quartzie-0.35.2-x64.iso"
+$iso = Join-Path $PSScriptRoot "Quartzie-0.35.2-x64.iso"
 if (!(Test-Path $iso)) { $iso = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.35.2-x64.iso" }
 if (!(Test-Path $executable)) { throw "QEMU not found: $executable" }
 if (!(Test-Path $iso)) { throw "ISO not found: $iso" }
