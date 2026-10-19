@@ -334,6 +334,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
 static void close_popups(QDesktop *q){q->menu=0;q->notifications=0;q->quick=0;}
 static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
+static uint32_t scene_back[Q_MAX_W*Q_MAX_H];
 static void begin_scene_tween(QDesktop *q,int kind){
     if(!q->animations_enabled||q->drag>=0)return;
     size_t total=(size_t)q->width*q->height;
@@ -349,6 +350,7 @@ static void start_tween(QDesktop *q,int app,int kind,int x,int y,int w,int h){
     if(!q->animations_enabled)return;
     QWindow *window=&q->windows[app];
     window->tween_kind=kind;
+    q->scene_tween_app=app;
     window->tween_step=0;
     window->tween_x=x;window->tween_y=y;
     window->tween_w=w;window->tween_h=h;
@@ -718,13 +720,69 @@ static void drag_redraw(QDesktop *q){
     q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
     q->damage_valid=1;
 }
+static uint32_t geometry_color(uint32_t base,uint32_t original,uint32_t final){
+    int r=(int)(base>>16&255)+(int)(final>>16&255)-(int)(original>>16&255);
+    int g=(int)(base>>8&255)+(int)(final>>8&255)-(int)(original>>8&255);
+    int b=(int)(base&255)+(int)(final&255)-(int)(original&255);
+    return rgb(clamp(r,0,255),clamp(g,0,255),clamp(b,0,255));
+}
+static void paint_window_geometry(QDesktop *q,int weight){
+    int app=q->scene_tween_app;
+    if(app<0||app>=Q_APPS)return;
+    const QWindow *w=&q->windows[app];
+    int ax=w->tween_x,ay=w->tween_y,aw=w->tween_w,ah=w->tween_h;
+    int bx=w->x,by=w->y,bw=w->w,bh=w->h;
+    if(q->scene_tween_kind==1){
+        ax=bx+(bw*4)/100;
+        ay=by+(bh*4)/100+12;
+        aw=bw-(bw*8)/100;
+        ah=bh-(bh*8)/100;
+    }
+    int ix=ax+(int)(((int64_t)(bx-ax)*weight)/256);
+    int iy=ay+(int)(((int64_t)(by-ay)*weight)/256);
+    int iw=aw+(int)(((int64_t)(bw-aw)*weight)/256);
+    int ih=ah+(int)(((int64_t)(bh-ah)*weight)/256);
+    if(iw<1||ih<1)return;
+    int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
+    for(int y=y0;y<y1;y++){
+        size_t row=(size_t)y*q->width;
+        for(int x=x0;x<x1;x++)q->pixels[row+x]=scene_back[row+x];
+    }
+    int left=clamp(ix-32,x0,x1),top=clamp(iy-32,y0,y1);
+    int right=clamp(ix+iw+32,x0,x1),bottom=clamp(iy+ih+32,y0,y1);
+    for(int y=top;y<bottom;y++){
+        int sy=by+(int)(((int64_t)(y-iy)*bh)/ih);
+        if(y<iy)sy=y-iy+by;
+        else if(y>=iy+ih)sy=y-(iy+ih)+by+bh;
+        if(sy<0||sy>=q->height)continue;
+        size_t row=(size_t)y*q->width;
+        size_t srcrow=(size_t)sy*q->width;
+        for(int x=left;x<right;x++){
+            int sx=bx+(int)(((int64_t)(x-ix)*bw)/iw);
+            if(x<ix)sx=x-ix+bx;
+            else if(x>=ix+iw)sx=x-(ix+iw)+bx+bw;
+            if(sx<0||sx>=q->width)continue;
+            size_t dst=row+x,src=srcrow+sx;
+            q->pixels[dst]=geometry_color(scene_back[dst],scene_back[src],scene_to[src]);
+        }
+    }
+    clip_region(q,x0,y0,x1,y1);
+    draw_dock(q);
+    clip_full(q);
+}
 static void paint_scene_tween(QDesktop *q){
     static const int ease[13]={0,10,27,49,76,106,137,167,195,217,235,248,256};
     int progress=clamp(q->scene_tween_step,0,12);
     int weight=ease[progress];
     int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
+    if((q->scene_tween_kind==1||q->scene_tween_kind==2)&&weight>0&&weight<256){
+        paint_window_geometry(q,weight);
+        q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
+        q->damage_valid=1;
+        return;
+    }
     int shift=0;
-    if(q->scene_tween_kind==1||q->scene_tween_kind==5)shift=(256-weight)*10/256;
+    if(q->scene_tween_kind==5)shift=(256-weight)*10/256;
     if(q->scene_tween_kind==3||q->scene_tween_kind==4||q->scene_tween_kind==6)shift=weight*9/256;
     for(int y=y0;y<y1;y++){
         size_t row=(size_t)y*q->width;
@@ -777,6 +835,16 @@ void q_draw(QDesktop *q){
             }
         }
         if(left<right&&top<bottom){
+            if((q->scene_tween_kind==1||q->scene_tween_kind==2)&&q->scene_tween_app>=0&&q->scene_tween_app<Q_APPS){
+                QWindow *target=&q->windows[q->scene_tween_app];
+                int old=target->minimized;
+                target->minimized=1;
+                draw_scene(q,-1);
+                size_t total=(size_t)q->width*q->height;
+                for(size_t i=0;i<total;i++)scene_back[i]=q->pixels[i];
+                target->minimized=old;
+                for(size_t i=0;i<total;i++)q->pixels[i]=scene_from[i];
+            }
             q->scene_x0=clamp(left-20,0,q->width);
             q->scene_y0=clamp(top-20,0,q->height);
             q->scene_x1=clamp(right+20,0,q->width);
