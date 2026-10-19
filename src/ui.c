@@ -750,7 +750,7 @@ static void paint_window_geometry(QDesktop *q,int weight){
     }
     int left=clamp(ix-32,x0,x1),top=clamp(iy-32,y0,y1);
     int right=clamp(ix+iw+32,x0,x1),bottom=clamp(iy+ih+32,y0,y1);
-    int map_x[Q_MAX_W];
+    static int map_x[Q_MAX_W];
     for(int x=left;x<right;x++){
         int sx=bx+(int)(((int64_t)(x-ix)*bw)/iw);
         if(x<ix)sx=x-ix+bx;
