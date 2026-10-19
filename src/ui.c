@@ -93,7 +93,7 @@ static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int
             if(distance<0||distance>=spread)continue;
             int strength=intensity*(spread-distance)*(spread-distance)/(spread*spread);
             uint32_t *dst=&q->pixels[(size_t)yy*q->width+xx];
-            *dst=blend(*dst,0x030a19,strength);
+            *dst=blend(*dst,0x102743,strength);
         }
     }
 }
@@ -198,7 +198,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
-    soft_shadow(q,x,y+9,w,h,r,36,83);
+    soft_shadow(q,x,y,w,h,r,32,40);
     surface(q,x,y,w,h,r,tint,alpha);
 }
 static void string_limit(QDesktop *q,int x,int baseline,const char *s,uint32_t color,int style,int max_width,int max_lines){
@@ -382,18 +382,6 @@ static void draw_desktop(QDesktop *q){
         int width=text_width(names[i],0);
         text(q,x+(86-width)/2,y+82,names[i],foreground(q),0);
     }
-    if(q->width>=1100&&q->height>=660){
-        int x=q->width-395,y=108;
-        pane(q,x,y,363,236,25,0xcadfee,117);
-        text(q,x+26,y+39,"Quick access",foreground(q),1);
-        thin_rule(q,x+25,y+59,310,55);
-        surface(q,x+25,y+81,313,58,17,inner_material(q),q->theme?86:96);
-        icon(q,x+57,y+109,Q_NOTES,0xfcffff);
-        text(q,x+92,y+115,"New note",foreground(q),1);
-        surface(q,x+25,y+151,313,58,17,inner_material(q),q->theme?86:96);
-        icon(q,x+57,y+180,Q_FILES,0xfcffff);
-        text(q,x+92,y+186,"Browse files",foreground(q),1);
-    }
 }
 static void draw_dock(QDesktop *q){
     int x=dock_x(q),y=dock_y(q);
@@ -529,7 +517,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.35.1",ink,2);
+        text(q,x,y,"Quartzie 0.35.2",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -545,8 +533,7 @@ static void draw_window(QDesktop *q,int app){
     int previous_render_app=q->render_app;
     q->render_app=app;
     pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?180:149);
-    surface(q,w->x+1,w->y+1,w->w-2,55,23,q->theme?0x304c6a:0xe5f2fc,q->theme?111:129);
-    thin_rule(q,w->x+23,w->y+56,w->w-46,45);
+    thin_rule(q,w->x+23,w->y+56,w->w-46,28);
     text(q,w->x+29,w->y+36,names[app],foreground(q),1);
     surface(q,w->x+w->w-157,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-108,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
@@ -765,11 +752,6 @@ void q_click(QDesktop *q,int x,int y){
             }
         }
         return;
-    }
-    if(q->width>=1100&&q->height>=660){
-        int ax=q->width-395;
-        if(hit(x,y,ax+25,108+81,313,58)){q_open(q,Q_NOTES);return;}
-        if(hit(x,y,ax+25,108+151,313,58)){q_open(q,Q_FILES);return;}
     }
     int shortcut=desktop_shortcut(q,x,y);
     if(shortcut>=0){q_open(q,shortcut);return;}
