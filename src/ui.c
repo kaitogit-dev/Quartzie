@@ -486,7 +486,9 @@ static void drag_capture(QDesktop *q){
     for(size_t i=0;i<total;i++)q->drag_base[i]=q->pixels[i];
     draw_scene(q,-1);
     for(int y=0;y<w->h;y++)for(int x=0;x<w->w;x++){
-        q->drag_sprite[(size_t)y*w->w+x]=q->pixels[(size_t)(w->y+y)*q->width+w->x+x];
+        int coverage=round_cover(x,y,w->w,w->h,25);
+        uint32_t color=q->pixels[(size_t)(w->y+y)*q->width+w->x+x];
+        q->drag_sprite[(size_t)y*w->w+x]=(color&0xffffffu)|((uint32_t)(coverage==256?255:coverage)<<24);
     }
     q->drag_sprite_w=w->w;q->drag_sprite_h=w->h;
     q->drag_prev_x=w->x;q->drag_prev_y=w->y;
@@ -514,10 +516,11 @@ static void drag_redraw(QDesktop *q){
             int px=w->x+x;
             if(px<0||px>=q->width)continue;
             if(hit(px,py,dx,dy,567,82))continue;
-            int coverage=round_cover(x,y,w->w,w->h,25);
+            uint32_t packed=q->drag_sprite[(size_t)y*w->w+x];
+            int coverage=(int)(packed>>24);
             if(!coverage)continue;
             uint32_t *dst=q->pixels+(size_t)py*q->width+px;
-            *dst=blend(*dst,q->drag_sprite[(size_t)y*w->w+x],coverage);
+            *dst=coverage==255?(packed&0xffffffu):blend(*dst,packed&0xffffffu,coverage);
         }
     }
     q->drag_prev_x=w->x;q->drag_prev_y=w->y;
