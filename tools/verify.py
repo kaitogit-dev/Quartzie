@@ -16,6 +16,7 @@ def verify(iso_path, disk_path, esp_path, efi_path, iso_esp_path):
     assert struct.unpack_from('<H', efi, pe+4)[0] == 0x8664
     assert struct.unpack_from('<H', efi, pe+24)[0] == 0x20b
     assert struct.unpack_from('<H', efi, pe+24+68)[0] == 10
+    assert len(iso) < 12 * 1024 * 1024, 'ISO uses the wrong EFI boot image'
     assert iso[16*2048+1:16*2048+6] == b'CD001'
     catalogs = []
     for sector in range(16, 40):
@@ -33,7 +34,7 @@ def verify(iso_path, disk_path, esp_path, efi_path, iso_esp_path):
             candidates.append(struct.unpack_from('<I', catalog, offset+40)[0])
     assert candidates
     assert any(iso[lba*2048:lba*2048+len(optical)] == optical for lba in candidates)
-    assert len(optical) == 8192 * 512
+    assert len(optical) == 8192 * 512, 'ISO must contain the compact EFI filesystem'
     assert optical[510:512] == b'\x55\xaa'
     assert optical[54:62] == b'FAT16   '
     assert struct.unpack_from('<H', optical, 17)[0] == 512
