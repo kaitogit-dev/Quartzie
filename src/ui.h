@@ -12,6 +12,7 @@
 #define Q_ABOUT 5
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
+    int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
 } QWindow;
 typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
@@ -27,9 +28,12 @@ typedef struct {
     int damage_valid,damage_x,damage_y,damage_w,damage_h;
     int hover_only,hover_last;
     int render_app,glass_cached_app,render_topbar;
+    int animations_enabled,dock_lift[Q_APPS],dock_pulse[Q_APPS];
 } QDesktop;
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
+void q_enable_animations(QDesktop *q);
+void q_tick(QDesktop *q);
 void q_drag_buffers(QDesktop *q,uint32_t *background);
 void q_click(QDesktop *q,int x,int y);
 void q_press(QDesktop *q,int x,int y);
