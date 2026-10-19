@@ -1,4 +1,4 @@
-VERSION = 0.36.0
+VERSION = 0.37.0
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -36,7 +36,7 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h build/font.c | buil
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c -o $@
-test: build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test
+test: build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/ui-test
 	./build/ps2-test
 	./build/glass-test
@@ -44,10 +44,13 @@ test: build/ui-test build/ps2-test build/glass-test build/window-test build/curs
 	./build/cursor-test
 	./build/layout-test
 	./build/tween-test
+	./build/transitions-test
 verify: all test
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+build/transitions-test: tests/transitions.c src/ui.c src/ui.h src/font.h build/font.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/transitions.c src/ui.c build/font.c -o $@
 build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c build/font.c -o $@
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h build/font.c | build
