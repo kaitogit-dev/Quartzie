@@ -718,9 +718,74 @@ static void drag_redraw(QDesktop *q){
     q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
     q->damage_valid=1;
 }
+static void paint_scene_tween(QDesktop *q){
+    static const int ease[13]={0,10,27,49,76,106,137,167,195,217,235,248,256};
+    int progress=clamp(q->scene_tween_step,0,12);
+    int weight=ease[progress];
+    int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
+    int shift=0;
+    if(q->scene_tween_kind==1||q->scene_tween_kind==5)shift=(256-weight)*10/256;
+    if(q->scene_tween_kind==3||q->scene_tween_kind==4||q->scene_tween_kind==6)shift=weight*9/256;
+    for(int y=y0;y<y1;y++){
+        size_t row=(size_t)y*q->width;
+        for(int x=x0;x<x1;x++){
+            size_t p=row+x;
+            uint32_t from=scene_from[p],to=scene_to[p];
+            if(shift>0){
+                if(q->scene_tween_kind==1||q->scene_tween_kind==5){
+                    int sy=y+shift;
+                    if(sy<q->height)to=scene_to[(size_t)sy*q->width+x];
+                }else{
+                    int sy=y-shift;
+                    if(sy>=0)from=scene_from[(size_t)sy*q->width+x];
+                }
+            }
+            q->pixels[p]=blend(from,to,weight);
+        }
+    }
+    q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
+    q->damage_valid=1;
+    if(progress==12){
+        size_t total=(size_t)q->width*q->height;
+        for(size_t i=0;i<total;i++)q->pixels[i]=scene_to[i];
+        q->scene_tween_active=0;
+        q->damage_valid=0;
+    }
+}
 void q_draw(QDesktop *q){
     if(!q->dirty)return;
-    if(q->drag>=0&&q->drag_base){
+    if(q->scene_tween_pending&&q->drag<0){
+        q->scene_tween_pending=0;
+        q->drag_cache_valid=0;
+        q->glass_cached_app=-1;
+        clip_full(q);
+        draw_scene(q,-1);
+        int left=q->width,top=q->height,right=0,bottom=0;
+        for(int y=0;y<q->height;y++){
+            size_t row=(size_t)y*q->width;
+            for(int x=0;x<q->width;x++){
+                size_t p=row+x;
+                scene_to[p]=q->pixels[p];
+                if(scene_from[p]!=scene_to[p]){
+                    if(x<left)left=x;
+                    if(y<top)top=y;
+                    if(x+1>right)right=x+1;
+                    if(y+1>bottom)bottom=y+1;
+                }
+            }
+        }
+        if(left<right&&top<bottom){
+            q->scene_x0=clamp(left-20,0,q->width);
+            q->scene_y0=clamp(top-20,0,q->height);
+            q->scene_x1=clamp(right+20,0,q->width);
+            q->scene_y1=clamp(bottom+20,0,q->height);
+            q->scene_tween_active=1;
+            paint_scene_tween(q);
+        }else q->scene_tween_active=0;
+    }else if(q->scene_tween_active&&q->drag<0){
+        paint_scene_tween(q);
+    }else if(q->drag>=0&&q->drag_base){
+        q->scene_tween_pending=0;q->scene_tween_active=0;
         int cached=q->drag_cache_valid&&q->drag_cache_app==q->drag;
         if(cached)drag_redraw(q);
         else drag_capture(q);
