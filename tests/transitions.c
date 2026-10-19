@@ -8,6 +8,12 @@ static uint32_t pixels[1280*720],wall[1280*720],work[1280*720],reference_pixels[
 static QDesktop ui;
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL transition line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 
+static int distance_color(uint32_t a,uint32_t b){
+    int dr=(int)(a>>16&255)-(int)(b>>16&255);
+    int dg=(int)(a>>8&255)-(int)(b>>8&255);
+    int db=(int)(a&255)-(int)(b&255);
+    return abs(dr)+abs(dg)+abs(db);
+}
 static uint64_t checksum(void){
     uint64_t n=1469598103934665603ull;
     for(int y=70;y<690;y+=7)for(int x=28;x<1250;x+=11){
@@ -50,8 +56,28 @@ int main(void){
     q_draw(&ui);
     q_enable_animations(&ui);
     q_open(&ui,Q_FILES);
-    animate();
     QWindow *w=&ui.windows[Q_FILES];
+    int center=w->x+w->w/2+(w->y+w->h/2)*1280;
+    uint32_t before=pixels[center];
+    q_draw(&ui);
+    q_tick(&ui);
+    q_draw(&ui);
+    uint32_t during=pixels[center];
+    QDesktop fresh=ui;
+    fresh.pixels=reference_pixels;
+    fresh.blurred=reference_work;
+    fresh.animations_enabled=0;
+    fresh.scene_tween_active=0;
+    fresh.scene_tween_pending=0;
+    fresh.drag=-1;
+    fresh.drag_base=0;
+    fresh.dirty=1;
+    fresh.hover_only=0;
+    q_draw(&fresh);
+    CHECK(distance_color(during,reference_pixels[center])<distance_color(during,before));
+    for(int n=0;n<16;n++){q_tick(&ui);if(ui.dirty)q_draw(&ui);}
+    CHECK(!ui.scene_tween_active);
+    same_as_fresh();
     q_click(&ui,w->x+w->w-90,w->y+25);
     CHECK(w->maximized);
     animate();
