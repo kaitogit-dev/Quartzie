@@ -36,7 +36,8 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h build/font.c | buil
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c -o $@
-test: build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+	./build/ntcore-test
 	./build/pe-test build/winapp.exe
 	./build/ui-test
 	./build/ps2-test
@@ -58,6 +59,8 @@ build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h build/font.c | bu
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c build/font.c -o $@
 build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/ui.h src/efi.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c build/font.c -o $@
+build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
 	$(LINK) /dll /noentry /machine:x64 /def:tests/kernel32.def /out:build/kernel32.dll /implib:$@
 build/winapp.obj: tests/win32_app.c | build
