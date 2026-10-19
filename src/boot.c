@@ -124,7 +124,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             uint64_t n=0;EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *m=0;
             if(video->QueryMode(video,i,&n,&m)!=0||!m)continue;
             if(m->HorizontalResolution<800||m->VerticalResolution<600||m->HorizontalResolution>Q_MAX_W||m->VerticalResolution>Q_MAX_H||m->PixelFormat>1)continue;
-            int64_t dx=(int64_t)m->HorizontalResolution-1280,dy=(int64_t)m->VerticalResolution-720;
+            int64_t dx=(int64_t)m->HorizontalResolution-1920,dy=(int64_t)m->VerticalResolution-1080;
             uint64_t diff=(uint64_t)(dx*dx+dy*dy);
             if(diff<best){best=diff;choice=i;}
         }
@@ -139,6 +139,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_draw(&desktop);present();
+    if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
+    else serial_text("QUARTZIE-MODE-FALLBACK\n");
     serial_text("QUARTZIE-DESKTOP-READY\n");
     EFI_SIMPLE_POINTER_PROTOCOL *mouse=0;
     EFI_ABSOLUTE_POINTER_PROTOCOL *absolute=0;
@@ -205,11 +207,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 q_key(&desktop,key.UnicodeChar,key.ScanCode);
             }
         }
+        if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
         if(desktop.dirty){
             q_draw(&desktop);
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
         }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
-        bs->Stall(desktop.drag>=0?2000:7000);
+        bs->Stall(desktop.drag>=0?1000:3000);
     }
 }

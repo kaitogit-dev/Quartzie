@@ -1,4 +1,4 @@
-VERSION = 0.34.0
+VERSION = 0.35.0
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -34,10 +34,13 @@ build/ps2-test: tests/ps2.c src/ps2.c src/ps2.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ps2.c src/ps2.c -o $@
 build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c -o $@
-test: build/ui-test build/ps2-test build/glass-test
+build/window-test: tests/window.c src/ui.c src/ui.h src/font.h build/font.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c -o $@
+test: build/ui-test build/ps2-test build/glass-test build/window-test
 	./build/ui-test
 	./build/ps2-test
 	./build/glass-test
+	./build/window-test
 verify: all test
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 clean:

@@ -1,4 +1,4 @@
-# Quartzie 0.34.0
+# Quartzie 0.35.0
 
 ## Build
 
@@ -11,12 +11,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.34.0-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.35.0-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.34.0-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.35.0-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `qemu-system-x86_64.exe` and the firmware files provided by the QEMU installer. Add `-usb -device usb-tablet` for UEFI tablet input; Quartzie also includes a PS/2 mouse fallback.
