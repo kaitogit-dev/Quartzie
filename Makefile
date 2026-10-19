@@ -53,6 +53,7 @@ test: build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-t
 	./build/transitions-test
 verify: all test
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
+	$(PYTHON) tools/check_app.py build/winapp.exe Quartzie-x64.iso Quartzie-x64-uefi.img
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
 build/transitions-test: tests/transitions.c src/ui.c src/ui.h src/font.h build/font.c | build
