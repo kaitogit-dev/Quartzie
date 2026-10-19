@@ -44,7 +44,9 @@ int main(int argc,char **argv){
     CHECK(image!=MAP_FAILED);
     QPe64Resolver host={0,resolver};
     QPe64Image loaded={0};
-    CHECK(q_pe64_load(data,(size_t)n,image,1024*1024,&host,&loaded)==Q_PE_OK);
+    int load_result=q_pe64_load(data,(size_t)n,image,1024*1024,&host,&loaded);
+    if(load_result!=Q_PE_OK)fprintf(stderr,"PE image load status=%d, bytes=%ld\n",load_result,n);
+    CHECK(load_result==Q_PE_OK);
     CHECK(loaded.imports==3);
     uint32_t (__attribute__((ms_abi)) *entry)(void)=(uint32_t (__attribute__((ms_abi)) *)(void))q_pe64_export(&loaded,"QuartzieTest");
     CHECK(entry!=0&&entry()==42);
