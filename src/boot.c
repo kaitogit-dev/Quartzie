@@ -1,11 +1,16 @@
 #include "efi.h"
 #include "ui.h"
 #include "ps2.h"
+#include "ntcore.h"
+#include "winapi.h"
 static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
 static QDesktop desktop;
+static QNtKernel native_kernel;
+extern const uint8_t q_winapp_data[];
+extern const size_t q_winapp_size;
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
 static uint32_t *screen;
 static uint32_t scanline;
@@ -155,6 +160,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_enable_animations(&desktop);
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
+    qnt_init(&native_kernel);
+    if(qwin_execute(&native_kernel,bs,q_winapp_data,q_winapp_size,serial_char)==QNT_OK)
+        serial_text("QUARTZIE-WIN32-READY\n");
+    else serial_text("QUARTZIE-WIN32-FAILED\n");
     serial_text("QUARTZIE-DESKTOP-READY\n");
     EFI_SIMPLE_POINTER_PROTOCOL *mouse=0;
     EFI_ABSOLUTE_POINTER_PROTOCOL *absolute=0;
@@ -222,6 +231,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             }
         }
         if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+        qnt_tick(&native_kernel);
         q_tick(&desktop);
         if(desktop.dirty){
             q_draw(&desktop);
