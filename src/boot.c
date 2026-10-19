@@ -11,6 +11,8 @@ static uint32_t *screen;
 static uint32_t scanline;
 static int pixel_format;
 static int cursor_old_x=-100,cursor_old_y=-100;
+static uint32_t cursor_underlay[27*31];
+static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
 static void serial_char(uint8_t c){
     for(int i=0;i<10000;i++){
         uint8_t flag;
@@ -27,11 +29,6 @@ static void serial_init(void){
     __asm__ volatile("outb %0,%1"::"a"((uint8_t)3),"Nd"((uint16_t)0x3fb));
 }
 static void serial_text(const char *value){for(;*value;value++)serial_char((uint8_t)*value);}
-static uint32_t bg_for_pixel(int x,int y){
-    uint32_t c=desktop.pixels[(size_t)y*desktop.width+x];
-    if(pixel_format==0)return ((c&255)<<16)|(c&0x00ff00)|((c>>16)&255);
-    return c;
-}
 static uint32_t mix(uint32_t a,uint32_t b,int alpha){
     int inv=256-alpha;
     return (((((a>>16)&255)*inv+((b>>16)&255)*alpha)>>8)<<16)|(((((a>>8)&255)*inv+((b>>8)&255)*alpha)>>8)<<8)|((((a&255)*inv)+((b&255)*alpha))>>8);
@@ -58,22 +55,35 @@ static int pointer_cover(int px,int py,int inner){
     }
     return count*64;
 }
-static void cursor_reset(void){cursor_old_x=-100;cursor_old_y=-100;}
+static void cursor_prepare(void){
+    for(int y=0;y<31;y++)for(int x=0;x<27;x++){
+        int k=y*27+x;
+        cursor_shadows[k]=(uint16_t)pointer_cover(x-2,y-2,0);
+        cursor_edges[k]=(uint16_t)pointer_cover(x,y,0);
+        cursor_fills[k]=(uint16_t)pointer_cover(x,y,1);
+    }
+}
+static void cursor_hide(void){
+    if(cursor_old_x<0)return;
+    for(int yy=0;yy<31;yy++)for(int xx=0;xx<27;xx++){
+        int px=cursor_old_x+xx,py=cursor_old_y+yy;
+        if((unsigned)px<(unsigned)desktop.width&&(unsigned)py<(unsigned)desktop.height)
+            screen[(size_t)py*scanline+px]=cursor_underlay[yy*27+xx];
+    }
+    cursor_old_x=-100;cursor_old_y=-100;
+}
 static void cursor_draw(int x,int y){
     const int cw=27,ch=31;
-    if(cursor_old_x>=0){
-        for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
-            int px=cursor_old_x+xx,py=cursor_old_y+yy;
-            if((unsigned)px<(unsigned)desktop.width&&(unsigned)py<(unsigned)desktop.height)screen[(size_t)py*scanline+px]=bg_for_pixel(px,py);
-        }
-    }
+    cursor_hide();
     for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
         int px=x+xx,py=y+yy;
         if((unsigned)px>=(unsigned)desktop.width||(unsigned)py>=(unsigned)desktop.height)continue;
-        uint32_t col=desktop.pixels[(size_t)py*desktop.width+px];
-        int shadow=pointer_cover(xx-2,yy-2,0);
-        int edge=pointer_cover(xx,yy,0);
-        int fill=pointer_cover(xx,yy,1);
+        uint32_t raw=screen[(size_t)py*scanline+px];
+        cursor_underlay[yy*cw+xx]=raw;
+        uint32_t col=pixel_format==0?(((raw&255)<<16)|(raw&0x00ff00)|((raw>>16)&255)):raw;
+        int shadow=cursor_shadows[yy*cw+xx];
+        int edge=cursor_edges[yy*cw+xx];
+        int fill=cursor_fills[yy*cw+xx];
         if(shadow)col=mix(col,0x091526,shadow/4);
         if(edge)col=mix(col,0x15273a,edge);
         if(fill)col=mix(col,0xffffff,fill);
@@ -83,6 +93,7 @@ static void cursor_draw(int x,int y){
     cursor_old_x=x;cursor_old_y=y;
 }
 static void present(void){
+    cursor_hide();
     for(int y=0;y<desktop.height;y++){
         size_t offset=(size_t)y*desktop.width;
         volatile uint32_t *out=(volatile uint32_t *)(screen+(size_t)y*scanline);
@@ -92,9 +103,10 @@ static void present(void){
             out[x]=c;
         }
     }
-    cursor_reset();cursor_draw(desktop.mouse_x,desktop.mouse_y);
+    cursor_draw(desktop.mouse_x,desktop.mouse_y);
 }
 static void present_damage(int x,int y,int width,int height){
+    cursor_hide();
     int x0=x<0?0:x,y0=y<0?0:y;
     int x1=x+width>desktop.width?desktop.width:x+width;
     int y1=y+height>desktop.height?desktop.height:y+height;
@@ -136,6 +148,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     if(video->Mode->FrameBufferSize<(uint64_t)mode->PixelsPerScanLine*h*4)return 5;
     scanline=mode->PixelsPerScanLine;pixel_format=(int)mode->PixelFormat;
     screen=(uint32_t *)(uintptr_t)video->Mode->FrameBufferBase;
+    cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_draw(&desktop);present();
