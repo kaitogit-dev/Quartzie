@@ -165,6 +165,7 @@ static void wallpaper(QDesktop *q){
     }
 }
 static void thin_rule(QDesktop *q,int x,int y,int w,int alpha){
+    if(y<0||y>=q->height)return;
     for(int xx=clamp(x,0,q->width);xx<clamp(x+w,0,q->width);xx++){
         uint32_t *p=q->pixels+(size_t)y*q->width+xx;
         *p=blend(*p,0xe1f3ff,alpha);
