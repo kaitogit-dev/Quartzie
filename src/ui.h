@@ -29,6 +29,8 @@ typedef struct {
     int hover_only,hover_last;
     int render_app,glass_cached_app,render_topbar;
     int animations_enabled,dock_lift[Q_APPS],dock_pulse[Q_APPS];
+    int scene_tween_pending,scene_tween_active,scene_tween_step,scene_tween_kind;
+    int scene_x0,scene_y0,scene_x1,scene_y1,scene_render_final;
 } QDesktop;
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
