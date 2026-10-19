@@ -1,4 +1,4 @@
-VERSION = 0.35.1
+VERSION = 0.35.2
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -36,16 +36,19 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h build/font.c | buil
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c -o $@
-test: build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test
+test: build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test
 	./build/ui-test
 	./build/ps2-test
 	./build/glass-test
 	./build/window-test
 	./build/cursor-test
+	./build/layout-test
 verify: all test
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h build/font.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c build/font.c -o $@
 build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/ui.h src/efi.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c build/font.c -o $@
 .PHONY: all release test verify clean
