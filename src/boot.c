@@ -165,6 +165,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     qnt_init(&native_kernel);
     size_t executable_size=0;
     int has_disk_app=qefi_read_app(image,bs,executable_buffer,sizeof(executable_buffer),&executable_size)==0;
+    if(has_disk_app)serial_text("QUARTZIE-WIN32-FILE\n");
     const uint8_t *app=has_disk_app?executable_buffer:q_winapp_data;
     size_t app_size=has_disk_app?executable_size:q_winapp_size;
     if(qwin_execute(&native_kernel,bs,app,app_size,serial_char)==QNT_OK)
