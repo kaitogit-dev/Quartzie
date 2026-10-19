@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include "pe64.h"
 #include <stdint.h>
 #include <stdio.h>
