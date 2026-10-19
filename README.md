@@ -1,4 +1,4 @@
-# Quartzie 0.35.2
+# Quartzie 0.36.0
 
 ## Build
 
@@ -11,12 +11,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.35.2-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.36.0-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.35.2-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.36.0-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -29,6 +29,10 @@ For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with G
 - F9: Control center
 - Escape: Dismiss overlays
 - Drag title bars to move windows
+
+## Animation
+
+Windows use short easing transitions for opening and resizing. Dock hover is interpolated and minimize/close produce a brief dock pulse. The desktop redraws only while an animation is active; dragging cancels the active window's transition.
 
 ## Rendering
 
