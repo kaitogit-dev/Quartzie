@@ -3,12 +3,14 @@
 #include "ps2.h"
 #include "ntcore.h"
 #include "winapi.h"
+#include "fileboot.h"
 static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
 static QDesktop desktop;
 static QNtKernel native_kernel;
+static uint8_t executable_buffer[1024*1024];
 extern const uint8_t q_winapp_data[];
 extern const size_t q_winapp_size;
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
@@ -161,7 +163,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
     qnt_init(&native_kernel);
-    if(qwin_execute(&native_kernel,bs,q_winapp_data,q_winapp_size,serial_char)==QNT_OK)
+    size_t executable_size=0;
+    int has_disk_app=qefi_read_app(image,bs,executable_buffer,sizeof(executable_buffer),&executable_size)==0;
+    const uint8_t *app=has_disk_app?executable_buffer:q_winapp_data;
+    size_t app_size=has_disk_app?executable_size:q_winapp_size;
+    if(qwin_execute(&native_kernel,bs,app,app_size,serial_char)==QNT_OK)
         serial_text("QUARTZIE-WIN32-READY\n");
     else serial_text("QUARTZIE-WIN32-FAILED\n");
     serial_text("QUARTZIE-DESKTOP-READY\n");
