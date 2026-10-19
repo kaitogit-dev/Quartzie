@@ -17,7 +17,10 @@ struct EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
 typedef struct EFI_BOOT_SERVICES EFI_BOOT_SERVICES;
 struct EFI_BOOT_SERVICES {
     EFI_TABLE_HEADER Header;
-    void *reserved_before_stall[28];
+    void *RaiseTPL;
+    void *RestoreTPL;
+    EFI_STATUS (EFIAPI *AllocatePages)(uint32_t,uint32_t,uint64_t,uint64_t *);
+    void *reserved_before_stall[25];
     EFI_STATUS (EFIAPI *Stall)(uint64_t);
     void *reserved_before_locate[8];
     EFI_STATUS (EFIAPI *LocateProtocol)(EFI_GUID *, void *, void **);
