@@ -152,6 +152,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_draw(&desktop);present();
+    q_enable_animations(&desktop);
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
     serial_text("QUARTZIE-DESKTOP-READY\n");
@@ -221,6 +222,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             }
         }
         if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+        q_tick(&desktop);
         if(desktop.dirty){
             q_draw(&desktop);
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
