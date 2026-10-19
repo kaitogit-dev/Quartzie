@@ -40,6 +40,8 @@ int main(void){
     check(desktop.drag==Q_NOTES);
     q_move(&desktop,desktop.mouse_x+90,desktop.mouse_y+30);
     check(desktop.windows[Q_NOTES].x!=w.x);
+    q_move(&desktop,desktop.mouse_x,719);
+    check(desktop.windows[Q_NOTES].y+desktop.windows[Q_NOTES].h>top);
     q_release(&desktop);check(desktop.drag==-1);
     q_click(&desktop,left+77+4*77+30,top+32);
     check(desktop.active==Q_SETTINGS);
