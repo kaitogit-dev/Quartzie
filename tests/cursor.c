@@ -1,0 +1,32 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "../src/boot.c"
+static uint32_t mock_frame[128*128];
+static uint32_t mock_scene[128*128];
+static uint32_t original[128*128];
+#define VERIFY(cond) do{if(!(cond)){fprintf(stderr,"FAIL cursor test line %d: %s\n",__LINE__,#cond);exit(1);}}while(0)
+int main(void){
+    desktop.width=128;desktop.height=128;desktop.pixels=mock_scene;
+    screen=mock_frame;scanline=128;pixel_format=1;
+    for(int y=0;y<128;y++)for(int x=0;x<128;x++){
+        mock_scene[y*128+x]=(uint32_t)(0x104090+(x*7%40)*0x10000+(y*3%20)*0x100);
+        mock_frame[y*128+x]=mock_scene[y*128+x];
+    }
+    memcpy(original,mock_frame,sizeof(original));
+    cursor_prepare();
+    cursor_draw(20,20);
+    VERIFY(memcmp(original,mock_frame,sizeof(original))!=0);
+    cursor_draw(60,60);
+    for(int y=20;y<51;y++)for(int x=20;x<47;x++)VERIFY(mock_frame[y*128+x]==original[y*128+x]);
+    cursor_hide();
+    VERIFY(memcmp(original,mock_frame,sizeof(original))==0);
+    cursor_draw(60,60);
+    for(int y=60;y<91;y++)for(int x=60;x<87;x++)mock_scene[y*128+x]=0x4477cc;
+    present_damage(55,55,40,40);
+    cursor_hide();
+    for(int y=0;y<128;y++)for(int x=0;x<128;x++)VERIFY(mock_frame[y*128+x]==mock_scene[y*128+x]);
+    puts("PASS: cursor underlay, movement, scene damage and restoration");
+    return 0;
+}
