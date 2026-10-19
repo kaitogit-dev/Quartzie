@@ -750,6 +750,13 @@ static void paint_window_geometry(QDesktop *q,int weight){
     }
     int left=clamp(ix-32,x0,x1),top=clamp(iy-32,y0,y1);
     int right=clamp(ix+iw+32,x0,x1),bottom=clamp(iy+ih+32,y0,y1);
+    int map_x[Q_MAX_W];
+    for(int x=left;x<right;x++){
+        int sx=bx+(int)(((int64_t)(x-ix)*bw)/iw);
+        if(x<ix)sx=x-ix+bx;
+        else if(x>=ix+iw)sx=x-(ix+iw)+bx+bw;
+        map_x[x]=sx;
+    }
     for(int y=top;y<bottom;y++){
         int sy=by+(int)(((int64_t)(y-iy)*bh)/ih);
         if(y<iy)sy=y-iy+by;
@@ -758,9 +765,7 @@ static void paint_window_geometry(QDesktop *q,int weight){
         size_t row=(size_t)y*q->width;
         size_t srcrow=(size_t)sy*q->width;
         for(int x=left;x<right;x++){
-            int sx=bx+(int)(((int64_t)(x-ix)*bw)/iw);
-            if(x<ix)sx=x-ix+bx;
-            else if(x>=ix+iw)sx=x-(ix+iw)+bx+bw;
+            int sx=map_x[x];
             if(sx<0||sx>=q->width)continue;
             size_t dst=row+x,src=srcrow+sx;
             q->pixels[dst]=geometry_color(scene_back[dst],scene_back[src],scene_to[src]);
