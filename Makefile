@@ -5,7 +5,7 @@ PYTHON = python3
 FONT_REGULAR ?= /usr/share/fonts/opentype/inter/Inter-Regular.otf
 FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
-OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj
+OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/embed_app.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img
 release: all
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
@@ -20,6 +20,10 @@ build/font.obj: build/font.c src/font.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
 build/BOOTX64.EFI: $(OBJECTS)
 	$(LINK) /subsystem:efi_application /entry:efi_main /nodefaultlib /machine:x64 /out:$@ $(OBJECTS)
+build/embed_app.c: build/winapp.exe tools/embed.py
+	$(PYTHON) tools/embed.py build/winapp.exe $@
+build/embed_app.obj: build/embed_app.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
 build/esp.img: build/BOOTX64.EFI tools/esp.py
 	$(PYTHON) tools/esp.py $< $@
 build/esp-iso.img: build/BOOTX64.EFI tools/compact_esp.py
@@ -57,8 +61,8 @@ build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h build/font.c | buil
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c build/font.c -o $@
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h build/font.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c build/font.c -o $@
-build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/ui.h src/efi.h build/font.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c build/font.c -o $@
+build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/ui.h src/efi.h build/font.c build/embed_app.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c build/font.c build/embed_app.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
