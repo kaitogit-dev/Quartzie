@@ -5,7 +5,31 @@
 #include <string.h>
 static uint32_t framebuffer[1280*720],wall[1280*720],blur[1280*720];
 static QDesktop desktop;
-static uint32_t drag_back[1280*720],drag_sprite[900*640];
+static uint32_t drag_back[1280*720];
+static uint32_t reference_pixels[1280*720],reference_blur[1280*720];
+static void check_reference(QDesktop *actual){
+    static int compare_number;
+    compare_number++;
+    QDesktop reference=*actual;
+    reference.pixels=reference_pixels;
+    reference.blurred=reference_blur;
+    reference.drag=-1;
+    reference.drag_base=0;
+    reference.drag_cache_valid=0;
+    reference.dirty=1;
+    reference.damage_valid=0;
+    reference.clip_left=0;reference.clip_top=0;
+    reference.clip_right=actual->width;reference.clip_bottom=actual->height;
+    q_draw(&reference);
+    for(size_t i=0;i<(size_t)actual->width*actual->height;i++){
+        if(actual->pixels[i]!=reference_pixels[i]){
+            fprintf(stderr,"DRAG COMPOSITOR MISMATCH check=%d x=%zu y=%zu got=%08x expected=%08x\n",compare_number,
+                i%(size_t)actual->width,i/(size_t)actual->width,
+                actual->pixels[i],reference_pixels[i]);
+            exit(1);
+        }
+    }
+}
 #define check(x) do{if(!(x)){fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static void shot(const char *file){
     FILE *f=fopen(file,"wb");check(f!=0);
@@ -68,7 +92,7 @@ int main(void){
     q_draw(&desktop);
     check(framebuffer[0]!=0&&framebuffer[100*1280+100]!=0);
     q_init(&desktop,1280,720,framebuffer,wall,blur);
-    q_drag_buffers(&desktop,drag_back,drag_sprite);
+    q_drag_buffers(&desktop,drag_back);
     q_open(&desktop,Q_NOTES);
     q_draw(&desktop);
     QWindow original=desktop.windows[Q_NOTES];
@@ -86,6 +110,28 @@ int main(void){
     q_release(&desktop);
     q_draw(&desktop);
     check(!desktop.drag_cache_valid&&!desktop.damage_valid);
-    printf("PASS: antialiased desktop, routed dock and menu input, window focus, cached partial window dragging, settings, notes and calculator\n");
+    q_init(&desktop,1280,720,framebuffer,wall,blur);
+    q_drag_buffers(&desktop,drag_back);
+    q_open(&desktop,Q_FILES);
+    q_open(&desktop,Q_SETTINGS);
+    q_draw(&desktop);
+    check_reference(&desktop);
+    QWindow moving=desktop.windows[Q_SETTINGS];
+    int px=moving.x+135,py=moving.y+27;
+    q_press(&desktop,px,py);
+    q_draw(&desktop);
+    check_reference(&desktop);
+    for(int n=0;n<14;n++){
+        int x=px+((n%7)-3)*72;
+        int y=py+((n%5)-2)*83;
+        if(n>7)y=703;
+        q_move(&desktop,x,y);
+        q_draw(&desktop);
+        check_reference(&desktop);
+    }
+    q_release(&desktop);
+    q_draw(&desktop);
+    check_reference(&desktop);
+    printf("PASS: correct layered dragging, pixel-exact fullscreen comparison, dock overlap, input and applications\n");
     return 0;
 }

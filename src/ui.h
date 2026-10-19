@@ -21,13 +21,14 @@ typedef struct {
     char notes[2048],command[128],calc[64],answer[64],status[96];
     QWindow windows[Q_APPS];
     uint32_t *pixels,*wallpaper,*blurred;
-    uint32_t *drag_base,*drag_sprite;
-    int drag_cache_valid,drag_cache_app,drag_prev_x,drag_prev_y,drag_sprite_w,drag_sprite_h;
+    uint32_t *drag_base;
+    int drag_cache_valid,drag_cache_app,drag_prev_x,drag_prev_y;
+    int clip_left,clip_top,clip_right,clip_bottom;
     int damage_valid,damage_x,damage_y,damage_w,damage_h;
 } QDesktop;
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
-void q_drag_buffers(QDesktop *q,uint32_t *background,uint32_t *sprite);
+void q_drag_buffers(QDesktop *q,uint32_t *background);
 void q_click(QDesktop *q,int x,int y);
 void q_press(QDesktop *q,int x,int y);
 void q_release(QDesktop *q);

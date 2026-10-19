@@ -5,7 +5,6 @@ static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
-static uint32_t drag_sprite_buffer[900*640];
 static QDesktop desktop;
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
 static uint32_t *screen;
@@ -138,7 +137,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     scanline=mode->PixelsPerScanLine;pixel_format=(int)mode->PixelFormat;
     screen=(uint32_t *)(uintptr_t)video->Mode->FrameBufferBase;
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
-    q_drag_buffers(&desktop,drag_base_buffer,drag_sprite_buffer);
+    q_drag_buffers(&desktop,drag_base_buffer);
     q_draw(&desktop);present();
     serial_text("QUARTZIE-DESKTOP-READY\n");
     EFI_SIMPLE_POINTER_PROTOCOL *mouse=0;
