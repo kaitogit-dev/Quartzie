@@ -45,6 +45,8 @@ def run_image(image, kind):
         try:
             for _ in range(180):
                 if serial.exists() and b'QUARTZIE-DESKTOP-READY' in serial.read_bytes():
+                    if b'QUARTZIE-MODE-1920x1080' not in serial.read_bytes():
+                        raise RuntimeError(f'{kind} did not select 1920x1080: {serial.read_text(errors="replace")}')
                     snapshot = ROOT / 'build' / f'{kind}-screen.ppm'
                     if monitor.exists():
                         try:
