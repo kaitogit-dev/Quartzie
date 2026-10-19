@@ -1,4 +1,4 @@
-# Quartzie 0.37.1
+# Quartzie 0.38.0
 
 ## Build
 
@@ -11,12 +11,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.37.1-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.38.0-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.37.1-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.0-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -38,9 +38,19 @@ Windows opening and maximizing use opaque geometric scale transitions. Minimize 
 
 Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass surfaces have an integrated window header and a soft perimeter shadow. During dragging, only the background behind the active window is cached; the moving window, controls and dock are composited at their current positions. The top bar remains independent of window motion.
 
-## Current limits
+## Run a Windows executable
 
-The EFI application retains firmware services during operation. Notes are volatile, Files has no mounted filesystem, and process isolation, sound and networking are not implemented. Native QEMU with OVMF is the supported testing environment. The unsigned EFI image requires Secure Boot to be disabled.
+The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
+
+```sh
+python3 tools/replace_app.py Quartzie-0.38.0-x64.img program.exe Quartzie-custom.img
+```
+
+Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
+
+## Native services
+
+The NT-style core provides process and thread records, quantum-based scheduling, typed and generation-checked handles, memory-region permissions, in-memory files, syscall dispatch, and driver registration. Tests run a compiled Windows console executable, relocate it, resolve imports, call its entry point, and validate the services.
 
 ## Fonts
 
