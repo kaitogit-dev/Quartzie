@@ -16,7 +16,7 @@ static uint64_t snapshot(void){
     return hash;
 }
 static void finish(void){
-    for(int n=0;n<10;n++){q_tick(&ui);if(ui.dirty)q_draw(&ui);}
+    for(int n=0;n<16;n++){q_tick(&ui);if(ui.dirty)q_draw(&ui);}
 }
 int main(void){
     q_init(&ui,1280,720,pixels,wall,work);
