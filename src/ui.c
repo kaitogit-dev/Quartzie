@@ -746,9 +746,11 @@ static void paint_scene_tween(QDesktop *q){
     q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
     q->damage_valid=1;
     if(progress==12){
-        size_t total=(size_t)q->width*q->height;
-        for(size_t i=0;i<total;i++)q->pixels[i]=scene_to[i];
         q->scene_tween_active=0;
+        q->drag_cache_valid=0;
+        q->glass_cached_app=-1;
+        clip_full(q);
+        draw_scene(q,-1);
         q->damage_valid=0;
     }
 }
