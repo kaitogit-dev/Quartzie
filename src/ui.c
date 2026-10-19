@@ -332,12 +332,62 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     wallpaper(q);
 }
 static void close_popups(QDesktop *q){q->menu=0;q->notifications=0;q->quick=0;}
+static void start_tween(QDesktop *q,int app,int kind,int x,int y,int w,int h){
+    if(!q->animations_enabled)return;
+    QWindow *window=&q->windows[app];
+    window->tween_kind=kind;
+    window->tween_step=0;
+    window->tween_x=x;window->tween_y=y;
+    window->tween_w=w;window->tween_h=h;
+    q->drag_cache_valid=0;
+}
+void q_enable_animations(QDesktop *q){
+    q->animations_enabled=1;
+}
+void q_tick(QDesktop *q){
+    if(!q->animations_enabled)return;
+    int window_change=0,dock_change=0;
+    for(int i=0;i<Q_APPS;i++){
+        QWindow *w=&q->windows[i];
+        if(w->tween_kind){
+            if(q->drag==i){w->tween_kind=0;w->tween_step=0;window_change=1;}
+            else{
+                w->tween_step++;
+                if(w->tween_step>=8){w->tween_step=0;w->tween_kind=0;}
+                window_change=1;
+            }
+        }
+        int target=q->hover==i?256:0;
+        int current=q->dock_lift[i];
+        if(current!=target){
+            int advance=target>current?48:-48;
+            int next=clamp(current+advance,0,256);
+            if((advance>0&&next>target)||(advance<0&&next<target))next=target;
+            q->dock_lift[i]=next;dock_change=1;
+        }
+        if(q->dock_pulse[i]>0){
+            q->dock_pulse[i]-=40;
+            if(q->dock_pulse[i]<0)q->dock_pulse[i]=0;
+            dock_change=1;
+        }
+    }
+    if(window_change){q->hover_only=0;q->dirty=1;q->drag_cache_valid=0;}
+    else if(dock_change){
+        if(!q->dirty&&q->drag<0)q->hover_only=1;
+        q->dirty=1;
+    }
+}
 void q_open(QDesktop *q,int app){
     q->hover_only=0;
     if(app<0||app>=Q_APPS)return;
     int z=0;for(int i=0;i<Q_APPS;i++)if(q->windows[i].z>z)z=q->windows[i].z;
     if(z>10000){for(int i=0;i<Q_APPS;i++)q->windows[i].z=i+1;z=Q_APPS;}
+    int was_hidden=!q->windows[app].open||q->windows[app].minimized;
     q->windows[app].open=1;q->windows[app].minimized=0;q->windows[app].z=z+1;q->active=app;
+    if(was_hidden){
+        QWindow *w=&q->windows[app];
+        start_tween(q,app,1,w->x+12,w->y+20,w->w-24,w->h-40);
+    }
     close_popups(q);q->dirty=1;
 }
 int q_dock_hit(QDesktop *q,int x,int y){
@@ -391,10 +441,13 @@ static void draw_dock(QDesktop *q){
     rectangle(q,x+69,y+14,1,41,0x9cbbce);
     for(int i=0;i<Q_APPS;i++){
         int xx=x+77+i*77;
-        if((q->active==i&&q->windows[i].open&&!q->windows[i].minimized)||q->hover==i){
-            surface(q,xx,y+7,61,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?94:128);
+        int lift=q->animations_enabled?q->dock_lift[i]*5/256:0;
+        int pulse=q->dock_pulse[i];
+        if((q->active==i&&q->windows[i].open&&!q->windows[i].minimized)||q->hover==i||q->dock_lift[i]>0){
+            surface(q,xx,y+7-lift,61,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?94:128);
         }
-        icon(q,xx+30,y+32,i,q->theme?0xd7edfd:0xf6fcff);
+        if(pulse>0)circular(q,xx+30,y+32-lift,22,accent(q),pulse/4);
+        icon(q,xx+30,y+32-lift,i,q->theme?0xd7edfd:0xf6fcff);
         if(q->windows[i].open)circular(q,xx+30,y+59,3,q->windows[i].minimized?secondary(q):accent(q),255);
     }
     if(q->hover>=0&&q->hover<Q_APPS){
@@ -453,20 +506,26 @@ static void close_window(QDesktop *q,int app){
         w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;
     }
     q->windows[app].open=0;q->windows[app].minimized=0;q->windows[app].maximized=0;
+    q->windows[app].tween_kind=0;
+    q->dock_pulse[app]=q->animations_enabled?256:0;
     focus_remaining(q);q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
 static void minimize_window(QDesktop *q,int app){
     q->windows[app].minimized=1;
+    q->windows[app].tween_kind=0;
+    q->dock_pulse[app]=q->animations_enabled?256:0;
     focus_remaining(q);q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
 static void maximize_window(QDesktop *q,int app){
     QWindow *w=&q->windows[app];
+    int from_x=w->x,from_y=w->y,from_w=w->w,from_h=w->h;
     if(!w->maximized){
         w->restore_x=w->x;w->restore_y=w->y;w->restore_w=w->w;w->restore_h=w->h;
         w->x=12;w->y=69;w->w=q->width-24;w->h=q->height-82;w->maximized=1;
     }else{
         w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;w->maximized=0;
     }
+    start_tween(q,app,2,from_x,from_y,from_w,from_h);
     q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
 static void window_content(QDesktop *q,int app,QWindow *w){
@@ -517,7 +576,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.35.2",ink,2);
+        text(q,x,y,"Quartzie 0.36.0",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -528,8 +587,24 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y+262,"Esc  Close overlays",ink,0);
     }
 }
+static int tween_value(int from,int to,int weight){
+    return from+(int)(((int64_t)(to-from)*weight)/256);
+}
 static void draw_window(QDesktop *q,int app){
-    QWindow *w=&q->windows[app];if(!w->open||w->minimized)return;
+    const QWindow *target=&q->windows[app];
+    if(!target->open||target->minimized)return;
+    QWindow visual=*target;
+    if(q->animations_enabled&&target->tween_kind&&q->drag!=app){
+        static const int pop[9]={0,72,143,204,249,266,265,259,256};
+        static const int settle[9]={0,37,83,136,183,219,241,253,256};
+        int step=clamp(target->tween_step,0,8);
+        int weight=target->tween_kind==1?pop[step]:settle[step];
+        visual.x=tween_value(target->tween_x,target->x,weight);
+        visual.y=tween_value(target->tween_y,target->y,weight);
+        visual.w=tween_value(target->tween_w,target->w,weight);
+        visual.h=tween_value(target->tween_h,target->h,weight);
+    }
+    QWindow *w=&visual;
     int previous_render_app=q->render_app;
     q->render_app=app;
     pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?180:149);
