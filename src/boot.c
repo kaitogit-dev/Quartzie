@@ -275,6 +275,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     clock_ticks_per_us=(tick_after-tick_before)/10000;
     if(!clock_ticks_per_us)clock_ticks_per_us=1;
     uint64_t last_tick=read_clock();
+    uint64_t fallback_tick=last_tick+clock_ticks_per_us*850000;
     for(;;){
         pointer_sample(0);
         if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
@@ -284,6 +285,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
+        if(!ps2_active&&!ever_moved&&!absolute&&read_clock()>=fallback_tick){
+            ps2_active=q_ps2_enable();
+            if(ps2_active){pointer_ps2=&ps2;serial_text("QUARTZIE-PS2-READY\n");}
+            fallback_tick=read_clock()+clock_ticks_per_us*2500000;
+        }
         if(q_ps2_bytes_seen&&!ps2_logged){serial_text("QUARTZIE-PS2-RAW\n");ps2_logged=1;}
         if(table->ConIn){
             for(int n=0;n<12;n++){
