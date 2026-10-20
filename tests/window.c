@@ -5,6 +5,7 @@
 #include <string.h>
 static uint32_t canvas[1920*1080],background[1920*1080],blur[1920*1080],drag[1920*1080];
 static QDesktop ui;
+static uint32_t dock_backdrop[659*137];
 static uint32_t reference_pixels[1920*1080],reference_blur[1920*1080];
 static void same_as_full(void){
     QDesktop reference=ui;
@@ -22,6 +23,7 @@ static void same_as_full(void){
 int main(void){
     q_init(&ui,1920,1080,canvas,background,blur);
     q_drag_buffers(&ui,drag);
+    q_dock_buffers(&ui,dock_backdrop);
     CHECK(ui.width==1920&&ui.height==1080);
     q_open(&ui,Q_NOTES);
     q_draw(&ui);
@@ -47,6 +49,7 @@ int main(void){
     q_draw(&ui);
     q_move(&ui,dock_left+77+2*77+30,dock_top+30);
     CHECK(ui.hover==Q_TERMINAL&&ui.hover_only);
+    CHECK(ui.dock_cache_valid);
     q_draw(&ui);
     CHECK(ui.damage_valid&&ui.damage_w<ui.width&&ui.damage_h<ui.height);
     CHECK(ui.damage_h<250);
