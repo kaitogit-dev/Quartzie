@@ -164,7 +164,7 @@ def verify_mouse(image, usb=False, host_cursor=False):
                     sock.sendall(json.dumps(extra).encode('ascii') + b'\r\n')
                     print('HMP mouse move:', sock.recv(4096))
             send_vnc_mouse(click_start=host_cursor)
-            if host_cursor:
+            if host_cursor and usb:
                 send_qmp_start_click(qmp)
             end = time.monotonic() + 6
             while time.monotonic() < end:
@@ -184,4 +184,4 @@ def verify_mouse(image, usb=False, host_cursor=False):
 
 
 if __name__ == '__main__':
-    verify_mouse(pathlib.Path(sys.argv[1]).resolve(), len(sys.argv) > 2 and sys.argv[2] in ('usb', 'usb-host'), len(sys.argv) > 2 and sys.argv[2] == 'usb-host')
+    verify_mouse(pathlib.Path(sys.argv[1]).resolve(), len(sys.argv) > 2 and sys.argv[2] in ('usb', 'usb-host'), len(sys.argv) > 2 and sys.argv[2] in ('usb-host', 'ps2-host'))
