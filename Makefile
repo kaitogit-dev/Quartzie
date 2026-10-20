@@ -1,4 +1,4 @@
-VERSION = 0.38.1
+VERSION = 0.38.2
 CC = clang
 LINK = lld-link
 PYTHON = python3
