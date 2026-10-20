@@ -82,6 +82,6 @@ build/pe-test: tests/pe64.c src/pe64.c src/pe64.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/pe64.c src/pe64.c -o $@
 build/icons-test: tests/icons.c build/icons.c src/icons.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/icons.c build/icons.c -o $@
-build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c src/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/icons.c build/font.c -o $@
+build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c build/font.c build/icons.c -o $@
 .PHONY: all release test verify clean
