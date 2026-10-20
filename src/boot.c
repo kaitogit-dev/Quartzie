@@ -20,6 +20,7 @@ static int pixel_format;
 static int cursor_old_x=-100,cursor_old_y=-100;
 static uint32_t cursor_underlay[27*31];
 static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
+static uint8_t cursor_covered[27*31];
 static void serial_char(uint8_t c){
     for(int i=0;i<10000;i++){
         uint8_t flag;
@@ -68,14 +69,17 @@ static void cursor_prepare(void){
         cursor_shadows[k]=(uint16_t)pointer_cover(x-2,y-2,0);
         cursor_edges[k]=(uint16_t)pointer_cover(x,y,0);
         cursor_fills[k]=(uint16_t)pointer_cover(x,y,1);
+        cursor_covered[k]=(cursor_shadows[k]||cursor_edges[k]||cursor_fills[k])?1:0;
     }
 }
 static void cursor_hide(void){
     if(cursor_old_x<0)return;
     for(int yy=0;yy<31;yy++)for(int xx=0;xx<27;xx++){
+        int k=yy*27+xx;
+        if(!cursor_covered[k])continue;
         int px=cursor_old_x+xx,py=cursor_old_y+yy;
         if((unsigned)px<(unsigned)desktop.width&&(unsigned)py<(unsigned)desktop.height)
-            screen[(size_t)py*scanline+px]=cursor_underlay[yy*27+xx];
+            screen[(size_t)py*scanline+px]=cursor_underlay[k];
     }
     cursor_old_x=-100;cursor_old_y=-100;
 }
@@ -83,6 +87,7 @@ static void cursor_draw(int x,int y){
     const int cw=27,ch=31;
     cursor_hide();
     for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
+        if(!cursor_covered[yy*cw+xx])continue;
         int px=x+xx,py=y+yy;
         if((unsigned)px>=(unsigned)desktop.width||(unsigned)py>=(unsigned)desktop.height)continue;
         uint32_t raw=screen[(size_t)py*scanline+px];
@@ -113,10 +118,11 @@ static void present(void){
     cursor_draw(desktop.mouse_x,desktop.mouse_y);
 }
 static void present_damage(int x,int y,int width,int height){
-    cursor_hide();
     int x0=x<0?0:x,y0=y<0?0:y;
     int x1=x+width>desktop.width?desktop.width:x+width;
     int y1=y+height>desktop.height?desktop.height:y+height;
+    int touches_cursor=cursor_old_x>=0&&cursor_old_x<x1&&cursor_old_x+27>x0&&cursor_old_y<y1&&cursor_old_y+31>y0;
+    if(touches_cursor)cursor_hide();
     for(int py=y0;py<y1;py++){
         size_t offset=(size_t)py*desktop.width;
         volatile uint32_t *dst=(volatile uint32_t *)(screen+(size_t)py*scanline);
@@ -126,7 +132,7 @@ static void present_damage(int x,int y,int width,int height){
             dst[px]=c;
         }
     }
-    cursor_draw(desktop.mouse_x,desktop.mouse_y);
+    if(touches_cursor)cursor_draw(desktop.mouse_x,desktop.mouse_y);
 }
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     (void)image;
@@ -245,6 +251,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
         }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
-        bs->Stall(desktop.drag>=0?1000:(desktop.scene_tween_active?9000:3000));
+        bs->Stall(desktop.drag>=0?700:(desktop.scene_tween_active?((desktop.scene_tween_kind==1||desktop.scene_tween_kind==2)?2500:6500):1500));
     }
 }
