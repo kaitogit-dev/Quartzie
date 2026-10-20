@@ -120,6 +120,13 @@ static void serial_init(void){
     __asm__ volatile("outb %0,%1"::"a"((uint8_t)3),"Nd"((uint16_t)0x3fb));
 }
 static void serial_text(const char *value){for(;*value;value++)serial_char((uint8_t)*value);}
+static void serial_decimal(int n){
+    if(n<0){serial_char('-');n=-n;}
+    char digits[16];int count=0;
+    do {digits[count++]=(char)('0'+n%10);n/=10;} while(n);
+    while(count)serial_char((uint8_t)digits[--count]);
+}
+
 static uint32_t mix(uint32_t a,uint32_t b,int alpha){
     int inv=256-alpha;
     return (((((a>>16)&255)*inv+((b>>16)&255)*alpha)>>8)<<16)|(((((a>>8)&255)*inv+((b>>8)&255)*alpha)>>8)<<8)|((((a&255)*inv)+((b&255)*alpha))>>8);
@@ -300,6 +307,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_pressed&&!left){
             if(host_cursor){
                 int index=q_dock_hit(&desktop,desktop.mouse_x,desktop.mouse_y);
+                serial_text("QUARTZIE-CLICK ");
+                serial_decimal(desktop.mouse_x);serial_char(' ');
+                serial_decimal(desktop.mouse_y);serial_char(' ');
+                serial_decimal(index);serial_char('\n');
                 if(index==10)serial_text("QUARTZIE-START-CLICK\n");
                 else if(index==Q_FILES)serial_text("QUARTZIE-FILES-CLICK\n");
             }
