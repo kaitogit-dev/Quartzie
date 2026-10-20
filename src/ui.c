@@ -417,6 +417,17 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
     uint32_t steps=q->dock_elapsed_us/8000;
     if(steps>16)steps=16;
     if(steps)q->dock_elapsed_us%=8000;
+    if(steps){
+        int target=q->start_hover?256:0;
+        int advance=(int)(steps*24);
+        int next=target>q->start_lift?clamp(q->start_lift+advance,0,256):clamp(q->start_lift-advance,0,256);
+        if(next!=q->start_lift){q->start_lift=next;dock_change=1;}
+        if(q->start_pulse>0){
+            int pulse=q->start_pulse-(int)(steps*20);
+            q->start_pulse=pulse>0?pulse:0;
+            dock_change=1;
+        }
+    }
     for(int i=0;i<Q_APPS;i++){
         QWindow *w=&q->windows[i];
         if(w->tween_kind){
@@ -506,8 +517,12 @@ static void draw_desktop(QDesktop *q){
 static void draw_dock(QDesktop *q){
     int x=dock_x(q),y=dock_y(q);
     pane(q,x,y,555,70,25,0xcadceb,q->theme?107:112);
-    surface(q,x+11,y+8,52,53,17,accent(q),122);
-    text(q,x+28,y+49,"Q",0x173c54,2);
+    int start_lift=q->animations_enabled?q->start_lift*5/256:0;
+    if(q->menu||q->start_hover||q->start_lift>0)
+        surface(q,x+7,y+7-start_lift,60,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?100:144);
+    if(q->start_pulse>0)circular(q,x+37,y+36-start_lift,23,accent(q),q->start_pulse/4);
+    sprite(q,x+37,y+36-start_lift,QI_START,43);
+    if(q->menu)circular(q,x+37,y+61,3,accent(q),255);
     rectangle(q,x+69,y+14,1,41,0x9cbbce);
     for(int i=0;i<Q_APPS;i++){
         int xx=x+77+i*77;
@@ -520,7 +535,12 @@ static void draw_dock(QDesktop *q){
         app_icon(q,xx+30,y+36-lift,i,40,q->theme?0xd7edfd:0xf6fcff);
         if(q->windows[i].open)circular(q,xx+30,y+59,3,q->windows[i].minimized?secondary(q):accent(q),255);
     }
-    if(q->hover>=0&&q->hover<Q_APPS){
+    if(q->start_hover){
+        int width=text_width("Start",0)+26;
+        int tx=clamp(x+37-width/2,12,q->width-width-12);
+        surface(q,tx,y-42,width,33,12,q->theme?0x153149:0xe4eff9,q->theme?186:202);
+        text(q,tx+13,y-21,"Start",foreground(q),0);
+    }else if(q->hover>=0&&q->hover<Q_APPS){
         int idx=q->hover,xx=x+77+idx*77;
         int width=text_width(names[idx],0)+26;
         int tx=clamp(xx+30-width/2,12,q->width-width-12);
@@ -648,7 +668,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.6",ink,2);
+        text(q,x,y,"Quartzie 0.38.7",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -985,7 +1005,15 @@ static void calc_input(QDesktop *q,char key){
 void q_click(QDesktop *q,int x,int y){
     q->hover_only=0;
     int dock=q_dock_hit(q,x,y);
-    if(dock==10){int was=q->menu;close_popups(q);q->menu=!was;begin_scene_tween(q,q->menu?5:6);q->dirty=1;return;}
+    if(dock==10){
+        int was=q->menu;
+        close_popups(q);
+        q->menu=!was;
+        if(q->animations_enabled)q->start_pulse=256;
+        begin_scene_tween(q,q->menu?5:6);
+        q->dirty=1;
+        return;
+    }
     if(dock>=0&&dock<Q_APPS){q_open(q,dock);return;}
     if(dock==11){int was=q->notifications;close_popups(q);q->notifications=!was;begin_scene_tween(q,q->notifications?5:6);q->dirty=1;return;}
     if(dock==12){int was=q->quick;close_popups(q);q->quick=!was;begin_scene_tween(q,q->quick?5:6);q->dirty=1;return;}
@@ -1071,12 +1099,14 @@ void q_move(QDesktop *q,int x,int y){
     if(q->drag>=0)return;
     int hover=-1;
     int dock=q_dock_hit(q,q->mouse_x,q->mouse_y);
+    int start_hover=dock==10;
     if(dock>=0&&dock<Q_APPS)hover=dock;
     else if(dock<0&&q->active<0){int index=desktop_shortcut(q,q->mouse_x,q->mouse_y);if(index>=0)hover=index+20;}
-    if(hover!=q->hover){
+    if(hover!=q->hover||start_hover!=q->start_hover){
         if(!q->dirty&&q->drag<0&&((hover>=20)==(q->hover>=20)))q->hover_only=1;
         else q->hover_only=0;
-        q->hover=hover;q->dirty=1;if(q->drag>=0)q->drag_cache_valid=0;}
+        q->start_hover=start_hover;q->hover=hover;q->dirty=1;
+    }
 }
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     q->hover_only=0;
