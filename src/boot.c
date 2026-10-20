@@ -272,6 +272,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     pointer_y=desktop.mouse_y;
     QPs2Mouse ps2={0};
     int ps2_active=0,ps2_wait=0,ps2_tries=0,ever_moved=0,ps2_logged=0;
+    int pointer_updates=0;
     if(!mouse&&!absolute){
         ps2_active=q_ps2_enable();
         if(ps2_active)pointer_ps2=&ps2;
@@ -289,6 +290,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
             q_move(&desktop,pointer_x,pointer_y);
             if(!ever_moved){serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
+            if(++pointer_updates==16)serial_text("QUARTZIE-POINTER-CONTINUOUS\n");
         }
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
