@@ -26,8 +26,6 @@ static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
 static uint8_t cursor_covered[27*31];
 static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
-static EFI_SIMPLE_POINTER_PROTOCOL *pointer_sources[8];
-static int pointer_source_count;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
 static int pointer_ps2_confirmed;
@@ -122,13 +120,6 @@ static void serial_init(void){
     __asm__ volatile("outb %0,%1"::"a"((uint8_t)3),"Nd"((uint16_t)0x3fb));
 }
 static void serial_text(const char *value){for(;*value;value++)serial_char((uint8_t)*value);}
-static void serial_decimal(int n){
-    if(n<0){serial_char('-');n=-n;}
-    char digits[16];int count=0;
-    do {digits[count++]=(char)('0'+n%10);n/=10;} while(n);
-    while(count)serial_char((uint8_t)digits[--count]);
-}
-
 static uint32_t mix(uint32_t a,uint32_t b,int alpha){
     int inv=256-alpha;
     return (((((a>>16)&255)*inv+((b>>16)&255)*alpha)>>8)<<16)|(((((a>>8)&255)*inv+((b>>8)&255)*alpha)>>8)<<8)|((((a&255)*inv)+((b&255)*alpha))>>8);
@@ -280,20 +271,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     bs->LocateProtocol((EFI_GUID *)&ABS_MOUSE_GUID,0,(void **)&absolute);
     pointer_absolute=absolute;
     pointer_relative=mouse;
-    if(bs->LocateHandleBuffer&&bs->HandleProtocol&&bs->FreePool){
-        uint64_t found=0;
-        EFI_HANDLE *handles=0;
-        if(bs->LocateHandleBuffer(2,(EFI_GUID *)&MOUSE_GUID,0,&found,&handles)==0&&handles){
-            for(uint64_t i=0;i<found&&pointer_source_count<8;i++){
-                EFI_SIMPLE_POINTER_PROTOCOL *source=0;
-                if(bs->HandleProtocol(handles[i],(EFI_GUID *)&MOUSE_GUID,(void **)&source)==0&&source&&source->GetState)
-                    pointer_sources[pointer_source_count++]=source;
-            }
-            bs->FreePool(handles);
-        }
-    }
-    serial_text("QUARTZIE-SIMPLE-SOURCES ");
-    serial_decimal(pointer_source_count);serial_char('\n');
     serial_text(absolute?"QUARTZIE-ABS-POINTER\n":"QUARTZIE-NO-ABS\n");
     serial_text(mouse?"QUARTZIE-REL-POINTER\n":"QUARTZIE-NO-REL\n");
     pointer_x=desktop.mouse_x;
@@ -320,18 +297,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             if(!ever_moved){serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
             if(++pointer_updates==16)serial_text("QUARTZIE-POINTER-CONTINUOUS\n");
         }
-        if(pointer_pressed&&!left){
-            if(host_cursor){
-                int index=q_dock_hit(&desktop,desktop.mouse_x,desktop.mouse_y);
-                serial_text("QUARTZIE-CLICK ");
-                serial_decimal(desktop.mouse_x);serial_char(' ');
-                serial_decimal(desktop.mouse_y);serial_char(' ');
-                serial_decimal(index);serial_char('\n');
-                if(index==10)serial_text("QUARTZIE-START-CLICK\n");
-                else if(index==Q_FILES)serial_text("QUARTZIE-FILES-CLICK\n");
-            }
-            q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
-        }
+        if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
         if(!ps2_active&&!ever_moved&&ps2_tries<2&&++ps2_wait>=400){
