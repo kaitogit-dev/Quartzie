@@ -8,6 +8,7 @@ static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
+static uint32_t dock_base_buffer[659*137];
 static QDesktop desktop;
 static QNtKernel native_kernel;
 static uint8_t executable_buffer[1024*1024];
@@ -164,6 +165,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
+    q_dock_buffers(&desktop,dock_base_buffer);
     q_draw(&desktop);present();
     q_enable_animations(&desktop);
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
