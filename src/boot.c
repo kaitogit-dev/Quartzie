@@ -26,7 +26,6 @@ static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
-static int pointer_seen;
 static uint64_t read_clock(void){
     unsigned int low,high;
     __asm__ volatile("rdtsc":"=a"(low),"=d"(high));
@@ -77,7 +76,6 @@ static void pointer_sample(void *context){
     if(pointer_y<0)pointer_y=0;
     if(pointer_x>=desktop.width)pointer_x=desktop.width-1;
     if(pointer_y>=desktop.height)pointer_y=desktop.height-1;
-    if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y)pointer_seen=1;
     if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
 }
 
@@ -307,7 +305,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             q_draw(&desktop);
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
-        }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+        }else if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
         bs->Stall(desktop.drag>=0?200:desktop.scene_tween_active?300:750);
     }
 }
