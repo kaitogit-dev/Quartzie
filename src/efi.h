@@ -20,11 +20,14 @@ struct EFI_BOOT_SERVICES {
     void *RaiseTPL;
     void *RestoreTPL;
     EFI_STATUS (EFIAPI *AllocatePages)(uint32_t,uint32_t,uint64_t,uint64_t *);
-    void *reserved_before_handle[13];
+    void *reserved_before_free_pool[3];
+    EFI_STATUS (EFIAPI *FreePool)(void *);
+    void *reserved_before_handle[9];
     EFI_STATUS (EFIAPI *HandleProtocol)(EFI_HANDLE,EFI_GUID *,void **);
     void *reserved_before_stall[11];
     EFI_STATUS (EFIAPI *Stall)(uint64_t);
-    void *reserved_before_locate[8];
+    void *reserved_before_locate[7];
+    EFI_STATUS (EFIAPI *LocateHandleBuffer)(uint32_t,EFI_GUID *,void *,uint64_t *,EFI_HANDLE **);
     EFI_STATUS (EFIAPI *LocateProtocol)(EFI_GUID *, void *, void **);
 };
 typedef struct {
