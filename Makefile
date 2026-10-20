@@ -1,4 +1,4 @@
-VERSION = 0.38.2
+VERSION = 0.38.3
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -46,6 +46,7 @@ build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c build/icons.c -o $@
 test: build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/icons-test
+	./build/timing-test
 	./build/ntcore-test
 	./build/pe-test build/winapp.exe
 	./build/ui-test
@@ -81,4 +82,6 @@ build/pe-test: tests/pe64.c src/pe64.c src/pe64.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/pe64.c src/pe64.c -o $@
 build/icons-test: tests/icons.c build/icons.c src/icons.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/icons.c build/icons.c -o $@
+build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c src/icons.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/icons.c build/font.c -o $@
 .PHONY: all release test verify clean
