@@ -22,6 +22,7 @@ static int cursor_old_x=-100,cursor_old_y=-100;
 static uint32_t cursor_underlay[27*31];
 static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
 static uint8_t cursor_covered[27*31];
+static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
@@ -174,7 +175,7 @@ static void present(void){
             out[x]=c;
         }
     }
-    cursor_draw(desktop.mouse_x,desktop.mouse_y);
+    cursor_draw(pointer_x,pointer_y);
 }
 static void present_damage(int x,int y,int width,int height){
     int x0=x<0?0:x,y0=y<0?0:y;
@@ -191,7 +192,7 @@ static void present_damage(int x,int y,int width,int height){
             dst[px]=c;
         }
     }
-    if(touches_cursor)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+    if(touches_cursor)cursor_draw(pointer_x,pointer_y);
 }
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     (void)image;
@@ -295,7 +296,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 q_key(&desktop,key.UnicodeChar,key.ScanCode);
             }
         }
-        if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
+        if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
         qnt_tick(&native_kernel);
         uint64_t now=read_clock();
         uint64_t delta=(now-last_tick)/ticks_per_us;
