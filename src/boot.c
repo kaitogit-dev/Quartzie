@@ -22,6 +22,64 @@ static int cursor_old_x=-100,cursor_old_y=-100;
 static uint32_t cursor_underlay[27*31];
 static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
 static uint8_t cursor_covered[27*31];
+static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
+static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
+static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
+static int pointer_seen;
+static uint64_t read_clock(void){
+    unsigned int low,high;
+    __asm__ volatile("rdtsc":"=a"(low),"=d"(high));
+    return ((uint64_t)high<<32)|low;
+}
+static void pointer_sample(void *context){
+    (void)context;
+    int moved=0;
+    if(pointer_absolute&&pointer_absolute->GetState&&pointer_absolute->Mode){
+        EFI_ABSOLUTE_POINTER_STATE state;
+        if(pointer_absolute->GetState(pointer_absolute,&state)==0){
+            EFI_ABSOLUTE_POINTER_MODE *mode=pointer_absolute->Mode;
+            if(mode->AbsoluteMaxX>mode->AbsoluteMinX&&mode->AbsoluteMaxY>mode->AbsoluteMinY){
+                uint64_t px=state.CurrentX>=mode->AbsoluteMinX?state.CurrentX-mode->AbsoluteMinX:0;
+                uint64_t py=state.CurrentY>=mode->AbsoluteMinY?state.CurrentY-mode->AbsoluteMinY:0;
+                uint64_t max_x=mode->AbsoluteMaxX-mode->AbsoluteMinX;
+                uint64_t max_y=mode->AbsoluteMaxY-mode->AbsoluteMinY;
+                if(px>max_x)px=max_x;
+                if(py>max_y)py=max_y;
+                pointer_x=(int)(px*(uint64_t)(desktop.width-1)/max_x);
+                pointer_y=(int)(py*(uint64_t)(desktop.height-1)/max_y);
+                pointer_pressed=(state.ActiveButtons&1)!=0;
+                moved=1;
+            }
+        }
+    }
+    if(!moved&&pointer_relative&&pointer_relative->GetState){
+        EFI_SIMPLE_POINTER_STATE state;
+        if(pointer_relative->GetState(pointer_relative,&state)==0){
+            uint64_t sx=pointer_relative->Mode?pointer_relative->Mode->ResolutionX:0;
+            uint64_t sy=pointer_relative->Mode?pointer_relative->Mode->ResolutionY:0;
+            if(sx<=100)sx=100;
+            if(sy<=100)sy=100;
+            if(sx>1000000)sx=1000000;
+            if(sy>1000000)sy=1000000;
+            int64_t mx=(int64_t)state.RelativeMovementX*100+pointer_rem_x;
+            int64_t my=(int64_t)state.RelativeMovementY*100+pointer_rem_y;
+            pointer_x+=(int)(mx/(int64_t)sx);
+            pointer_y+=(int)(my/(int64_t)sy);
+            pointer_rem_x=(int)(mx%(int64_t)sx);
+            pointer_rem_y=(int)(my%(int64_t)sy);
+            pointer_pressed=state.LeftButton!=0;
+            moved=1;
+        }
+    }
+    if(!moved)return;
+    if(pointer_x<0)pointer_x=0;
+    if(pointer_y<0)pointer_y=0;
+    if(pointer_x>=desktop.width)pointer_x=desktop.width-1;
+    if(pointer_y>=desktop.height)pointer_y=desktop.height-1;
+    if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y)pointer_seen=1;
+    if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
+}
+
 static void serial_char(uint8_t c){
     for(int i=0;i<10000;i++){
         uint8_t flag;
@@ -184,40 +242,30 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     EFI_ABSOLUTE_POINTER_PROTOCOL *absolute=0;
     bs->LocateProtocol((EFI_GUID *)&MOUSE_GUID,0,(void **)&mouse);
     bs->LocateProtocol((EFI_GUID *)&ABS_MOUSE_GUID,0,(void **)&absolute);
+    pointer_absolute=absolute;
+    pointer_relative=mouse;
+    pointer_x=desktop.mouse_x;
+    pointer_y=desktop.mouse_y;
+    q_render_poll(&desktop,pointer_sample,0);
     QPs2Mouse ps2={0};
     int ps2_active=0,wait=0,ever_moved=0,ps2_logged=0;
     if(!mouse&&!absolute){ps2_active=q_ps2_enable();serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");}
     uint8_t left=0;
+    uint64_t tick_before=read_clock();
+    bs->Stall(10000);
+    uint64_t tick_after=read_clock();
+    uint64_t ticks_per_us=(tick_after-tick_before)/10000;
+    if(!ticks_per_us)ticks_per_us=1;
+    uint64_t last_tick=read_clock();
     for(;;){
-        if(mouse&&mouse->GetState){
-            EFI_SIMPLE_POINTER_STATE s;
-            if(mouse->GetState(mouse,&s)==0){
-                int dx=s.RelativeMovementX,dy=s.RelativeMovementY;
-                uint64_t scale_x=mouse->Mode?mouse->Mode->ResolutionX:0;
-                uint64_t scale_y=mouse->Mode?mouse->Mode->ResolutionY:0;
-                if(scale_x>100)dx=(int)((int64_t)dx*100/(int64_t)scale_x);
-                if(scale_y>100)dy=(int)((int64_t)dy*100/(int64_t)scale_y);
-                if(dx||dy){q_move(&desktop,desktop.mouse_x+dx,desktop.mouse_y+dy);if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
-                if(s.LeftButton&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
-                if(!s.LeftButton&&left)q_release(&desktop);
-                left=s.LeftButton;
-            }
-        }else if(absolute&&absolute->GetState&&absolute->Mode){
-            EFI_ABSOLUTE_POINTER_STATE s;
-            if(absolute->GetState(absolute,&s)==0){
-                EFI_ABSOLUTE_POINTER_MODE *m=absolute->Mode;
-                if(m->AbsoluteMaxX>m->AbsoluteMinX&&m->AbsoluteMaxY>m->AbsoluteMinY){
-                    int x=(int)((s.CurrentX-m->AbsoluteMinX)*(uint64_t)(w-1)/(m->AbsoluteMaxX-m->AbsoluteMinX));
-                    int y=(int)((s.CurrentY-m->AbsoluteMinY)*(uint64_t)(h-1)/(m->AbsoluteMaxY-m->AbsoluteMinY));
-                    if(x!=desktop.mouse_x||y!=desktop.mouse_y){if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
-                    q_move(&desktop,x,y);
-                }
-                int pressed=(s.ActiveButtons&1)!=0;
-                if(pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
-                if(!pressed&&left)q_release(&desktop);
-                left=(uint8_t)pressed;
-            }
+        pointer_sample(0);
+        if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
+            q_move(&desktop,pointer_x,pointer_y);
+            if(!ever_moved){serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
         }
+        if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
+        if(!pointer_pressed&&left)q_release(&desktop);
+        left=(uint8_t)pointer_pressed;
         if(!ps2_active&&!ever_moved&&++wait>=220){
             ps2_active=q_ps2_enable();
             if(ps2_active)serial_text("QUARTZIE-PS2-READY\n");
@@ -229,6 +277,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
                 if(!q_ps2_poll(&ps2,&dx,&dy,&buttons))break;
                 if(dx||dy){
                     q_move(&desktop,desktop.mouse_x+dx,desktop.mouse_y+dy);
+                    pointer_x=desktop.mouse_x;pointer_y=desktop.mouse_y;
+                    if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
                     if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");
                     ever_moved=1;
                 }
@@ -247,12 +297,16 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         }
         if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
         qnt_tick(&native_kernel);
-        q_tick(&desktop);
+        uint64_t now=read_clock();
+        uint64_t delta=(now-last_tick)/ticks_per_us;
+        last_tick=now;
+        if(delta>100000)delta=100000;
+        q_tick_timed(&desktop,(uint32_t)delta);
         if(desktop.dirty){
             q_draw(&desktop);
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
         }else if(cursor_old_x!=desktop.mouse_x||cursor_old_y!=desktop.mouse_y)cursor_draw(desktop.mouse_x,desktop.mouse_y);
-        bs->Stall(desktop.drag>=0?700:(desktop.scene_tween_active?((desktop.scene_tween_kind==1||desktop.scene_tween_kind==2)?2500:6500):1500));
+        bs->Stall(desktop.drag>=0?200:desktop.scene_tween_active?300:750);
     }
 }
