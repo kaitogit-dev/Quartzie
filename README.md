@@ -1,4 +1,4 @@
-# Quartzie 0.38.3
+# Quartzie 0.38.4
 
 ## Build
 
@@ -11,12 +11,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.38.3-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.38.4-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.38.3-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.4-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -36,7 +36,7 @@ Windows opening and maximizing use opaque geometric scale transitions. Minimize 
 
 ## Responsiveness
 
-Opening and maximizing use elapsed-time cubic easing with a 9 ms target frame interval rather than seven discrete steps. Cursor input is sampled during long rendering passes, with absolute tablet positioning preferred where supported and fractional relative motion preserved. Dock and window animations stop triggering redundant full-scene redraws.
+The cursor uses the UEFI pointer interface directly on an idle desktop without repainting any windows. The PS/2 device is used only when firmware pointer interfaces are absent, with remote polling limited to approximately 83 times per second. Opening and maximizing use elapsed-time easing with a 16 ms target frame interval. The glass renderer never calls input firmware services inside its drawing loops.
 
 ## Rendering
 
@@ -47,7 +47,7 @@ Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass 
 The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.38.3-x64.img program.exe Quartzie-custom.img
+python3 tools/replace_app.py Quartzie-0.38.4-x64.img program.exe Quartzie-custom.img
 ```
 
 Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
