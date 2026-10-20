@@ -1,4 +1,5 @@
 #include "ui.h"
+static void poll_render(QDesktop *q);
 #include "font.h"
 #include "icons.h"
 #include <stddef.h>
