@@ -36,9 +36,9 @@ Windows opening and maximizing use opaque geometric scale transitions. Minimize 
 
 ## Responsiveness
 
-The Windows launcher enables a host-rendered cursor and explicitly selects QEMU's absolute USB tablet through its monitor. Hover and click positions therefore use the tablet's absolute coordinates rather than an accumulated PS/2 mouse position. The QEMU test checks that clicking the visible Start button activates Start, not Files.
+The Windows QEMU launcher uses Quartzie's guest-rendered cursor, so pointer hover, click targeting, and the visible cursor share the same desktop coordinates. This avoids the coordinate drift that occurred when the host cursor was combined with relative PS/2 input under QEMU display scaling.
 
-Without the Windows launcher, Quartzie continues using its custom framebuffer cursor. Streaming PS/2 reports and the ordinary USB tablet path remain available. Opening and maximizing use elapsed-time easing at a 16 ms frame target.
+The PS/2 input path consumes streaming movement packets. Opening and maximizing use elapsed-time easing with a 16 ms target frame interval.
 
 ## Rendering
 
