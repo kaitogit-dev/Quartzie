@@ -19,6 +19,8 @@ jobs:
         run: python3 tools/mousecheck.py Quartzie-x64.iso
       - name: Verify USB tablet movement
         run: python3 tools/mousecheck.py Quartzie-x64.iso usb
+      - name: Verify native PS2 cursor
+        run: python3 tools/mousecheck.py Quartzie-x64.iso ps2-host
       - name: Verify native cursor mode
         run: python3 tools/mousecheck.py Quartzie-x64.iso usb-host
       - name: Boot GPT image in OVMF
