@@ -1,4 +1,4 @@
-VERSION = 0.38.6
+VERSION = 0.38.7
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -18,7 +18,7 @@ build/font.c: tools/font.py | build
 	$(PYTHON) tools/font.py $@ $(FONT_REGULAR) $(FONT_MEDIUM)
 build/font.obj: build/font.c src/font.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
-build/icons.c: tools/icons.py assets/icons.zip | build
+build/icons.c: tools/icons.py assets/icons.zip assets/start-icon.png.base64 | build
 	$(PYTHON) tools/icons.py assets/icons.zip $@
 build/icons.obj: build/icons.c src/icons.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -44,8 +44,9 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c build/icons.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c build/icons.c -o $@
-test: build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/icons-test
+	./build/start-test
 	./build/timing-test
 	./build/ntcore-test
 	./build/pe-test build/winapp.exe
@@ -62,6 +63,8 @@ verify: all test
 	$(PYTHON) tools/check_app.py build/winapp.exe Quartzie-x64.iso Quartzie-x64-uefi.img
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+build/start-test: tests/start.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/start.c src/ui.c build/font.c build/icons.c -o $@
 build/transitions-test: tests/transitions.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/transitions.c src/ui.c build/font.c build/icons.c -o $@
 build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
