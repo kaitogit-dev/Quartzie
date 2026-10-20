@@ -26,6 +26,8 @@ static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
 static uint8_t cursor_covered[27*31];
 static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
+static EFI_SIMPLE_POINTER_PROTOCOL *pointer_sources[8];
+static int pointer_source_count;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
 static int pointer_ps2_confirmed;
@@ -278,6 +280,20 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     bs->LocateProtocol((EFI_GUID *)&ABS_MOUSE_GUID,0,(void **)&absolute);
     pointer_absolute=absolute;
     pointer_relative=mouse;
+    if(bs->LocateHandleBuffer&&bs->HandleProtocol&&bs->FreePool){
+        uint64_t found=0;
+        EFI_HANDLE *handles=0;
+        if(bs->LocateHandleBuffer(2,(EFI_GUID *)&MOUSE_GUID,0,&found,&handles)==0&&handles){
+            for(uint64_t i=0;i<found&&pointer_source_count<8;i++){
+                EFI_SIMPLE_POINTER_PROTOCOL *source=0;
+                if(bs->HandleProtocol(handles[i],(EFI_GUID *)&MOUSE_GUID,(void **)&source)==0&&source&&source->GetState)
+                    pointer_sources[pointer_source_count++]=source;
+            }
+            bs->FreePool(handles);
+        }
+    }
+    serial_text("QUARTZIE-SIMPLE-SOURCES ");
+    serial_decimal(pointer_source_count);serial_char('\n');
     serial_text(absolute?"QUARTZIE-ABS-POINTER\n":"QUARTZIE-NO-ABS\n");
     serial_text(mouse?"QUARTZIE-REL-POINTER\n":"QUARTZIE-NO-REL\n");
     pointer_x=desktop.mouse_x;
