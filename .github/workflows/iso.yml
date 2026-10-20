@@ -15,9 +15,10 @@ jobs:
         run: make verify
       - name: Boot ISO in OVMF
         run: python3 tools/bootcheck.py Quartzie-x64.iso iso
-      - name: Diagnose pointer movement
-        continue-on-error: true
+      - name: Verify PS2 pointer movement
         run: python3 tools/mousecheck.py Quartzie-x64.iso
+      - name: Verify USB tablet movement
+        run: python3 tools/mousecheck.py Quartzie-x64.iso usb
       - name: Boot GPT image in OVMF
         run: python3 tools/bootcheck.py Quartzie-x64-uefi.img disk
       - name: Version builds
