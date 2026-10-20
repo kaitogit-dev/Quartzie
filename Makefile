@@ -5,7 +5,7 @@ PYTHON = python3
 FONT_REGULAR ?= /usr/share/fonts/opentype/inter/Inter-Regular.otf
 FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
-OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/embed_app.obj build/icons.obj
+OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img
 release: all
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
@@ -68,8 +68,8 @@ build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c build/font.c build/icons.c -o $@
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c build/font.c build/icons.c -o $@
-build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/ui.h src/efi.h build/font.c build/icons.c build/embed_app.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c build/font.c build/icons.c build/embed_app.c -o $@
+build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h build/font.c build/icons.c build/embed_app.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/font.c build/icons.c build/embed_app.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
