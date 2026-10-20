@@ -696,8 +696,19 @@ static void draw_base(QDesktop *q,int skip){
         drawn[app]=1;draw_window(q,app);
     }
 }
+static void cache_dock_background(QDesktop *q){
+    if(!q->dock_background||q->drag>=0||q->clip_left||q->clip_top||q->clip_right!=q->width||q->clip_bottom!=q->height)return;
+    int x=dock_x(q)-52,y=dock_y(q)-53;
+    for(int row=0;row<137;row++){
+        size_t src=(size_t)(y+row)*q->width+x;
+        size_t dst=(size_t)row*659;
+        for(int col=0;col<659;col++)q->dock_background[dst+col]=q->pixels[src+col];
+    }
+    q->dock_cache_valid=1;
+}
 static void draw_overlays(QDesktop *q){
     draw_topbar(q);
+    cache_dock_background(q);
     draw_dock(q);
     draw_menu(q);
     draw_notifications(q);
@@ -709,6 +720,10 @@ static void draw_scene(QDesktop *q,int skip){
 }
 void q_drag_buffers(QDesktop *q,uint32_t *background){
     q->drag_base=background;
+}
+void q_dock_buffers(QDesktop *q,uint32_t *background){
+    q->dock_background=background;
+    q->dock_cache_valid=0;
 }
 static void drag_capture(QDesktop *q){
     int app=q->drag;
@@ -906,7 +921,17 @@ void q_draw(QDesktop *q){
             x0=21;x1=248;y0=90;y1=453;
         }
         clip_region(q,x0,y0,x1,y1);
-        draw_scene(q,-1);
+        if(q->dock_cache_valid&&q->dock_background&&q->hover<20&&q->hover_last<20){
+            int bx=dock_x(q)-52,by=dock_y(q)-53;
+            for(int row=0;row<137;row++){
+                size_t dst=(size_t)(by+row)*q->width+bx;
+                size_t src=(size_t)row*659;
+                for(int col=0;col<659;col++)q->pixels[dst+col]=q->dock_background[src+col];
+            }
+            draw_dock(q);
+        }else{
+            draw_scene(q,-1);
+        }
         q->damage_x=q->clip_left;q->damage_y=q->clip_top;
         q->damage_w=q->clip_right-q->clip_left;q->damage_h=q->clip_bottom-q->clip_top;
         q->damage_valid=1;
