@@ -25,6 +25,7 @@ static uint8_t cursor_covered[27*31];
 static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
+static QPs2Mouse *pointer_ps2;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
 static uint64_t read_clock(void){
     unsigned int low,high;
@@ -68,6 +69,16 @@ static void pointer_sample(void *context){
             pointer_rem_x=(int)(mx%(int64_t)sx);
             pointer_rem_y=(int)(my%(int64_t)sy);
             pointer_pressed=state.LeftButton!=0;
+            moved=1;
+        }
+    }
+    if(!moved&&pointer_ps2){
+        int dx=0,dy=0,buttons=0;
+        for(int n=0;n<12;n++){
+            if(!q_ps2_poll(pointer_ps2,&dx,&dy,&buttons))break;
+            pointer_x+=dx;
+            pointer_y+=dy;
+            pointer_pressed=(buttons&1)!=0;
             moved=1;
         }
     }
@@ -248,7 +259,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_render_poll(&desktop,pointer_sample,0);
     QPs2Mouse ps2={0};
     int ps2_active=0,wait=0,ever_moved=0,ps2_logged=0;
-    if(!mouse&&!absolute){ps2_active=q_ps2_enable();serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");}
+    if(!mouse&&!absolute){
+        ps2_active=q_ps2_enable();
+        if(ps2_active)pointer_ps2=&ps2;
+        serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");
+    }
     uint8_t left=0;
     uint64_t tick_before=read_clock();
     bs->Stall(10000);
@@ -267,24 +282,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         left=(uint8_t)pointer_pressed;
         if(!ps2_active&&!ever_moved&&++wait>=220){
             ps2_active=q_ps2_enable();
-            if(ps2_active)serial_text("QUARTZIE-PS2-READY\n");
+            if(ps2_active){pointer_ps2=&ps2;serial_text("QUARTZIE-PS2-READY\n");}
             wait=0;
-        }
-        if(ps2_active){
-            for(int n=0;n<12;n++){
-                int dx=0,dy=0,buttons=0;
-                if(!q_ps2_poll(&ps2,&dx,&dy,&buttons))break;
-                if(dx||dy){
-                    q_move(&desktop,desktop.mouse_x+dx,desktop.mouse_y+dy);
-                    pointer_x=desktop.mouse_x;pointer_y=desktop.mouse_y;
-                    if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
-                    if(!ever_moved)serial_text("QUARTZIE-POINTER-MOVED\n");
-                    ever_moved=1;
-                }
-                if((buttons&1)&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
-                if(!(buttons&1)&&left)q_release(&desktop);
-                left=(uint8_t)(buttons&1);
-            }
         }
         if(q_ps2_bytes_seen&&!ps2_logged){serial_text("QUARTZIE-PS2-RAW\n");ps2_logged=1;}
         if(table->ConIn){
