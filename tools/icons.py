@@ -1,3 +1,4 @@
+import base64
 import pathlib
 import sys
 import zipfile
@@ -33,6 +34,20 @@ def build(archive, output):
                     for r, g, b, a in section
                 ) + ',')
             lines.append('},')
+    icon = Image.open(BytesIO(base64.b64decode(
+        pathlib.Path("assets/start-icon.png.base64").read_text().strip()
+    ))).convert("RGBA")
+    if icon.size != (48, 48):
+        raise ValueError("Start logo atlas image must be 48 x 48")
+    lines.append("{")
+    pixels = list(icon.getdata())
+    for start in range(0, len(pixels), 16):
+        section = pixels[start:start + 16]
+        lines.append(",".join(
+            "0x%08x" % ((a << 24) | (r << 16) | (g << 8) | b)
+            for r, g, b, a in section
+        ) + ",")
+    lines.append("},")
     lines.extend((
         '};',
         'const uint32_t *q_icon_pixels(unsigned int id){',
