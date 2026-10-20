@@ -4,6 +4,7 @@
 #include "ntcore.h"
 #include "winapi.h"
 #include "fileboot.h"
+#include "hostcursor.h"
 static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
@@ -18,6 +19,7 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
 static uint32_t *screen;
 static uint32_t scanline;
 static int pixel_format;
+static int host_cursor;
 static int cursor_old_x=-100,cursor_old_y=-100;
 static uint32_t cursor_underlay[27*31];
 static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
@@ -165,6 +167,7 @@ static void cursor_hide(void){
     cursor_old_x=-100;cursor_old_y=-100;
 }
 static void cursor_draw(int x,int y){
+    if(host_cursor)return;
     const int cw=27,ch=31;
     cursor_hide();
     for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
@@ -242,6 +245,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     if(video->Mode->FrameBufferSize<(uint64_t)mode->PixelsPerScanLine*h*4)return 5;
     scanline=mode->PixelsPerScanLine;pixel_format=(int)mode->PixelFormat;
     screen=(uint32_t *)(uintptr_t)video->Mode->FrameBufferBase;
+    host_cursor=q_host_cursor_enabled();
+    if(host_cursor)serial_text("QUARTZIE-HOST-CURSOR\n");
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
