@@ -26,6 +26,8 @@ static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
+static uint64_t pointer_next_ps2_tick;
+static uint64_t clock_ticks_per_us=1;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
 static uint64_t read_clock(void){
     unsigned int low,high;
@@ -73,13 +75,16 @@ static void pointer_sample(void *context){
         }
     }
     if(!moved&&pointer_ps2){
-        int dx=0,dy=0,buttons=0;
-        for(int n=0;n<12;n++){
-            if(!q_ps2_poll(pointer_ps2,&dx,&dy,&buttons))break;
-            pointer_x+=dx;
-            pointer_y+=dy;
-            pointer_pressed=(buttons&1)!=0;
-            moved=1;
+        uint64_t now=read_clock();
+        if(now>=pointer_next_ps2_tick){
+            pointer_next_ps2_tick=now+clock_ticks_per_us*12000;
+            int dx=0,dy=0,buttons=0;
+            if(q_ps2_poll(pointer_ps2,&dx,&dy,&buttons)){
+                pointer_x+=dx;
+                pointer_y+=dy;
+                pointer_pressed=(buttons&1)!=0;
+                moved=1;
+            }
         }
     }
     if(!moved)return;
@@ -256,9 +261,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     pointer_relative=mouse;
     pointer_x=desktop.mouse_x;
     pointer_y=desktop.mouse_y;
-    q_render_poll(&desktop,pointer_sample,0);
     QPs2Mouse ps2={0};
-    int ps2_active=0,wait=0,ever_moved=0,ps2_logged=0;
+    int ps2_active=0,ever_moved=0,ps2_logged=0;
     if(!mouse&&!absolute){
         ps2_active=q_ps2_enable();
         if(ps2_active)pointer_ps2=&ps2;
@@ -268,8 +272,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     uint64_t tick_before=read_clock();
     bs->Stall(10000);
     uint64_t tick_after=read_clock();
-    uint64_t ticks_per_us=(tick_after-tick_before)/10000;
-    if(!ticks_per_us)ticks_per_us=1;
+    clock_ticks_per_us=(tick_after-tick_before)/10000;
+    if(!clock_ticks_per_us)clock_ticks_per_us=1;
     uint64_t last_tick=read_clock();
     for(;;){
         pointer_sample(0);
@@ -280,11 +284,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
-        if(!ps2_active&&!ever_moved&&++wait>=220){
-            ps2_active=q_ps2_enable();
-            if(ps2_active){pointer_ps2=&ps2;serial_text("QUARTZIE-PS2-READY\n");}
-            wait=0;
-        }
         if(q_ps2_bytes_seen&&!ps2_logged){serial_text("QUARTZIE-PS2-RAW\n");ps2_logged=1;}
         if(table->ConIn){
             for(int n=0;n<12;n++){
@@ -296,7 +295,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
         qnt_tick(&native_kernel);
         uint64_t now=read_clock();
-        uint64_t delta=(now-last_tick)/ticks_per_us;
+        uint64_t delta=(now-last_tick)/clock_ticks_per_us;
         last_tick=now;
         if(delta>100000)delta=100000;
         q_tick_timed(&desktop,(uint32_t)delta);
