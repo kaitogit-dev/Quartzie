@@ -26,6 +26,7 @@ static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
+static int pointer_ps2_confirmed;
 static uint64_t pointer_next_ps2_tick;
 static uint64_t clock_ticks_per_us=1;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
@@ -37,7 +38,7 @@ static uint64_t read_clock(void){
 static void pointer_sample(void *context){
     (void)context;
     int moved=0;
-    if(pointer_absolute&&pointer_absolute->GetState&&pointer_absolute->Mode){
+    if(!pointer_ps2_confirmed&&pointer_absolute&&pointer_absolute->GetState&&pointer_absolute->Mode){
         EFI_ABSOLUTE_POINTER_STATE state;
         if(pointer_absolute->GetState(pointer_absolute,&state)==0){
             EFI_ABSOLUTE_POINTER_MODE *mode=pointer_absolute->Mode;
@@ -48,14 +49,18 @@ static void pointer_sample(void *context){
                 uint64_t max_y=mode->AbsoluteMaxY-mode->AbsoluteMinY;
                 if(px>max_x)px=max_x;
                 if(py>max_y)py=max_y;
-                pointer_x=(int)(px*(uint64_t)(desktop.width-1)/max_x);
-                pointer_y=(int)(py*(uint64_t)(desktop.height-1)/max_y);
-                pointer_pressed=(state.ActiveButtons&1)!=0;
-                moved=1;
+                int next_x=(int)(px*(uint64_t)(desktop.width-1)/max_x);
+                int next_y=(int)(py*(uint64_t)(desktop.height-1)/max_y);
+                int next_pressed=(state.ActiveButtons&1)!=0;
+                if(next_x!=pointer_x||next_y!=pointer_y||next_pressed!=pointer_pressed){
+                    pointer_x=next_x;pointer_y=next_y;pointer_pressed=next_pressed;
+                    pointer_ps2=0;
+                    moved=1;
+                }
             }
         }
     }
-    if(!moved&&pointer_relative&&pointer_relative->GetState){
+    if(!moved&&!pointer_ps2_confirmed&&pointer_relative&&pointer_relative->GetState){
         EFI_SIMPLE_POINTER_STATE state;
         if(pointer_relative->GetState(pointer_relative,&state)==0){
             uint64_t sx=pointer_relative->Mode?pointer_relative->Mode->ResolutionX:0;
@@ -66,12 +71,15 @@ static void pointer_sample(void *context){
             if(sy>1000000)sy=1000000;
             int64_t mx=(int64_t)state.RelativeMovementX*100+pointer_rem_x;
             int64_t my=(int64_t)state.RelativeMovementY*100+pointer_rem_y;
-            pointer_x+=(int)(mx/(int64_t)sx);
-            pointer_y+=(int)(my/(int64_t)sy);
+            int dx=(int)(mx/(int64_t)sx),dy=(int)(my/(int64_t)sy);
+            int next_pressed=state.LeftButton!=0;
             pointer_rem_x=(int)(mx%(int64_t)sx);
             pointer_rem_y=(int)(my%(int64_t)sy);
-            pointer_pressed=state.LeftButton!=0;
-            moved=1;
+            if(dx||dy||next_pressed!=pointer_pressed){
+                pointer_x+=dx;pointer_y+=dy;pointer_pressed=next_pressed;
+                pointer_ps2=0;
+                moved=1;
+            }
         }
     }
     if(!moved&&pointer_ps2){
@@ -80,10 +88,14 @@ static void pointer_sample(void *context){
             pointer_next_ps2_tick=now+clock_ticks_per_us*12000;
             int dx=0,dy=0,buttons=0;
             if(q_ps2_poll(pointer_ps2,&dx,&dy,&buttons)){
-                pointer_x+=dx;
-                pointer_y+=dy;
-                pointer_pressed=(buttons&1)!=0;
-                moved=1;
+                int next_pressed=(buttons&1)!=0;
+                if(dx||dy||next_pressed!=pointer_pressed){
+                    pointer_x+=dx;
+                    pointer_y+=dy;
+                    pointer_pressed=next_pressed;
+                    pointer_ps2_confirmed=1;
+                    moved=1;
+                }
             }
         }
     }
@@ -286,7 +298,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
-        if(!ps2_active&&!ever_moved&&!absolute&&++ps2_wait>=400){
+        if(!ps2_active&&!ever_moved&&++ps2_wait>=400){
             ps2_active=q_ps2_enable();
             if(ps2_active){pointer_ps2=&ps2;serial_text("QUARTZIE-PS2-READY\n");}
             ps2_wait=0;
