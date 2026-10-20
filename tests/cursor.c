@@ -6,6 +6,17 @@
 static uint32_t mock_frame[128*128];
 static uint32_t mock_scene[128*128];
 static uint32_t original[128*128];
+static int pointer_event;
+static EFI_STATUS EFIAPI fake_relative_state(EFI_SIMPLE_POINTER_PROTOCOL *self,EFI_SIMPLE_POINTER_STATE *state){
+    (void)self;
+    if(!pointer_event)return 1;
+    pointer_event--;
+    memset(state,0,sizeof(*state));
+    state->RelativeMovementX=4;
+    return 0;
+}
+static EFI_SIMPLE_POINTER_MODE fake_mode={400,400,0,0,0};
+static EFI_SIMPLE_POINTER_PROTOCOL fake_pointer={0,fake_relative_state,0,&fake_mode};
 #define VERIFY(cond) do{if(!(cond)){fprintf(stderr,"FAIL cursor test line %d: %s\n",__LINE__,#cond);exit(1);}}while(0)
 int main(void){
     desktop.width=128;desktop.height=128;desktop.pixels=mock_scene;
@@ -36,6 +47,26 @@ int main(void){
     present_damage(55,55,40,40);
     cursor_hide();
     for(int y=0;y<128;y++)for(int x=0;x<128;x++)VERIFY(mock_frame[y*128+x]==mock_scene[y*128+x]);
-    puts("PASS: sparse cursor overlay, unrelated region preservation and restoration");
+    pointer_relative=&fake_pointer;
+    pointer_absolute=0;
+    pointer_ps2=0;
+    pointer_x=18;
+    pointer_y=18;
+    cursor_draw(pointer_x,pointer_y);
+    desktop.dirty=0;
+    for(int i=0;i<8;i++){
+        pointer_event=1;
+        pointer_sample(0);
+        VERIFY(pointer_x==19+i&&pointer_y==18);
+        VERIFY(cursor_old_x==pointer_x&&cursor_old_y==pointer_y);
+        VERIFY(desktop.dirty==0);
+    }
+    pointer_event=0;
+    pointer_sample(0);
+    VERIFY(pointer_x==26&&desktop.dirty==0);
+    pointer_relative=0;
+    cursor_hide();
+    for(int y=0;y<128;y++)for(int x=0;x<128;x++)VERIFY(mock_frame[y*128+x]==mock_scene[y*128+x]);
+    puts("PASS: idle pointer movement with fractional precision, no desktop redraw and cursor restoration");
     return 0;
 }
