@@ -62,7 +62,7 @@ def send_vnc_mouse():
         print('VNC pointer events sent at', width, height)
 
 
-def verify_mouse(image, usb=False):
+def verify_mouse(image, usb=False, host_cursor=False):
     code, variables = choose_firmware()
     with tempfile.TemporaryDirectory() as folder:
         root = pathlib.Path(folder)
@@ -82,10 +82,14 @@ def verify_mouse(image, usb=False):
         ]
         if usb:
             command += ['-usb', '-device', 'usb-tablet']
+        if host_cursor:
+            command += ['-fw_cfg', 'name=opt/quartzie/hostcursor,string=1']
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
             before = wait_ready(process, serial, 35)
             print(before.decode('ascii', errors='replace'))
+            if host_cursor and b'QUARTZIE-HOST-CURSOR' not in before:
+                raise RuntimeError('Host cursor mode was not selected')
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.settimeout(5)
                 sock.connect(str(qmp))
@@ -141,4 +145,4 @@ def verify_mouse(image, usb=False):
 
 
 if __name__ == '__main__':
-    verify_mouse(pathlib.Path(sys.argv[1]).resolve(), len(sys.argv) > 2 and sys.argv[2] == 'usb')
+    verify_mouse(pathlib.Path(sys.argv[1]).resolve(), len(sys.argv) > 2 and sys.argv[2] in ('usb', 'usb-host'), len(sys.argv) > 2 and sys.argv[2] == 'usb-host')
