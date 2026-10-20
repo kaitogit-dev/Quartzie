@@ -71,6 +71,29 @@ def send_vnc_mouse(click_start=False):
         print('VNC pointer events sent at', width, height)
 
 
+def send_qmp_start_click(socket_path):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+        stream.settimeout(6)
+        stream.connect(str(socket_path))
+        stream.recv(4096)
+        stream.sendall(b'{"execute":"qmp_capabilities"}\r\n')
+        stream.recv(4096)
+        def event(events):
+            command = {'execute': 'input-send-event', 'arguments': {'events': events}}
+            stream.sendall(json.dumps(command).encode('ascii') + b'\r\n')
+            response = stream.recv(4096)
+            if b'"return"' not in response:
+                raise RuntimeError(f'Mouse event failed: {response!r}')
+        event([
+            {'type': 'abs', 'data': {'axis': 'x', 'value': round(719 * 32767 / 1919)}},
+            {'type': 'abs', 'data': {'axis': 'y', 'value': round(1025 * 32767 / 1079)}},
+        ])
+        time.sleep(0.45)
+        event([{'type': 'btn', 'data': {'button': 'left', 'down': True}}])
+        time.sleep(0.7)
+        event([{'type': 'btn', 'data': {'button': 'left', 'down': False}}])
+
+
 def verify_mouse(image, usb=False, host_cursor=False):
     code, variables = choose_firmware()
     with tempfile.TemporaryDirectory() as folder:
@@ -141,6 +164,8 @@ def verify_mouse(image, usb=False, host_cursor=False):
                     sock.sendall(json.dumps(extra).encode('ascii') + b'\r\n')
                     print('HMP mouse move:', sock.recv(4096))
             send_vnc_mouse(click_start=host_cursor)
+            if host_cursor:
+                send_qmp_start_click(qmp)
             end = time.monotonic() + 6
             while time.monotonic() < end:
                 data = serial.read_bytes()
