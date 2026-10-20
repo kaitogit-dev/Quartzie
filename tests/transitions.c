@@ -45,7 +45,7 @@ static void animate(void){
     CHECK(ui.scene_tween_active);
     CHECK(checksum()==before);
     CHECK(ui.damage_valid);
-    q_tick(&ui);q_draw(&ui);
+    q_tick(&ui);q_tick(&ui);q_draw(&ui);
     CHECK(checksum()!=before);
     for(int n=0;n<16;n++){q_tick(&ui);if(ui.dirty)q_draw(&ui);}
     CHECK(!ui.scene_tween_active);
@@ -60,6 +60,7 @@ int main(void){
     int center=w->x+w->w/2+(w->y+w->h/2)*1280;
     uint32_t before=pixels[center];
     q_draw(&ui);
+    q_tick(&ui);
     q_tick(&ui);
     q_draw(&ui);
     uint32_t during=pixels[center];
