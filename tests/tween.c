@@ -29,6 +29,8 @@ int main(void){
     q_draw(&ui);
     uint64_t first=snapshot();
     q_tick(&ui);
+    CHECK(ui.windows[Q_FILES].tween_step==0);
+    q_tick(&ui);
     CHECK(ui.windows[Q_FILES].tween_step==1);
     q_draw(&ui);
     CHECK(snapshot()!=first);
@@ -42,6 +44,7 @@ int main(void){
     CHECK(window->tween_x==x&&window->tween_y==y);
     q_draw(&ui);
     first=snapshot();
+    q_tick(&ui);
     q_tick(&ui);
     q_draw(&ui);
     CHECK(snapshot()!=first);
