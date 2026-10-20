@@ -27,7 +27,6 @@ static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
 static int pointer_ps2_confirmed;
-static uint64_t pointer_next_ps2_tick;
 static uint64_t clock_ticks_per_us=1;
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
 static uint64_t read_clock(void){
@@ -83,19 +82,15 @@ static void pointer_sample(void *context){
         }
     }
     if(!moved&&pointer_ps2){
-        uint64_t now=read_clock();
-        if(now>=pointer_next_ps2_tick){
-            pointer_next_ps2_tick=now+clock_ticks_per_us*12000;
-            int dx=0,dy=0,buttons=0;
-            if(q_ps2_poll(pointer_ps2,&dx,&dy,&buttons)){
-                int next_pressed=(buttons&1)!=0;
-                if(dx||dy||next_pressed!=pointer_pressed){
-                    pointer_x+=dx;
-                    pointer_y+=dy;
-                    pointer_pressed=next_pressed;
-                    pointer_ps2_confirmed=1;
-                    moved=1;
-                }
+        int dx=0,dy=0,buttons=0;
+        if(q_ps2_poll(pointer_ps2,&dx,&dy,&buttons)){
+            int next_pressed=(buttons&1)!=0;
+            if(dx||dy||next_pressed!=pointer_pressed){
+                pointer_x+=dx;
+                pointer_y+=dy;
+                pointer_pressed=next_pressed;
+                pointer_ps2_confirmed=1;
+                moved=1;
             }
         }
     }
@@ -301,7 +296,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(!ps2_active&&!ever_moved&&ps2_tries<2&&++ps2_wait>=400){
             ps2_tries++;
             ps2_active=q_ps2_enable();
-            if(ps2_active){pointer_ps2=&ps2;serial_text("QUARTZIE-PS2-READY\n");}
+            if(ps2_active){pointer_ps2=&ps2;pointer_relative=0;serial_text("QUARTZIE-PS2-READY\n");}
             ps2_wait=0;
         }
         if(q_ps2_bytes_seen&&!ps2_logged){serial_text("QUARTZIE-PS2-RAW\n");ps2_logged=1;}
