@@ -54,11 +54,11 @@ def send_vnc_mouse():
         title_length = struct.unpack_from('>I', header, 20)[0]
         receive_exact(stream, title_length)
         width, height = struct.unpack_from('>HH', header, 0)
-        for x, y in ((width // 2, height // 2), (width // 3, height // 3),
-                     (width // 2 + 160, height // 2 + 90),
-                     (width // 2 + 210, height // 2 + 130)):
+        for i in range(48):
+            x = width // 3 + (i * 13) % (width // 3)
+            y = height // 3 + (i * 7) % (height // 3)
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
-            time.sleep(0.2)
+            time.sleep(0.018)
         print('VNC pointer events sent at', width, height)
 
 
@@ -126,8 +126,8 @@ def verify_mouse(image, usb=False):
             end = time.monotonic() + 6
             while time.monotonic() < end:
                 data = serial.read_bytes()
-                if b'QUARTZIE-POINTER-MOVED' in data:
-                    print('PASS: QEMU mouse movement reached Quartzie')
+                if b'QUARTZIE-POINTER-CONTINUOUS' in data:
+                    print('PASS: QEMU cursor received at least 16 distinct movement updates')
                     return
                 time.sleep(0.15)
             raise RuntimeError(f'Pointer never moved after QMP mouse event: {serial.read_text(errors="replace")}')
