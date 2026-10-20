@@ -1,4 +1,4 @@
-# Quartzie 0.38.6
+# Quartzie 0.38.7
 
 ## Build
 
@@ -11,12 +11,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.38.6-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.38.7-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.38.6-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.7-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -49,7 +49,7 @@ Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass 
 The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.38.6-x64.img program.exe Quartzie-custom.img
+python3 tools/replace_app.py Quartzie-0.38.7-x64.img program.exe Quartzie-custom.img
 ```
 
 Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
@@ -59,6 +59,8 @@ Use the ISO as input and output to create a custom ISO instead. Boot the resulti
 The NT-style core provides process and thread records, quantum-based scheduling, typed and generation-checked handles, memory-region permissions, in-memory files, syscall dispatch, and driver registration. Tests run a compiled Windows console executable, relocate it, resolve imports, call its entry point, and validate the services.
 
 ## Icons
+
+The Start button uses the supplied Quartzie logo, with its transparent artwork generated from `assets/start-icon.png.base64`. Start now has a hover lift, glow, tooltip, press pulse, and active menu indicator, alongside its existing popup tweens. The logo is also available as a multi-resolution `.ico` for Windows.
 
 The icon assets are stored in `assets/icons.zip`. Building generates `build/icons.c` from the 20 supplied multi-resolution ICO files. The desktop, application launcher, dock, window headers, Files, and Control Center use the matching icons. The atlas keeps transparency and uses the system compositor for blending.
 
