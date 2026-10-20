@@ -419,9 +419,11 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
     if(steps)q->dock_elapsed_us%=8000;
     if(steps){
         int target=q->start_hover?256:0;
-        int advance=(int)(steps*24);
-        int next=target>q->start_lift?clamp(q->start_lift+advance,0,256):clamp(q->start_lift-advance,0,256);
-        if(next!=q->start_lift){q->start_lift=next;dock_change=1;}
+        if(q->start_lift!=target){
+            int advance=(int)(steps*24);
+            int next=target>q->start_lift?clamp(q->start_lift+advance,0,256):clamp(q->start_lift-advance,0,256);
+            if(next!=q->start_lift){q->start_lift=next;dock_change=1;}
+        }
         if(q->start_pulse>0){
             int pulse=q->start_pulse-(int)(steps*20);
             q->start_pulse=pulse>0?pulse:0;
