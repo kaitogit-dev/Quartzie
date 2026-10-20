@@ -22,6 +22,7 @@ enum {
     QI_VOLUME,
     QI_WIFI,
     QI_WIFI_ERROR,
+    QI_START,
     QI_COUNT
 };
 #define Q_ICON_SIZE 48
