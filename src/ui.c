@@ -1,5 +1,4 @@
 #include "ui.h"
-static void poll_render(QDesktop *q);
 #include "font.h"
 #include "icons.h"
 #include <stddef.h>
@@ -86,7 +85,6 @@ static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int
     int x0=clamp(x-spread,q->clip_left,q->clip_right),x1=clamp(x+w+spread,q->clip_left,q->clip_right);
     int y0=clamp(y-spread,q->clip_top,q->clip_bottom),y1=clamp(y+h+spread,q->clip_top,q->clip_bottom);
     for(int yy=y0;yy<y1;yy++){
-        if((yy&31)==0)poll_render(q);
         int cy=clamp(yy,y+r,y+h-r-1);
         for(int xx=x0;xx<x1;xx++){
             int cx=clamp(xx,x+r,x+w-r-1);
@@ -112,7 +110,6 @@ static int glass_cache_cols,glass_cache_rows;
 static const int glass_weight[7]={1,2,3,4,3,2,1};
 static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
     for(int yy=0;yy<rows;yy++){
-        if((yy&7)==0)poll_render(q);
         int y=clamp(sy+yy*GLASS_SCALE,0,q->height-1);
         int y1=clamp(y+2,0,q->height-1);
         for(int xx=0;xx<cols;xx++){
@@ -129,7 +126,6 @@ static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
         }
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
-        if((yy&7)==0&&xx==0)poll_render(q);
         int r=0,g=0,b=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_source[(size_t)yy*cols+clamp(xx+k,0,cols-1)];
@@ -141,7 +137,6 @@ static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
         glass_horizontal[(size_t)yy*cols+xx]=rgb(r/16,g/16,b/16);
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
-        if((yy&7)==0&&xx==0)poll_render(q);
         int r=0,g=0,b=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_horizontal[(size_t)clamp(yy+k,0,rows-1)*cols+xx];
@@ -185,9 +180,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS)return;
     if(!cached)glass_filter(q,sx,sy,cols,rows);
     int bw=q->width;
-    for(int py=y0;py<y1;py++){
-        if((py&15)==0)poll_render(q);
-        for(int px=x0;px<x1;px++){
+    for(int py=y0;py<y1;py++)for(int px=x0;px<x1;px++){
         int dx=px-x,dy=py-y;
         int cover=round_cover(dx,dy,w,h,radius);
         if(!cover)continue;
@@ -203,7 +196,6 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
         if(dx>w-3||dy>h-3)c=blend(c,q->theme?0x86a7d0:0x557099,q->theme?25:17);
         if(rim>0)c=blend(c,0xffffff,clamp(rim/3,0,72));
         q->pixels[at]=blend(q->pixels[at],c,cover);
-        }
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
@@ -372,13 +364,6 @@ static void close_popups(QDesktop *q){q->menu=0;q->notifications=0;q->quick=0;}
 static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_back[Q_MAX_W*Q_MAX_H];
-void q_render_poll(QDesktop *q,void (*callback)(void *),void *context){
-    q->render_poll=callback;
-    q->render_poll_context=context;
-}
-static void poll_render(QDesktop *q){
-    if(q->render_poll)q->render_poll(q->render_poll_context);
-}
 static void begin_scene_tween(QDesktop *q,int kind){
     if(!q->animations_enabled||q->drag>=0)return;
     size_t total=(size_t)q->width*q->height;
@@ -418,8 +403,8 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
             if(elapsed_us>=remaining)q->scene_elapsed_us=(uint32_t)duration;
             else q->scene_elapsed_us+=elapsed_us;
             q->scene_paint_us+=elapsed_us;
-            if(q->scene_paint_us>=9000||q->scene_elapsed_us==(uint32_t)duration){
-                q->scene_paint_us%=9000;
+            if(q->scene_paint_us>=16000||q->scene_elapsed_us==(uint32_t)duration){
+                q->scene_paint_us%=16000;
                 if(q->scene_tween_step<256)q->scene_tween_step++;
                 q->dirty=1;
                 q->hover_only=0;
@@ -715,7 +700,6 @@ static void clip_region(QDesktop *q,int x0,int y0,int x1,int y1){
 }
 static void draw_base(QDesktop *q,int skip){
     for(int y=q->clip_top;y<q->clip_bottom;y++){
-        if((y&31)==0)poll_render(q);
         size_t row=(size_t)y*q->width;
         for(int x=q->clip_left;x<q->clip_right;x++)q->pixels[row+x]=q->wallpaper[row+x];
     }
@@ -822,7 +806,6 @@ static void paint_window_geometry(QDesktop *q,int weight){
     if(iw<1||ih<1)return;
     int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
     for(int y=y0;y<y1;y++){
-        if((y&15)==0)poll_render(q);
         size_t row=(size_t)y*q->width;
         for(int x=x0;x<x1;x++)q->pixels[row+x]=scene_back[row+x];
     }
@@ -836,7 +819,6 @@ static void paint_window_geometry(QDesktop *q,int weight){
         map_x[x]=sx;
     }
     for(int y=top;y<bottom;y++){
-        if((y&15)==0)poll_render(q);
         int sy=by+(int)(((int64_t)(y-iy)*bh)/ih);
         if(y<iy)sy=y-iy+by;
         else if(y>=iy+ih)sy=y-(iy+ih)+by+bh;
@@ -869,7 +851,6 @@ static void paint_scene_tween(QDesktop *q){
     if(q->scene_tween_kind==5)shift=(256-weight)*10/256;
     if(q->scene_tween_kind==3||q->scene_tween_kind==4||q->scene_tween_kind==6)shift=weight*9/256;
     for(int y=y0;y<y1;y++){
-        if((y&15)==0)poll_render(q);
         size_t row=(size_t)y*q->width;
         for(int x=x0;x<x1;x++){
             size_t p=row+x;
