@@ -297,7 +297,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             if(!ever_moved){serial_text("QUARTZIE-POINTER-MOVED\n");ever_moved=1;}
             if(++pointer_updates==16)serial_text("QUARTZIE-POINTER-CONTINUOUS\n");
         }
-        if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
+        if(pointer_pressed&&!left){
+            if(host_cursor){
+                int index=q_dock_hit(&desktop,desktop.mouse_x,desktop.mouse_y);
+                if(index==10)serial_text("QUARTZIE-START-CLICK\n");
+                else if(index==Q_FILES)serial_text("QUARTZIE-FILES-CLICK\n");
+            }
+            q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
+        }
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
         if(!ps2_active&&!ever_moved&&ps2_tries<2&&++ps2_wait>=400){
