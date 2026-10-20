@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "font.h"
+#include "icons.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -305,6 +306,34 @@ static void icon(QDesktop *q,int cx,int cy,int id,uint32_t color){
         text(q,x-text_width("i",0)/2,y+5,"i",0x365a7b,0);
     }
 }
+static void sprite(QDesktop *q,int cx,int cy,int sprite_id,int size){
+    const uint32_t *source=q_icon_pixels((unsigned int)sprite_id);
+    if(!source||size<1)return;
+    int x=cx-size/2,y=cy-size/2;
+    int x0=clamp(x,q->clip_left,q->clip_right),x1=clamp(x+size,q->clip_left,q->clip_right);
+    int y0=clamp(y,q->clip_top,q->clip_bottom),y1=clamp(y+size,q->clip_top,q->clip_bottom);
+    if(x0>=x1||y0>=y1)return;
+    for(int py=y0;py<y1;py++){
+        int sy=(py-y)*Q_ICON_SIZE/size;
+        for(int px=x0;px<x1;px++){
+            int sx=(px-x)*Q_ICON_SIZE/size;
+            uint32_t raw=source[sy*Q_ICON_SIZE+sx];
+            int alpha=(int)(raw>>24);
+            if(!alpha)continue;
+            uint32_t *dst=q->pixels+(size_t)py*q->width+px;
+            *dst=blend(*dst,raw&0xffffffu,alpha==255?256:alpha);
+        }
+    }
+}
+static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
+    int icon_id=-1;
+    if(app==Q_FILES)icon_id=QI_FILE_EXPLORER;
+    else if(app==Q_NOTES)icon_id=QI_TEXT;
+    else if(app==Q_TERMINAL)icon_id=QI_CMD;
+    else if(app==Q_SETTINGS)icon_id=QI_SETTINGS;
+    if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
+    else icon(q,cx,cy,app,color);
+}
 static int dock_x(QDesktop *q){return (q->width-555)/2;}
 static int dock_y(QDesktop *q){return q->height-89;}
 static int menu_x(QDesktop *q){return (q->width-510)/2;}
@@ -451,8 +480,8 @@ static void draw_desktop(QDesktop *q){
     for(int i=0;i<Q_APPS;i++){
         int x=37+(i%2)*94,y=113+(i/2)*104;
         if(q->hover==i+20)surface(q,x,y,86,91,17,inner_material(q),q->theme?63:116);
-        circular(q,x+42,y+38,27,0xc7e5fa,q->theme?40:76);
-        icon(q,x+42,y+38,i,q->theme?0xe7f6ff:0xf7fbff);
+        if(i==Q_CALCULATOR||i==Q_ABOUT)circular(q,x+42,y+38,27,0xc7e5fa,q->theme?40:76);
+        app_icon(q,x+42,y+38,i,52,q->theme?0xe7f6ff:0xf7fbff);
         int width=text_width(names[i],0);
         text(q,x+(86-width)/2,y+82,names[i],foreground(q),0);
     }
@@ -471,7 +500,7 @@ static void draw_dock(QDesktop *q){
             surface(q,xx,y+7-lift,61,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?94:128);
         }
         if(pulse>0)circular(q,xx+30,y+32-lift,22,accent(q),pulse/4);
-        icon(q,xx+30,y+32-lift,i,q->theme?0xd7edfd:0xf6fcff);
+        app_icon(q,xx+30,y+32-lift,i,40,q->theme?0xd7edfd:0xf6fcff);
         if(q->windows[i].open)circular(q,xx+30,y+59,3,q->windows[i].minimized?secondary(q):accent(q),255);
     }
     if(q->hover>=0&&q->hover<Q_APPS){
@@ -491,7 +520,7 @@ static void draw_menu(QDesktop *q){
     for(int i=0;i<Q_APPS;i++){
         int bx=x+26+(i%3)*159,by=y+112+(i/3)*144;
         surface(q,bx,by,141,126,19,inner_material(q),q->theme?109:128);
-        icon(q,bx+70,by+49,i,q->theme?0xecfaff:0xffffff);
+        app_icon(q,bx+70,by+49,i,58,q->theme?0xecfaff:0xffffff);
         int width=text_width(names[i],1);
         text(q,bx+(141-width)/2,by+104,names[i],foreground(q),1);
     }
@@ -517,6 +546,8 @@ static void draw_quick(QDesktop *q){
     surface(q,x+19,y+164,298,68,16,inner_material(q),q->theme?103:119);
     text(q,x+37,y+191,"Accent",foreground(q),1);
     for(int i=0;i<4;i++)circular(q,x+178+i*32,y+194,10,(uint32_t[]){0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85}[i],255);
+    sprite(q,x+230,y+263,QI_NO_WIFI,27);
+    sprite(q,x+277,y+263,QI_MUTED_VOLUME,27);
     text(q,x+38,y+266,"Open settings",foreground(q),0);
 }
 static void focus_remaining(QDesktop *q){
@@ -561,7 +592,8 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     if(app==Q_FILES){
         text(q,x,y,"Files",ink,2);
         surface(q,x,y+30,cw,54,14,inner_material(q),q->theme?95:115);
-        text(q,x+21,y+63,"Home     /     Local",ink,0);
+        sprite(q,x+31,y+57,QI_FOLDER,28);
+        text(q,x+54,y+63,"Home    /    Local",ink,0);
         surface(q,x,y+102,cw,133,17,inner_material(q),q->theme?100:126);
         text(q,x+24,y+139,"No volumes mounted",ink,1);
         text(q,x+24,y+169,"Connect a writable disk to browse files.",muted,0);
@@ -603,7 +635,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.0",ink,2);
+        text(q,x,y,"Quartzie 0.38.1",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -621,7 +653,8 @@ static void draw_window(QDesktop *q,int app){
     q->render_app=app;
     pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?180:149);
     thin_rule(q,w->x+23,w->y+56,w->w-46,28);
-    text(q,w->x+29,w->y+36,names[app],foreground(q),1);
+    app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
+    text(q,w->x+61,w->y+36,names[app],foreground(q),1);
     surface(q,w->x+w->w-157,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-108,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-59,w->y+13,36,29,10,0xeac0cb,q->theme?143:166);
