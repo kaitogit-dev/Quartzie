@@ -31,7 +31,7 @@ def receive_exact(stream, length):
     return bytes(data)
 
 
-def send_vnc_mouse():
+def send_vnc_mouse(click_start=False):
     import struct
     with socket.create_connection(('127.0.0.1', 5909), timeout=5) as stream:
         stream.settimeout(5)
@@ -59,6 +59,12 @@ def send_vnc_mouse():
             y = height // 3 + (i * 7) % (height // 3)
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
             time.sleep(0.018)
+        if click_start:
+            x = (width - 555) // 2 + 37
+            y = height - 89 + 34
+            for buttons in (0, 1, 0):
+                stream.sendall(struct.pack('>BBHH', 5, buttons, x, y))
+                time.sleep(0.11)
         print('VNC pointer events sent at', width, height)
 
 
@@ -109,7 +115,12 @@ def verify_mouse(image, usb=False, host_cursor=False):
                     sock.sendall(json.dumps(selection).encode('ascii') + b'\r\n')
                     print('Tablet selection:', sock.recv(4096))
                     sock.sendall(b'{"execute":"query-mice"}\r\n')
-                    print('Selected mice:', sock.recv(4096))
+                    sock.recv(4096)
+                    sock.sendall(b'{"execute":"query-mice"}\r\n')
+                    selected = json.loads(sock.recv(4096).decode('ascii'))['return']
+                    if not any(item['current'] and item['absolute'] for item in selected):
+                        raise RuntimeError(f'USB tablet was not selected: {selected!r}')
+                    print('Selected USB tablet:', selected)
                 events = ([
                     {'type': 'abs', 'data': {'axis': 'x', 'value': 24000}},
                     {'type': 'abs', 'data': {'axis': 'y', 'value': 33000}},
@@ -126,12 +137,12 @@ def verify_mouse(image, usb=False, host_cursor=False):
                     extra = {'execute': 'human-monitor-command', 'arguments': {'command-line': 'mouse_move 60 25'}}
                     sock.sendall(json.dumps(extra).encode('ascii') + b'\r\n')
                     print('HMP mouse move:', sock.recv(4096))
-            send_vnc_mouse()
+            send_vnc_mouse(click_start=host_cursor)
             end = time.monotonic() + 6
             while time.monotonic() < end:
                 data = serial.read_bytes()
-                if b'QUARTZIE-POINTER-CONTINUOUS' in data:
-                    print('PASS: QEMU cursor received at least 16 distinct movement updates')
+                if b'QUARTZIE-POINTER-CONTINUOUS' in data and (not host_cursor or b'QUARTZIE-START-CLICK' in data):
+                    print('PASS: QEMU cursor received movement and correct Start button click')
                     return
                 time.sleep(0.15)
             raise RuntimeError(f'Pointer never moved after QMP mouse event: {serial.read_text(errors="replace")}')
