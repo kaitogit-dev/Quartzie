@@ -112,6 +112,7 @@ static int glass_cache_cols,glass_cache_rows;
 static const int glass_weight[7]={1,2,3,4,3,2,1};
 static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
     for(int yy=0;yy<rows;yy++){
+        if((yy&7)==0)poll_render(q);
         int y=clamp(sy+yy*GLASS_SCALE,0,q->height-1);
         int y1=clamp(y+2,0,q->height-1);
         for(int xx=0;xx<cols;xx++){
@@ -128,6 +129,7 @@ static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
         }
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
+        if((yy&7)==0&&xx==0)poll_render(q);
         int r=0,g=0,b=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_source[(size_t)yy*cols+clamp(xx+k,0,cols-1)];
@@ -139,6 +141,7 @@ static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
         glass_horizontal[(size_t)yy*cols+xx]=rgb(r/16,g/16,b/16);
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
+        if((yy&7)==0&&xx==0)poll_render(q);
         int r=0,g=0,b=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_horizontal[(size_t)clamp(yy+k,0,rows-1)*cols+xx];
@@ -182,7 +185,9 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS)return;
     if(!cached)glass_filter(q,sx,sy,cols,rows);
     int bw=q->width;
-    for(int py=y0;py<y1;py++)for(int px=x0;px<x1;px++){
+    for(int py=y0;py<y1;py++){
+        if((py&15)==0)poll_render(q);
+        for(int px=x0;px<x1;px++){
         int dx=px-x,dy=py-y;
         int cover=round_cover(dx,dy,w,h,radius);
         if(!cover)continue;
@@ -198,6 +203,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
         if(dx>w-3||dy>h-3)c=blend(c,q->theme?0x86a7d0:0x557099,q->theme?25:17);
         if(rim>0)c=blend(c,0xffffff,clamp(rim/3,0,72));
         q->pixels[at]=blend(q->pixels[at],c,cover);
+        }
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
