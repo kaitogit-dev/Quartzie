@@ -62,9 +62,12 @@ def send_vnc_mouse(click_start=False):
         if click_start:
             x = (width - 555) // 2 + 37
             y = height - 89 + 34
-            for buttons in (0, 1, 0):
-                stream.sendall(struct.pack('>BBHH', 5, buttons, x, y))
-                time.sleep(0.11)
+            stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
+            time.sleep(0.65)
+            stream.sendall(struct.pack('>BBHH', 5, 1, x, y))
+            time.sleep(0.75)
+            stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
+            time.sleep(0.25)
         print('VNC pointer events sent at', width, height)
 
 
