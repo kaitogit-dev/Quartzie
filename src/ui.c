@@ -390,7 +390,7 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
         if(q->drag>=0){
             q->scene_tween_active=0;q->scene_tween_pending=0;q->dirty=1;
         }else{
-            int duration=(q->scene_tween_kind==1)?145000:(q->scene_tween_kind==2)?165000:185000;
+            int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?145000:(q->scene_tween_kind==2)?165000:185000;
             uint32_t remaining=q->scene_elapsed_us<(uint32_t)duration?(uint32_t)duration-q->scene_elapsed_us:0;
             if(elapsed_us>=remaining)q->scene_elapsed_us=(uint32_t)duration;
             else q->scene_elapsed_us+=elapsed_us;
@@ -423,6 +423,14 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
         }
     }
     for(int i=0;i<Q_APPS;i++){
+        if(steps&&q->menu){
+            int target=q->menu_hover==i?256:0;
+            if(q->menu_lift[i]!=target){
+                int advance=(int)(steps*24);
+                int next=target>q->menu_lift[i]?clamp(q->menu_lift[i]+advance,0,256):clamp(q->menu_lift[i]-advance,0,256);
+                if(next!=q->menu_lift[i]){q->menu_lift[i]=next;dock_change=1;}
+            }
+        }else if(!q->menu)q->menu_lift[i]=0;
         QWindow *w=&q->windows[i];
         if(w->tween_kind){
             if(q->drag==i||(!q->scene_tween_pending&&!q->scene_tween_active)){
@@ -767,11 +775,17 @@ static uint32_t geometry_color(uint32_t base,uint32_t original,uint32_t final){
 }
 static void paint_window_geometry(QDesktop *q,int weight){
     int app=q->scene_tween_app;
-    if(app<0||app>=Q_APPS)return;
-    const QWindow *w=&q->windows[app];
-    int ax=w->tween_x,ay=w->tween_y,aw=w->tween_w,ah=w->tween_h;
-    int bx=w->x,by=w->y,bw=w->w,bh=w->h;
-    if(q->scene_tween_kind==1){
+    int ax,ay,aw,ah,bx,by,bw,bh;
+    if(q->scene_tween_kind==7){
+        bx=menu_x(q);by=menu_y(q);bw=510;bh=434;
+        ax=bx;ay=by;aw=bw;ah=bh;
+    }else{
+        if(app<0||app>=Q_APPS)return;
+        const QWindow *w=&q->windows[app];
+        ax=w->tween_x;ay=w->tween_y;aw=w->tween_w;ah=w->tween_h;
+        bx=w->x;by=w->y;bw=w->w;bh=w->h;
+    }
+    if(q->scene_tween_kind==1||q->scene_tween_kind==7){
         ax=bx+(bw*4)/100;
         ay=by+(bh*4)/100+12;
         aw=bw-(bw*8)/100;
@@ -815,11 +829,11 @@ static void paint_window_geometry(QDesktop *q,int weight){
     clip_full(q);
 }
 static void paint_scene_tween(QDesktop *q){
-    int duration=q->scene_tween_kind==1?145000:q->scene_tween_kind==2?165000:185000;
+    int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?145000:q->scene_tween_kind==2?165000:185000;
     int progress=clamp((int)((uint64_t)q->scene_elapsed_us*256/(uint32_t)duration),0,256);
     int weight=progress*progress*(768-2*progress)/(256*256);
     int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
-    if((q->scene_tween_kind==1||q->scene_tween_kind==2)&&weight>0&&weight<256){
+    if((q->scene_tween_kind==1||q->scene_tween_kind==2||q->scene_tween_kind==7)&&weight>0&&weight<256){
         paint_window_geometry(q,weight);
         q->damage_x=x0;q->damage_y=y0;q->damage_w=x1-x0;q->damage_h=y1-y0;
         q->damage_valid=1;
@@ -888,6 +902,13 @@ void q_draw(QDesktop *q){
                 for(size_t i=0;i<total;i++)scene_back[i]=q->pixels[i];
                 target->minimized=old;
                 for(size_t i=0;i<total;i++)q->pixels[i]=scene_from[i];
+            }else if(q->scene_tween_kind==7){
+                q->menu=0;
+                draw_scene(q,-1);
+                size_t total=(size_t)q->width*q->height;
+                for(size_t i=0;i<total;i++)scene_back[i]=q->pixels[i];
+                q->menu=1;
+                for(size_t i=0;i<total;i++)q->pixels[i]=scene_from[i];
             }
             q->scene_x0=clamp(left-20,0,q->width);
             q->scene_y0=clamp(top-20,0,q->height);
@@ -907,13 +928,13 @@ void q_draw(QDesktop *q){
         q->drag_cache_valid=0;
         int x0=dock_x(q)-52,x1=dock_x(q)+607;
         int y0=dock_y(q)-53,y1=dock_y(q)+84;
-        if(q->hover>=20&&q->hover<20+Q_APPS){
-            x0=21;x1=248;y0=90;y1=453;
-        }else if(q->hover_last>=20&&q->hover_last<20+Q_APPS){
-            x0=21;x1=248;y0=90;y1=453;
+        if(q->menu){
+            int mx=menu_x(q),my=menu_y(q);
+            x0=mx-42;x1=mx+552;
+            y0=my-42;y1=dock_y(q)+84;
         }
         clip_region(q,x0,y0,x1,y1);
-        if(q->dock_cache_valid&&q->dock_background&&q->hover<20&&q->hover_last<20){
+        if(q->dock_cache_valid&&q->dock_background&&!q->menu){
             int bx=dock_x(q)-52,by=dock_y(q)-53;
             for(int row=0;row<137;row++){
                 size_t dst=(size_t)(by+row)*q->width+bx;
