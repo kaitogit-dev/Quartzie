@@ -26,14 +26,13 @@ static int difference(int y){
 int main(void){
     q_init(&ui,1280,720,pixels,background,blurred);
     q_draw(&ui);
-    for(int y=112;y<334;y+=17)for(int x=920;x<1240;x+=23){
+    for(int y=8;y<440;y+=17)for(int x=35;x<230;x+=23)
         CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
-    }
+    for(int y=8;y<61;y+=11)for(int x=300;x<980;x+=41)
+        CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
     q_click(&ui,1040,200);
     for(int i=0;i<Q_APPS;i++)CHECK(!ui.windows[i].open);
-    int a=difference(446),b=difference(454),c=difference(466),d=difference(480);
-    CHECK(a>b&&b>c&&c>=d);
-    CHECK(a<100);
+    CHECK(difference(446)==0&&difference(454)==0&&difference(466)==0&&difference(480)==0);
     q_open(&ui,Q_FILES);
     q_draw(&ui);
     QWindow *w=&ui.windows[Q_FILES];
@@ -42,6 +41,6 @@ int main(void){
     CHECK(abs((int)(p>>16&255)-(int)(v>>16&255))<35);
     CHECK(abs((int)(p>>8&255)-(int)(v>>8&255))<35);
     CHECK(abs((int)(p&255)-(int)(v&255))<35);
-    puts("PASS: no quick access panel, no shadow strip and integrated window header");
+    puts("PASS: no top panel or Favorites, clean wallpaper and integrated window header");
     return 0;
 }
