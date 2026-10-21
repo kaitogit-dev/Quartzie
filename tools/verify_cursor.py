@@ -27,7 +27,10 @@ def check(cursor_path,artwork_path):
     rendered=Image.open(BytesIO(data)).convert("RGBA")
     if rendered.size!=(64,64):
         raise ValueError("CUR preview size mismatch")
-    if rendered.getpixel((0,0))[3]==0 or rendered.getpixel((63,0))[3]!=0:
+    alpha_offset=struct.unpack_from("<I",data,6+3*16+12)[0]+40
+    first=data[alpha_offset+(63*64*4)+3]
+    clear=data[alpha_offset+(63*64*4)+(63*4)+3]
+    if first==0 or clear!=0:
         raise ValueError("CUR transparency or hotspot mismatch")
     print("PASS: multi-size transparent CUR, hotspot (0,0), 24/32/48/64 pixels")
 
