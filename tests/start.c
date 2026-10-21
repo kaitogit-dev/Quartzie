@@ -73,7 +73,7 @@ int main(void){
         q_tick_timed(&ui,16000);
         CHECK(ui.menu_lift[i]>0);
         q_draw(&ui);
-        CHECK(ui.damage_valid&&ui.damage_h<550);
+        CHECK(ui.damage_valid&&ui.damage_h<ui.height);
         verify_frame();
     }
     q_move(&ui,x,y);
