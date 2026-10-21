@@ -753,6 +753,14 @@ static void drag_redraw(QDesktop *q){
     int y0=clamp((w->y<q->drag_prev_y?w->y:q->drag_prev_y)-pad,0,q->height);
     int x1=clamp((w->x>q->drag_prev_x?w->x:q->drag_prev_x)+w->w+pad,0,q->width);
     int y1=clamp((w->y>q->drag_prev_y?w->y:q->drag_prev_y)+w->h+pad,0,q->height);
+    int dx=dock_x(q)-52,dy=dock_y(q)-53;
+    int dx2=dock_x(q)+607,dy2=dock_y(q)+84;
+    if(x0<dx2&&x1>dx&&y0<dy2&&y1>dy){
+        x0=clamp(x0<dx-32?x0:dx-32,0,q->width);
+        x1=clamp(x1>dx2+32?x1:dx2+32,0,q->width);
+        y0=clamp(y0<dy-32?y0:dy-32,0,q->height);
+        y1=clamp(y1>dy2+32?y1:dy2+32,0,q->height);
+    }
     if(x0>=x1||y0>=y1){q->damage_valid=0;return;}
     clip_region(q,x0,y0,x1,y1);
     for(int y=y0;y<y1;y++){
