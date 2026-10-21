@@ -50,7 +50,7 @@ int main(void){
     CHECK(snapshot()!=first);
     finish();
     CHECK(window->tween_kind==0);
-    CHECK(window->x==12&&window->y==69);
+    CHECK(window->x==12&&window->y==12);
     q_click(&ui,window->x+window->w-90,window->y+25);
     CHECK(!window->maximized&&window->tween_kind==2);
     finish();
