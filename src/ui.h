@@ -31,6 +31,7 @@ typedef struct {
     int render_app,glass_cached_app,render_topbar;
     int animations_enabled,dock_lift[Q_APPS],dock_pulse[Q_APPS];
     int start_hover,start_lift,start_pulse;
+    int menu_hover,menu_lift[Q_APPS];
     int scene_tween_pending,scene_tween_active,scene_tween_step,scene_tween_kind;
     int scene_x0,scene_y0,scene_x1,scene_y1,scene_render_final,scene_tween_app;
     uint32_t scene_elapsed_us,scene_paint_us,dock_elapsed_us;
