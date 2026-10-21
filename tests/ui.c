@@ -53,7 +53,7 @@ int main(void){
     q_click(&desktop,(1280-510)/2+50,720-607+140);
     check(!desktop.menu&&desktop.windows[Q_FILES].open&&desktop.active==Q_FILES);
     q_draw(&desktop);shot("build/files.ppm");
-    q_click(&desktop,1280-97,30);check(desktop.notifications);
+    q_key(&desktop,0,18);check(desktop.notifications);
     q_click(&desktop,left+77+77+30,top+32);
     check(!desktop.notifications&&desktop.windows[Q_NOTES].open&&desktop.active==Q_NOTES);
     int previous=desktop.note_length;
@@ -73,7 +73,7 @@ int main(void){
     q_click(&desktop,settings.x+60,settings.y+85+71);
     check(desktop.theme!=theme);
     q_draw(&desktop);shot("build/settings.ppm");
-    q_click(&desktop,1280-47,30);check(desktop.quick&&!desktop.notifications);
+    q_key(&desktop,0,19);check(desktop.quick&&!desktop.notifications);
     q_click(&desktop,1280-363+39,72+80+35);check(desktop.theme==theme);
     q_click(&desktop,left+77+3*77+30,top+32);check(desktop.active==Q_CALCULATOR);
     q_key(&desktop,'1',0);q_key(&desktop,'2',0);q_key(&desktop,'+',0);q_key(&desktop,'3',0);q_key(&desktop,'=',0);
