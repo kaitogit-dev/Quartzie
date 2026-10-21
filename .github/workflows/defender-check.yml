@@ -1,0 +1,54 @@
+name: Defender ISO comparison
+
+on:
+  push:
+    paths:
+      - .github/workflows/defender-check.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  scan:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download original builds
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force old,new | Out-Null
+          gh run download 39520243433 --repo kaitogit-dev/Quartzie --name Quartzie-0.38.8-x64-UEFI --dir old
+          gh run download 39523318078 --repo kaitogit-dev/Quartzie --name Quartzie-0.38.9-x64-UEFI --dir new
+          foreach ($version in @("0.38.8","0.38.9")) {
+            $root = if ($version -eq "0.38.8") { "old" } else { "new" }
+            $iso = Get-ChildItem $root -Recurse -Filter "*.iso" | Select-Object -First 1
+            if (!$iso) { throw "Missing ISO $version" }
+            "$version SHA256: $((Get-FileHash $iso.FullName -Algorithm SHA256).Hash)"
+          }
+      - name: Scan ISO files with Microsoft Defender
+        shell: pwsh
+        run: |
+          $state = Get-MpComputerStatus -ErrorAction SilentlyContinue
+          if (!$state) { "Defender unavailable on this runner"; exit 0 }
+          "Defender status: AMService=$($state.AMServiceEnabled), Antivirus=$($state.AntivirusEnabled), Realtime=$($state.RealTimeProtectionEnabled)"
+          "Defender signatures: $($state.AntivirusSignatureVersion)"
+          $scanner = Get-ChildItem "C:\ProgramData\Microsoft\Windows Defender\Platform" -Recurse -Filter MpCmdRun.exe -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$scanner) {
+            $candidate = Join-Path $env:ProgramFiles "Windows Defender\MpCmdRun.exe"
+            if (Test-Path $candidate) { $scanner = Get-Item $candidate }
+          }
+          if (!$scanner) { "Defender command-line scanner unavailable"; exit 0 }
+          foreach ($root in @("old","new")) {
+            $iso = Get-ChildItem $root -Recurse -Filter "*.iso" | Select-Object -First 1
+            "Scanning $($iso.Name)"
+            & $scanner.FullName -Scan -ScanType 3 -File $iso.FullName
+            "Scan exit code: $LASTEXITCODE"
+            $findings = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.Resources -match [regex]::Escape($iso.Name) })
+            "Matching threat detections: $($findings.Count)"
+            foreach ($item in $findings) {
+              "ThreatID=$($item.ThreatID); InitialDetectionTime=$($item.InitialDetectionTime); Resources=$($item.Resources -join ',')"
+            }
+          }
