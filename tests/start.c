@@ -58,12 +58,28 @@ int main(void){
     q_click(&ui,x,y);
     CHECK(ui.menu&&!ui.windows[Q_FILES].open);
     CHECK(ui.start_pulse==256);
-    CHECK(ui.scene_tween_pending);
+    CHECK(ui.scene_tween_pending&&ui.scene_tween_kind==7);
     q_draw(&ui);
     for(int i=0;i<24;i++){q_tick_timed(&ui,16000);if(ui.dirty)q_draw(&ui);}
     CHECK(!ui.scene_tween_active&&!ui.scene_tween_pending);
     CHECK(ui.start_pulse==0);
     CHECK(ui.menu);
+    int mx=(ui.width-510)/2,my=ui.height-607;
+    for(int i=0;i<Q_APPS;i++){
+        int bx=mx+26+(i%3)*159,by=my+112+(i/3)*144;
+        q_move(&ui,bx+70,by+49);
+        CHECK(ui.menu_hover==i);
+        q_draw(&ui);
+        q_tick_timed(&ui,16000);
+        CHECK(ui.menu_lift[i]>0);
+        q_draw(&ui);
+        CHECK(ui.damage_valid&&ui.damage_h<550);
+        verify_frame();
+    }
+    q_move(&ui,x,y);
+    CHECK(ui.menu_hover==-1);
+    q_draw(&ui);
+    for(int i=0;i<16;i++){q_tick_timed(&ui,8000);if(ui.dirty)q_draw(&ui);}
     q_click(&ui,x,y);
     CHECK(!ui.menu);
     q_draw(&ui);
@@ -75,6 +91,6 @@ int main(void){
     for(int i=0;i<20;i++){q_tick_timed(&ui,8000);if(ui.dirty)q_draw(&ui);}
     CHECK(ui.start_lift==0);
     verify_frame();
-    puts("PASS: Quartzie Start logo, hover lift, tooltip, pulse, menu tween and pixel-exact dock redraw");
+    puts("PASS: Quartzie Start logo, hover lift, tooltip, pulse, geometric menu opening, tile hover and pixel-exact redraw");
     return 0;
 }
