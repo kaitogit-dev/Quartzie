@@ -29,7 +29,7 @@ int main(void){
     cursor_prepare();
     VERIFY(Q_CURSOR_HOT_X==0&&Q_CURSOR_HOT_Y==0);
     VERIFY((q_cursor_pixels[0]>>24)>0);
-    VERIFY((q_cursor_pixels[Q_CURSOR_W*Q_CURSOR_H-1]>>24)==0);
+    VERIFY((q_cursor_pixels[Q_CURSOR_W-1]>>24)==0);
     int visible=0;
     for(int i=0;i<Q_CURSOR_W*Q_CURSOR_H;i++)visible+=cursor_covered[i]!=0;
     VERIFY(visible>100&&visible<Q_CURSOR_W*Q_CURSOR_H);
