@@ -5,6 +5,7 @@
 #include "winapi.h"
 #include "fileboot.h"
 #include "hostcursor.h"
+#include "cursor.h"
 static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
 static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
 static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
@@ -21,9 +22,8 @@ static uint32_t scanline;
 static int pixel_format;
 static int host_cursor;
 static int cursor_old_x=-100,cursor_old_y=-100;
-static uint32_t cursor_underlay[27*31];
-static uint16_t cursor_shadows[27*31],cursor_edges[27*31],cursor_fills[27*31];
-static uint8_t cursor_covered[27*31];
+static uint32_t cursor_underlay[Q_CURSOR_W*Q_CURSOR_H];
+static uint8_t cursor_covered[Q_CURSOR_W*Q_CURSOR_H];
 static void cursor_draw(int x,int y);
 static EFI_SIMPLE_POINTER_PROTOCOL *pointer_relative;
 static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
@@ -124,41 +124,14 @@ static uint32_t mix(uint32_t a,uint32_t b,int alpha){
     int inv=256-alpha;
     return (((((a>>16)&255)*inv+((b>>16)&255)*alpha)>>8)<<16)|(((((a>>8)&255)*inv+((b>>8)&255)*alpha)>>8)<<8)|((((a&255)*inv)+((b&255)*alpha))>>8);
 }
-static int pointer_poly(int x,int y,int inner){
-    static const int outer[7][2]={{1,1},{1,23},{6,18},{11,27},{15,25},{10,16},{20,16}};
-    static const int white[7][2]={{3,4},{3,18},{7,14},{12,24},{13,23},{8,14},{15,14}};
-    const int (*points)[2]=inner?white:outer;
-    int inside=0;
-    for(int i=0,j=6;i<7;j=i++){
-        int xa=points[i][0]*16,xb=points[j][0]*16;
-        int ya=points[i][1]*16,yb=points[j][1]*16;
-        if((ya>y)==(yb>y))continue;
-        int64_t left=(int64_t)(x-xa)*(yb-ya);
-        int64_t right=(int64_t)(xb-xa)*(y-ya);
-        if((yb>ya&&left<right)||(yb<ya&&left>right))inside=!inside;
-    }
-    return inside;
-}
-static int pointer_cover(int px,int py,int inner){
-    int count=0;
-    for(int iy=0;iy<2;iy++)for(int ix=0;ix<2;ix++){
-        if(pointer_poly(px*16+4+ix*8,py*16+4+iy*8,inner))count++;
-    }
-    return count*64;
-}
 static void cursor_prepare(void){
-    for(int y=0;y<31;y++)for(int x=0;x<27;x++){
-        int k=y*27+x;
-        cursor_shadows[k]=(uint16_t)pointer_cover(x-2,y-2,0);
-        cursor_edges[k]=(uint16_t)pointer_cover(x,y,0);
-        cursor_fills[k]=(uint16_t)pointer_cover(x,y,1);
-        cursor_covered[k]=(cursor_shadows[k]||cursor_edges[k]||cursor_fills[k])?1:0;
-    }
+    for(int i=0;i<Q_CURSOR_W*Q_CURSOR_H;i++)
+        cursor_covered[i]=(q_cursor_pixels[i]>>24)!=0;
 }
 static void cursor_hide(void){
     if(cursor_old_x<0)return;
-    for(int yy=0;yy<31;yy++)for(int xx=0;xx<27;xx++){
-        int k=yy*27+xx;
+    for(int yy=0;yy<Q_CURSOR_H;yy++)for(int xx=0;xx<Q_CURSOR_W;xx++){
+        int k=yy*Q_CURSOR_W+xx;
         if(!cursor_covered[k])continue;
         int px=cursor_old_x+xx,py=cursor_old_y+yy;
         if((unsigned)px<(unsigned)desktop.width&&(unsigned)py<(unsigned)desktop.height)
@@ -168,25 +141,23 @@ static void cursor_hide(void){
 }
 static void cursor_draw(int x,int y){
     if(host_cursor)return;
-    const int cw=27,ch=31;
+    const int left=x-Q_CURSOR_HOT_X,top=y-Q_CURSOR_HOT_Y;
     cursor_hide();
-    for(int yy=0;yy<ch;yy++)for(int xx=0;xx<cw;xx++){
-        if(!cursor_covered[yy*cw+xx])continue;
-        int px=x+xx,py=y+yy;
+    for(int yy=0;yy<Q_CURSOR_H;yy++)for(int xx=0;xx<Q_CURSOR_W;xx++){
+        int k=yy*Q_CURSOR_W+xx;
+        if(!cursor_covered[k])continue;
+        int px=left+xx,py=top+yy;
         if((unsigned)px>=(unsigned)desktop.width||(unsigned)py>=(unsigned)desktop.height)continue;
         uint32_t raw=screen[(size_t)py*scanline+px];
-        cursor_underlay[yy*cw+xx]=raw;
+        cursor_underlay[k]=raw;
         uint32_t col=pixel_format==0?(((raw&255)<<16)|(raw&0x00ff00)|((raw>>16)&255)):raw;
-        int shadow=cursor_shadows[yy*cw+xx];
-        int edge=cursor_edges[yy*cw+xx];
-        int fill=cursor_fills[yy*cw+xx];
-        if(shadow)col=mix(col,0x091526,shadow/4);
-        if(edge)col=mix(col,0x15273a,edge);
-        if(fill)col=mix(col,0xffffff,fill);
+        uint32_t overlay=q_cursor_pixels[k];
+        int opacity=(int)(overlay>>24);
+        col=mix(col,overlay&0xffffff,opacity==255?256:opacity);
         if(pixel_format==0)col=((col&255)<<16)|(col&0x00ff00)|((col>>16)&255);
         screen[(size_t)py*scanline+px]=col;
     }
-    cursor_old_x=x;cursor_old_y=y;
+    cursor_old_x=left;cursor_old_y=top;
 }
 static void present(void){
     cursor_hide();
@@ -205,7 +176,7 @@ static void present_damage(int x,int y,int width,int height){
     int x0=x<0?0:x,y0=y<0?0:y;
     int x1=x+width>desktop.width?desktop.width:x+width;
     int y1=y+height>desktop.height?desktop.height:y+height;
-    int touches_cursor=cursor_old_x>=0&&cursor_old_x<x1&&cursor_old_x+27>x0&&cursor_old_y<y1&&cursor_old_y+31>y0;
+    int touches_cursor=cursor_old_x>=0&&cursor_old_x<x1&&cursor_old_x+Q_CURSOR_W>x0&&cursor_old_y<y1&&cursor_old_y+Q_CURSOR_H>y0;
     if(touches_cursor)cursor_hide();
     for(int py=y0;py<y1;py++){
         size_t offset=(size_t)py*desktop.width;
