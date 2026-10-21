@@ -1,4 +1,4 @@
-name: Defender ISO comparison
+name: Defender executable comparison
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
             if (!$iso) { throw "Missing ISO $version" }
             "$version SHA256: $((Get-FileHash $iso.FullName -Algorithm SHA256).Hash)"
           }
-      - name: Scan ISO files with Microsoft Defender
+      - name: Scan EFI binaries with Microsoft Defender
         shell: pwsh
         run: |
           $state = Get-MpComputerStatus -ErrorAction SilentlyContinue
@@ -42,13 +42,21 @@ jobs:
           }
           if (!$scanner) { "Defender command-line scanner unavailable"; exit 0 }
           foreach ($root in @("old","new")) {
-            $iso = Get-ChildItem $root -Recurse -Filter "*.iso" | Select-Object -First 1
-            "Scanning $($iso.Name)"
-            & $scanner.FullName -Scan -ScanType 3 -File $iso.FullName
-            "Scan exit code: $LASTEXITCODE"
-            $findings = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.Resources -match [regex]::Escape($iso.Name) })
-            "Matching threat detections: $($findings.Count)"
-            foreach ($item in $findings) {
-              "ThreatID=$($item.ThreatID); InitialDetectionTime=$($item.InitialDetectionTime); Resources=$($item.Resources -join ',')"
+            $efi = Get-ChildItem $root -Recurse -Filter "BOOTX64.EFI" | Select-Object -First 1
+            if (!$efi) { throw "Missing EFI application in $root" }
+            $copy = Join-Path $env:RUNNER_TEMP "$root-efi-binary.exe"
+            Copy-Item $efi.FullName $copy -Force
+            "Executable SHA256: $((Get-FileHash $efi.FullName -Algorithm SHA256).Hash)"
+            foreach ($file in @($efi.FullName,$copy)) {
+              "Scanning $file"
+              $output = & $scanner.FullName -Scan -ScanType 3 -File $file 2>&1
+              $output | ForEach-Object { "$_" }
+              "Scanner exit code: $LASTEXITCODE"
+              if ($output -match 'skipped') { "INCONCLUSIVE: scanning was skipped" }
+              $findings = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.Resources -match [regex]::Escape((Split-Path $file -Leaf)) })
+              "Matching threat detections: $($findings.Count)"
+              foreach ($item in $findings) {
+                "ThreatID=$($item.ThreatID); InitialDetectionTime=$($item.InitialDetectionTime); Resources=$($item.Resources -join ',')"
+              }
             }
           }
