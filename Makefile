@@ -1,11 +1,11 @@
-VERSION = 0.38.8
+VERSION = 0.38.9
 CC = clang
 LINK = lld-link
 PYTHON = python3
 FONT_REGULAR ?= /usr/share/fonts/opentype/inter/Inter-Regular.otf
 FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
-OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj
+OBJECTS = build/boot.obj build/ui.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj build/cursor.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img
 release: all
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
@@ -21,6 +21,11 @@ build/font.obj: build/font.c src/font.h | build
 build/icons.c: tools/icons.py assets/icons.zip assets/start-icon.png.base64 | build
 	$(PYTHON) tools/icons.py assets/icons.zip $@
 build/icons.obj: build/icons.c src/icons.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+build/cursor.c: tools/cursor.py assets/cursor.png.base64 src/cursor.h | build
+	$(PYTHON) tools/cursor.py assets/cursor.png.base64 build/cursor.c build/Quartzie.cur
+build/Quartzie.cur: build/cursor.c
+build/cursor.obj: build/cursor.c src/cursor.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
 build/BOOTX64.EFI: $(OBJECTS)
 	$(LINK) /subsystem:efi_application /entry:efi_main /nodefaultlib /machine:x64 /out:$@ $(OBJECTS)
@@ -58,9 +63,10 @@ test: build/start-test build/timing-test build/icons-test build/ntcore-test buil
 	./build/layout-test
 	./build/tween-test
 	./build/transitions-test
-verify: all test
+verify: all test build/Quartzie.cur
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 	$(PYTHON) tools/check_app.py build/winapp.exe Quartzie-x64.iso Quartzie-x64-uefi.img
+	$(PYTHON) tools/verify_cursor.py build/Quartzie.cur assets/cursor.png.base64
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
 build/start-test: tests/start.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
@@ -71,8 +77,8 @@ build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c build/font.c build/icons.c -o $@
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c build/font.c build/icons.c -o $@
-build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h build/font.c build/icons.c build/embed_app.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/font.c build/icons.c build/embed_app.c -o $@
+build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h src/cursor.h build/cursor.c build/font.c build/icons.c build/embed_app.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
