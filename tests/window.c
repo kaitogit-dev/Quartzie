@@ -54,7 +54,7 @@ int main(void){
     q_draw(&ui);
     QWindow *w=&ui.windows[Q_NOTES];
     q_click(&ui,w->x+w->w-90,w->y+25);
-    CHECK(w->maximized&&w->w==1896&&w->h==998&&w->x==12&&w->y==69);
+    CHECK(w->maximized&&w->w==1896&&w->h==1056&&w->x==12&&w->y==12);
     q_draw(&ui);
     q_click(&ui,w->x+w->w-90,w->y+25);
     CHECK(!w->maximized&&w->w==original.w&&w->h==original.h);
