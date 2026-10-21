@@ -352,7 +352,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     }
     wallpaper(q);
 }
-static void close_popups(QDesktop *q){q->menu=0;q->notifications=0;q->quick=0;}
+static void close_popups(QDesktop *q){q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;}
 static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_back[Q_MAX_W*Q_MAX_H];
@@ -462,6 +462,7 @@ void q_tick(QDesktop *q){
 void q_open(QDesktop *q,int app){
     q->hover_only=0;
     if(app<0||app>=Q_APPS)return;
+    q->menu_hover=-1;
     int z=0;for(int i=0;i<Q_APPS;i++)if(q->windows[i].z>z)z=q->windows[i].z;
     if(z>10000){for(int i=0;i<Q_APPS;i++)q->windows[i].z=i+1;z=Q_APPS;}
     int was_hidden=!q->windows[app].open||q->windows[app].minimized;
@@ -477,8 +478,6 @@ int q_dock_hit(QDesktop *q,int x,int y){
     int left=dock_x(q),top=dock_y(q);
     if(hit(x,y,left+11,top+8,52,53))return 10;
     for(int i=0;i<Q_APPS;i++)if(hit(x,y,left+77+i*77,top+8,61,53))return i;
-    if(hit(x,y,q->width-119,11,44,38))return 11;
-    if(hit(x,y,q->width-69,11,43,38))return 12;
     return -1;
 }
 static void draw_dock(QDesktop *q){
