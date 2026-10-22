@@ -20,10 +20,26 @@ int main(void){
         }
         CHECK(visible>20&&transparent>20&&colorful>20);
     }
-    CHECK(q_icon_pixels(QI_FILE_EXPLORER)[24*Q_ICON_SIZE+24]!=q_icon_pixels(QI_TEXT)[24*Q_ICON_SIZE+24]);
-    CHECK(q_icon_pixels(QI_START)[5*Q_ICON_SIZE+24]!=0);
+    CHECK(q_icon_pixels(QI_FILE_EXPLORER)[32*Q_ICON_SIZE+32]!=q_icon_pixels(QI_TEXT)[32*Q_ICON_SIZE+32]);
+    CHECK(q_icon_pixels(QI_START)[16*Q_ICON_SIZE+32]!=0);
     CHECK((q_icon_pixels(QI_START)[0]>>24)==0);
-    CHECK((q_icon_pixels(QI_START)[20*Q_ICON_SIZE+24]>>24)>200);
-    puts("PASS: 20 application icons and the transparent Quartzie Start logo");
+    CHECK((q_icon_pixels(QI_START)[32*Q_ICON_SIZE+32]>>24)>200);
+    CHECK(Q_ICON_SIZE==64);
+    for(int id=0;id<QI_COUNT;id++){
+        for(int size_index=0;size_index<3;size_index++){
+            const int size=size_index==0?40:size_index==1?43:58;
+            const uint32_t *bitmap=q_icon_pixels_sized((unsigned int)id,size);
+            CHECK(bitmap!=0);
+            int visible=0,transparent=0;
+            for(int n=0;n<size*size;n++){
+                if((bitmap[n]>>24)>200)visible++;
+                if((bitmap[n]>>24)<20)transparent++;
+            }
+            CHECK(visible>12&&transparent>12);
+        }
+    }
+    CHECK(q_icon_pixels_sized(QI_COUNT,40)==0);
+    CHECK(q_icon_pixels_sized(QI_COUNT,25)==0);
+    puts("PASS: native 64px source and transparent 40/43/58px app icons");
     return 0;
 }
