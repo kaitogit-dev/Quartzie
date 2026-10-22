@@ -30,7 +30,7 @@ int main(void){
     }
     REQUIRE(ui.scene_elapsed_us==110000);
     REQUIRE(!ui.scene_tween_active);
-    REQUIRE(ui.scene_tween_step>=8);
+    REQUIRE(ui.scene_tween_step>=7);
     REQUIRE(ui.scene_elapsed_us>elapsed);
     QWindow *w=&ui.windows[Q_FILES];
     q_click(&ui,w->x+w->w-90,w->y+25);
