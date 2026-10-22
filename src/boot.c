@@ -78,8 +78,8 @@ static void pointer_sample(void *context){
             if(sy<=100)sy=100;
             if(sx>1000000)sx=1000000;
             if(sy>1000000)sy=1000000;
-            int64_t mx=(int64_t)state.RelativeMovementX*100+pointer_rem_x;
-            int64_t my=(int64_t)state.RelativeMovementY*100+pointer_rem_y;
+            int64_t mx=(int64_t)state.RelativeMovementX*400+pointer_rem_x;
+            int64_t my=(int64_t)state.RelativeMovementY*400+pointer_rem_y;
             int dx=(int)(mx/(int64_t)sx),dy=(int)(my/(int64_t)sy);
             int next_pressed=state.LeftButton!=0;
             pointer_rem_x=(int)(mx%(int64_t)sx);
@@ -317,9 +317,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         q_tick_timed(&desktop,(uint32_t)delta);
         if(desktop.dirty){
             q_draw(&desktop);
+            pointer_sample(0);
+            if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y)q_move(&desktop,pointer_x,pointer_y);
             if(desktop.damage_valid)present_damage(desktop.damage_x,desktop.damage_y,desktop.damage_w,desktop.damage_h);
             else present();
         }else if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
-        bs->Stall(desktop.drag>=0?200:desktop.scene_tween_active?300:750);
+        pointer_sample(0);
+        bs->Stall(desktop.drag>=0?200:desktop.scene_tween_active?300:500);
     }
 }
