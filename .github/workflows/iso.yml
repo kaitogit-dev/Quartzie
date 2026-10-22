@@ -35,3 +35,4 @@ jobs:
             build/BOOTX64.EFI
             build/Quartzie.cur
             build/*-screen.ppm
+            build/settings.ppm
