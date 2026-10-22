@@ -51,7 +51,8 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c build/font.c build/icons.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c build/font.c build/icons.c -o $@
-test: build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+	./build/features-test
 	./build/icons-test
 	./build/start-test
 	./build/timing-test
@@ -72,6 +73,8 @@ verify: all test build/Quartzie.cur
 	$(PYTHON) tools/verify_cursor.py build/Quartzie.cur assets/cursor.png.base64
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+build/features-test: tests/features.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/features.c src/ui.c build/font.c build/icons.c -o $@
 build/start-test: tests/start.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/start.c src/ui.c build/font.c build/icons.c -o $@
 build/transitions-test: tests/transitions.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
