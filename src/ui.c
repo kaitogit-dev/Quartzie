@@ -14,6 +14,19 @@ static uint32_t blend(uint32_t a,uint32_t b,int alpha){
                ((a>>8&255)*inv+(b>>8&255)*alpha)>>8,
                ((a&255)*inv+(b&255)*alpha)>>8);
 }
+typedef struct {
+    uint32_t ink,muted,material,inset,dock,hover,selected,tooltip;
+    uint32_t operator_button,close_button,close_ink,rule,shadow,rim,highlight;
+} QPalette;
+static const QPalette light_palette={
+    0x122c49,0x365676,0xdbebf9,0xe7f4ff,0xcadceb,0xddecf9,0xc6e2ff,0xe4eff9,
+    0xa4ddeb,0xeac0cb,0x71475d,0xe1f3ff,0x102743,0xffffff,0xf7fbff
+};
+static const QPalette dark_palette={
+    0xeaf5ff,0xa8c2da,0x101c2e,0x1a2d44,0x142539,0x283e59,0x324b6a,0x192e46,
+    0x2d455f,0x462934,0xffdbe2,0x7295b5,0x07101b,0x83a5c2,0x7da8cc
+};
+static const QPalette *colors(QDesktop *q){return q->theme?&dark_palette:&light_palette;}
 static void pixel(QDesktop *q,int x,int y,uint32_t color){
     if(x>=q->clip_left&&x<q->clip_right&&y>=q->clip_top&&y<q->clip_bottom)q->pixels[(size_t)y*q->width+x]=color;
 }
@@ -94,7 +107,7 @@ static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int
             if(distance<0||distance>=spread)continue;
             int strength=intensity*(spread-distance)*(spread-distance)/(spread*spread);
             uint32_t *dst=&q->pixels[(size_t)yy*q->width+xx];
-            *dst=blend(*dst,0x102743,strength);
+            *dst=blend(*dst,colors(q)->shadow,strength);
         }
     }
 }
@@ -207,14 +220,21 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
         size_t at=(size_t)py*bw+px;
         uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
         int sheen=dy<h/2?18*(h/2-dy)/(h/2+1):0;
-        int material=clamp(alpha-44+sheen,12,190);
+        int material=q->theme?clamp(185+alpha/5+sheen/4,190,234):clamp(alpha-44+sheen,12,190);
         uint32_t c=blend(backdrop,tint,material);
         int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
         int rim=cover-inner;
-        if(dy<2)c=blend(c,0xf7fbff,q->theme?65:100);
-        if(dx<2||dy<2)c=blend(c,0xffffff,q->theme?22:47);
-        if(dx>w-3||dy>h-3)c=blend(c,q->theme?0x86a7d0:0x557099,q->theme?25:17);
-        if(rim>0)c=blend(c,0xffffff,clamp(rim/3,0,72));
+        if(q->theme){
+            if(dy<2)c=blend(c,colors(q)->highlight,28);
+            if(dx<2||dy<2)c=blend(c,colors(q)->rim,14);
+            if(dx>w-3||dy>h-3)c=blend(c,0x050b14,40);
+            if(rim>0)c=blend(c,colors(q)->rim,clamp(rim/5,0,48));
+        }else{
+            if(dy<2)c=blend(c,colors(q)->highlight,100);
+            if(dx<2||dy<2)c=blend(c,colors(q)->rim,47);
+            if(dx>w-3||dy>h-3)c=blend(c,0x557099,17);
+            if(rim>0)c=blend(c,colors(q)->rim,clamp(rim/3,0,72));
+        }
         q->pixels[at]=blend(q->pixels[at],c,cover);
     }
 }
@@ -253,10 +273,10 @@ static void text(QDesktop *q,int x,int baseline,const char *s,uint32_t c,int sty
 static int text_width(const char *s,int style){
     int result=0;for(;*s&&*s!='\n';s++)result+=q_font_glyph(style,(unsigned char)*s)->advance;return result;
 }
-static uint32_t foreground(QDesktop *q){return q->theme?0xf0f8ff:0x122c49;}
-static uint32_t secondary(QDesktop *q){return q->theme?0xa6c2de:0x365676;}
-static uint32_t material(QDesktop *q){return q->theme?0x17283e:0xdbebf9;}
-static uint32_t inner_material(QDesktop *q){return q->theme?0x2d415c:0xe7f4ff;}
+static uint32_t foreground(QDesktop *q){return colors(q)->ink;}
+static uint32_t secondary(QDesktop *q){return colors(q)->muted;}
+static uint32_t material(QDesktop *q){return colors(q)->material;}
+static uint32_t inner_material(QDesktop *q){return colors(q)->inset;}
 static uint32_t accent(QDesktop *q){
     static const uint32_t shades[]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85};
     return shades[q->accent%4];
@@ -280,7 +300,6 @@ static void wallpaper(QDesktop *q){
         int wave=absval((v*5-u*2)/4-295);
         f=clamp(130-wave/3,0,130);
         r+=f*13/130;g+=f*30/130;b+=f*37/130;
-        if(q->theme){r=r*66/100;g=g*71/100;b=b*78/100;}
         q->wallpaper[(size_t)y*w+x]=rgb(clamp(r,0,255),clamp(g,0,255),clamp(b,0,255));
     }
 }
@@ -288,7 +307,7 @@ static void thin_rule(QDesktop *q,int x,int y,int w,int alpha){
     if(y<q->clip_top||y>=q->clip_bottom)return;
     for(int xx=clamp(x,q->clip_left,q->clip_right);xx<clamp(x+w,q->clip_left,q->clip_right);xx++){
         uint32_t *p=q->pixels+(size_t)y*q->width+xx;
-        *p=blend(*p,0xe1f3ff,alpha);
+        *p=blend(*p,colors(q)->rule,alpha);
     }
 }
 static void icon(QDesktop *q,int cx,int cy,int id,uint32_t color){
@@ -409,6 +428,19 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
 static void close_popups(QDesktop *q){
     q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;
     q->menu_search_length=0;q->menu_search[0]=0;
+}
+void q_set_theme(QDesktop *q,int dark){
+    dark=dark!=0;
+    if(q->theme==dark)return;
+    q->theme=dark;
+    q->hover_only=0;
+    q->drag_cache_valid=0;
+    q->dock_cache_valid=0;
+    q->glass_cached_app=-1;
+    q->scene_tween_pending=0;
+    q->scene_tween_active=0;
+    q->damage_valid=0;
+    q->dirty=1;
 }
 static void begin_scene_tween(QDesktop *q,int kind){
     if(!q->animations_enabled||q->drag>=0)return;
@@ -536,19 +568,19 @@ int q_dock_hit(QDesktop *q,int x,int y){
 }
 static void draw_dock(QDesktop *q){
     int x=dock_x(q),y=dock_y(q);
-    pane(q,x,y,555,70,25,0xcadceb,q->theme?107:112);
+    pane(q,x,y,555,70,25,colors(q)->dock,q->theme?190:112);
     int start_lift=q->animations_enabled?q->start_lift*5/256:0;
     if(q->menu||q->start_hover||q->start_lift>0)
-        surface(q,x+7,y+7-start_lift,60,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?100:144);
+        surface(q,x+7,y+7-start_lift,60,54,17,colors(q)->hover,q->theme?174:144);
     if(q->start_pulse>0)circular(q,x+37,y+36-start_lift,23,accent(q),q->start_pulse/4);
     sprite(q,x+37,y+33-start_lift,QI_START,43);
-    rectangle(q,x+69,y+14,1,41,0x9cbbce);
+    rectangle(q,x+69,y+14,1,41,colors(q)->rule);
     for(int i=0;i<Q_APPS;i++){
         int xx=x+77+i*77;
         int lift=q->animations_enabled?q->dock_lift[i]*5/256:0;
         int pulse=q->dock_pulse[i];
         if((q->active==i&&q->windows[i].open&&!q->windows[i].minimized)||q->hover==i||q->dock_lift[i]>0){
-            surface(q,xx,y+7-lift,61,54,17,q->theme?0x8fb4cc:0xddecf9,q->theme?94:128);
+            surface(q,xx,y+7-lift,61,54,17,colors(q)->hover,q->theme?174:128);
         }
         if(pulse>0)circular(q,xx+30,y+36-lift,22,accent(q),pulse/4);
         app_icon(q,xx+30,y+36-lift,i,40,q->theme?0xd7edfd:0xf6fcff);
@@ -557,20 +589,20 @@ static void draw_dock(QDesktop *q){
     if(q->start_hover){
         int width=text_width("Start",0)+26;
         int tx=clamp(x+37-width/2,12,q->width-width-12);
-        surface(q,tx,y-42,width,33,12,q->theme?0x153149:0xe4eff9,q->theme?186:202);
+        surface(q,tx,y-42,width,33,12,colors(q)->tooltip,q->theme?198:202);
         text(q,tx+13,y-21,"Start",foreground(q),0);
     }else if(q->hover>=0&&q->hover<Q_APPS){
         int idx=q->hover,xx=x+77+idx*77;
         int width=text_width(names[idx],0)+26;
         int tx=clamp(xx+30-width/2,12,q->width-width-12);
-        surface(q,tx,y-42,width,33,12,q->theme?0x153149:0xe4eff9,q->theme?186:202);
+        surface(q,tx,y-42,width,33,12,colors(q)->tooltip,q->theme?198:202);
         text(q,tx+13,y-21,names[idx],foreground(q),0);
     }
 }
 static void draw_menu(QDesktop *q){
     if(!q->menu)return;
     int x=menu_x(q),y=menu_y(q),w=510;
-    pane(q,x,y,w,434,26,material(q),q->theme?181:146);
+    pane(q,x,y,w,434,26,material(q),q->theme?209:146);
     text(q,x+29,y+49,"Applications",foreground(q),2);
     surface(q,x+26,y+64,457,39,12,inner_material(q),q->theme?123:164);
     text(q,x+41,y+90,q->menu_search_length?q->menu_search:"Search apps...",q->menu_search_length?foreground(q):secondary(q),0);
@@ -582,7 +614,7 @@ static void draw_menu(QDesktop *q){
         int bx=x+26+(slot%3)*159,by=y+112+(slot/3)*144;
         int lift=q->animations_enabled?q->menu_lift[app]*6/256:0;
         int selected=q->menu_hover==app||q->menu_lift[app]>0;
-        surface(q,bx,by-lift,141,126,19,selected?(q->theme?0x729cc8:0xc6e2ff):inner_material(q),selected?(q->theme?154:173):(q->theme?109:128));
+        surface(q,bx,by-lift,141,126,19,selected?colors(q)->selected:inner_material(q),selected?(q->theme?190:173):(q->theme?168:128));
         if(selected)thin_rule(q,bx+18,by+117-lift,105,q->theme?74:112);
         app_icon(q,bx+70,by+49-lift,app,58,q->theme?0xecfaff:0xffffff);
         int width=text_width(names[app],1);
@@ -593,7 +625,7 @@ static void draw_menu(QDesktop *q){
 static void draw_notifications(QDesktop *q){
     if(!q->notifications)return;
     int x=q->width-361,y=71;
-    pane(q,x,y,334,209,22,material(q),q->theme?179:153);
+    pane(q,x,y,334,209,22,material(q),q->theme?209:153);
     text(q,x+25,y+43,"Notifications",foreground(q),1);
     thin_rule(q,x+25,y+61,285,55);
     text(q,x+27,y+108,"All caught up",foreground(q),1);
@@ -602,7 +634,7 @@ static void draw_notifications(QDesktop *q){
 static void draw_quick(QDesktop *q){
     if(!q->quick)return;
     int x=q->width-363,y=72;
-    pane(q,x,y,336,293,22,material(q),q->theme?181:159);
+    pane(q,x,y,336,293,22,material(q),q->theme?209:159);
     text(q,x+24,y+40,"Control center",foreground(q),1);
     thin_rule(q,x+24,y+58,289,54);
     surface(q,x+19,y+80,298,72,16,inner_material(q),q->theme?103:119);
@@ -680,7 +712,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         const char *keys="789/456*123-C0=+";
         for(int i=0;i<16;i++){
             int bx=x+(i%4)*82,by=y+128+(i/4)*57;
-            surface(q,bx,by,73,49,13,(i%4)==3?0xa4ddeb:inner_material(q),q->theme?121:151);
+            surface(q,bx,by,73,49,13,(i%4)==3?colors(q)->operator_button:inner_material(q),q->theme?174:151);
             char value[2]={keys[i],0};
             text(q,bx+(73-text_width(value,1))/2,by+32,value,ink,1);
         }
@@ -721,13 +753,13 @@ static void draw_window(QDesktop *q,int app){
     if(!w->open||w->minimized)return;
     int previous_render_app=q->render_app;
     q->render_app=app;
-    pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?180:149);
+    pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?209:149);
     thin_rule(q,w->x+23,w->y+56,w->w-46,28);
     app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
     text(q,w->x+61,w->y+36,names[app],foreground(q),1);
     surface(q,w->x+w->w-157,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-108,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
-    surface(q,w->x+w->w-59,w->y+13,36,29,10,0xeac0cb,q->theme?143:166);
+    surface(q,w->x+w->w-59,w->y+13,36,29,10,colors(q)->close_button,q->theme?185:166);
     rectangle(q,w->x+w->w-147,w->y+29,14,2,foreground(q));
     int bx=w->x+w->w-99,by=w->y+20;
     if(w->maximized){
@@ -742,8 +774,8 @@ static void draw_window(QDesktop *q,int app){
         segment(q,bx+13,by,bx+13,by+13,foreground(q));
         segment(q,bx,by+13,bx+13,by+13,foreground(q));
     }
-    segment(q,w->x+w->w-48,w->y+20,w->x+w->w-35,w->y+33,0x71475d);
-    segment(q,w->x+w->w-35,w->y+20,w->x+w->w-48,w->y+33,0x71475d);
+    segment(q,w->x+w->w-48,w->y+20,w->x+w->w-35,w->y+33,colors(q)->close_ink);
+    segment(q,w->x+w->w-35,w->y+20,w->x+w->w-48,w->y+33,colors(q)->close_ink);
     window_content(q,app,w);
     q->render_app=previous_render_app;
 }
@@ -1169,7 +1201,7 @@ void q_click(QDesktop *q,int x,int y){
     }
     if(q->quick){
         int bx=q->width-363,by=72;
-        if(hit(x,y,bx+19,by+80,298,72)){q->theme=!q->theme;wallpaper(q);begin_scene_tween(q,2);q->dirty=1;return;}
+        if(hit(x,y,bx+19,by+80,298,72)){q_set_theme(q,!q->theme);return;}
         if(hit(x,y,bx+19,by+164,298,68)){
             if(x>=bx+178&&x<=bx+295)q->accent=clamp((x-(bx+162))/32,0,3);
             else q->accent=(q->accent+1)%4;
@@ -1193,7 +1225,7 @@ void q_click(QDesktop *q,int x,int y){
         }
         int bx=w->x+32,by=w->y+60;
         if(chosen==Q_SETTINGS){
-            if(hit(x,y,bx,by+36,w->w-64,91)){q->theme=!q->theme;wallpaper(q);q->dirty=1;}
+            if(hit(x,y,bx,by+36,w->w-64,91)){q_set_theme(q,!q->theme);}
             else if(hit(x,y,bx,by+143,w->w-64,97)){
                 if(x>=bx+160&&x<=bx+360)q->accent=clamp((x-(bx+150))/50,0,3);
                 else q->accent=(q->accent+1)%4;
