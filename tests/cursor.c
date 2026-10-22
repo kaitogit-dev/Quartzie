@@ -60,13 +60,18 @@ int main(void){
     for(int i=0;i<8;i++){
         pointer_event=1;
         pointer_sample(0);
-        VERIFY(pointer_x==19+i&&pointer_y==18);
+        VERIFY(pointer_x==22+i*4&&pointer_y==18);
         VERIFY(cursor_old_x==pointer_x&&cursor_old_y==pointer_y);
         VERIFY(desktop.dirty==0);
     }
     pointer_event=0;
     pointer_sample(0);
-    VERIFY(pointer_x==26&&desktop.dirty==0);
+    VERIFY(pointer_x==50&&desktop.dirty==0);
+    fake_mode.ResolutionX=800;
+    pointer_event=1;
+    pointer_sample(0);
+    VERIFY(pointer_x==52&&pointer_y==18&&desktop.dirty==0);
+    fake_mode.ResolutionX=400;
     pointer_relative=0;
     cursor_hide();
     for(int y=0;y<128;y++)for(int x=0;x<128;x++)VERIFY(mock_frame[y*128+x]==mock_scene[y*128+x]);
