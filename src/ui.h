@@ -19,6 +19,7 @@ typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
     int menu,notifications,quick,active,drag,drag_x,drag_y;
     int pressed,last_button,frame_count,hover;
+    int drag_start_x,drag_start_y,drag_moved;
     int note_length,command_length,calc_length;
     int menu_search_length,calc_history_count;
     char notes[2048],command[128],calc[64],answer[64],status[96];

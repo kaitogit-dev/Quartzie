@@ -1,105 +1,61 @@
-# Quartzie 0.38.15
+# Quartzie
 
-## Memory
-
-Framebuffer, desktop, and kernel workspaces are allocated through UEFI Boot Services. The EFI executable reserves only its own code and resources; workspace allocation failures abort startup before rendering.
+An x86-64 UEFI desktop with a framebuffer compositor, native applications, an NT-style services core, and an experimental PE32+ executable loader.
 
 ## Build
 
-Requires Clang, LLD, xorriso, Python 3 with Pillow, and Inter fonts. On Ubuntu:
+On Ubuntu:
 
 ```sh
 sudo apt-get install clang lld xorriso python3-pil fonts-inter make gcc
 make verify
+make release
 ```
 
-## Run
+The release artifacts are `Quartzie-0.38.16-x64.iso` and `Quartzie-0.38.16-x64.img`. GitHub Actions builds and tests both boot formats and publishes them as workflow artifacts.
 
-Boot `Quartzie-0.38.15-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+## Boot
+
+Boot the ISO with x86-64 QEMU and OVMF:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.38.15-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.16-x64.iso -usb -device usb-tablet
 ```
 
-For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
-
-## Responsiveness and icon quality
-
-Relative mouse input uses calibrated movement at 400 units per reference pixel, with additional pointer sampling immediately after expensive redraws. Application icons are generated directly from their original 64-pixel artwork at native dock, launcher, and small UI sizes instead of repeatedly resampling 48-pixel intermediate images.
-
-## Matched glass translucency
-
-Light and dark glass use the same backdrop/tint opacity curve, so wallpaper colors remain equally visible through both themes. Dark mode retains its independent navy/graphite palette, subtle border highlights, and unchanged wallpaper.
-
-## Dark glass theme
-
-Dark mode uses its own navy/graphite glass palette with cool, subtle edge highlights rather than a light-theme tint inversion. Wallpaper colors are identical in both modes. Window chrome, dock, Start, menus, tooltips, Calculator controls, Settings and Quick Settings all share dark materials. Switching the theme invalidates compositor caches and redraws all visible surfaces without a stale-frame animation.
-
-## Fullscreen maximize
-
-Maximized windows fill the entire Quartzie framebuffer edge to edge. Their outer corners become square and their drop shadow is removed, while the floating dock remains accessible above the window. The maximize/restore button and F11 preserve the original window position and dimensions.
-
-## Desktop features
-
-The Start launcher has an app search field. Type to filter the six installed apps, use Up/Down to move selection, and Enter to launch. Its original 1-6 number shortcuts still work when search is empty.
-
-Calculator supports keyboard input, Enter to evaluate, Backspace to edit, C to clear, chained operations, and a three-entry calculation history. Calculations reject invalid input and division by zero rather than returning misleading values.
-
-F10 minimizes the active window, F11 maximizes or restores it, and F12 closes it.
-
-The About OS and Calculator icons use custom supplied artwork in the dock, Start launcher, and window headers.
-
-## Cursor
-
-Quartzie's default pointer uses the supplied white cursor artwork with a top-left hotspot. The build generates a 32-pixel antialiased framebuffer cursor and `build/Quartzie.cur` with 24, 32, 48 and 64-pixel images. The pointer shares the same coordinates as click and hover detection. It restores only its covered pixels when it moves.
+For Windows QEMU, use `tools/run-windows.ps1`.
 
 ## Controls
 
-- F1–F6: Applications
-- F7: App launcher
-- F8: Notifications
-- F9: Control center
-- Escape: Dismiss overlays
-- Drag title bars to move windows
+| Input | Action |
+| --- | --- |
+| F1–F6 | Open an application |
+| F7 | Application launcher |
+| F8 | Notifications |
+| F9 | Control center |
+| F10 | Minimize |
+| F11 | Maximize or restore |
+| F12 | Close window |
+| Esc | Dismiss overlays |
 
-## Animation
+Drag a window title bar to move it, or to the top edge to maximize. Drag a maximized title bar downward to restore the window. The launcher supports search, arrow-key selection, and Enter.
 
-Windows and the Start menu open with opaque geometric scale transitions. Minimize, close, and Start menu dismissal retain faded exits. The six Start menu app tiles have hover highlights and lift tweens. The Start logo sits slightly higher in the dock without an indicator dot. Dock hover uses partial repainting, and dragging takes priority.
+## PE32+ support
 
-The desktop uses the wallpaper and floating dock without a top panel or Favorites window. Maximized windows extend to the top edge with a small margin. Applications open from the dock, Start menu, or F1–F6.
-
-## Responsiveness
-
-The Windows QEMU launcher uses Quartzie's guest-rendered cursor, so pointer hover, click targeting, and the visible cursor share the same desktop coordinates. This avoids the coordinate drift that occurred when the host cursor was combined with relative PS/2 input under QEMU display scaling.
-
-The PS/2 input path consumes streaming movement packets. Opening and maximizing use elapsed-time easing with a 16 ms target frame interval.
-
-## Rendering
-
-Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass surfaces have an integrated window header and a soft perimeter shadow. During dragging, only the background behind the active window is cached; the moving window, controls and dock are composited at their current positions. The top bar remains independent of window motion.
-
-## Run a Windows executable
-
-The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
+The boot volume includes `QSTART.EXE`. To replace it with an AMD64 PE32+ executable:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.38.15-x64.img program.exe Quartzie-custom.img
+python3 tools/replace_app.py Quartzie-0.38.16-x64.iso program.exe Quartzie-custom.iso
 ```
 
-Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
+The loader implements relocation, import resolution by name and ordinal, and PE export lookup. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`. This is a targeted compatibility layer, not a complete Win32 environment.
 
-## Native services
+## Source layout
 
-The NT-style core provides process and thread records, quantum-based scheduling, typed and generation-checked handles, memory-region permissions, in-memory files, syscall dispatch, and driver registration. Tests run a compiled Windows console executable, relocate it, resolve imports, call its entry point, and validate the services.
+- `src/` — UEFI entry point, compositor, input, native services, PE loader, and Win32 bridge
+- `tools/` — image generation, assets, firmware checks, and ISO verification
+- `tests/` — native behavior and rendering tests
+- `assets/` — original icon and cursor artwork
 
-## Icons
-
-The Start button uses the supplied Quartzie logo, with its transparent artwork generated from `assets/start-icon.png.base64`. It has a hover lift, glow, tooltip, and click pulse. The Start menu itself uses a geometric opening tween and animated app-tile highlights. The logo is also available as a multi-resolution `.ico` for Windows.
-
-The icon assets are stored in `assets/icons.zip`. Building generates `build/icons.c` from the 20 supplied multi-resolution ICO files. The desktop, application launcher, dock, window headers, Files, and Control Center use the matching icons. The atlas keeps transparency and uses the system compositor for blending.
-
-## Fonts
-
-The UI font is rendered at build time from Inter. License and attribution are in `FONT-LICENSE.txt`.
+The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`.

@@ -737,7 +737,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.15",ink,2);
+        text(q,x,y,"Quartzie 0.38.16",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -1221,8 +1221,10 @@ void q_click(QDesktop *q,int x,int y){
         if(hit(x,y,w->x+w->w-108,w->y+13,36,29)){maximize_window(q,chosen);return;}
         if(hit(x,y,w->x+w->w-157,w->y+13,36,29)){minimize_window(q,chosen);return;}
         q_open(q,chosen);
-        if(!w->maximized&&hit(x,y,w->x,w->y,w->w-175,55)){
-            q->drag=chosen;q->drag_x=x-w->x;q->drag_y=y-w->y;return;
+        if((!w->maximized||q->pressed)&&hit(x,y,w->x,w->y,w->w-175,55)){
+            q->drag=chosen;q->drag_x=x-w->x;q->drag_y=y-w->y;
+            q->drag_start_x=x;q->drag_start_y=y;q->drag_moved=0;
+            return;
         }
         int bx=w->x+32,by=w->y+60;
         if(chosen==Q_SETTINGS){
@@ -1248,11 +1250,32 @@ void q_press(QDesktop *q,int x,int y){
     q->pressed=1;q_click(q,x,y);
     if(q->drag>=0){q->scene_tween_active=0;q->scene_tween_pending=0;}
 }
-void q_release(QDesktop *q){q->pressed=0;if(q->drag>=0){q->dirty=1;q->drag_cache_valid=0;q->glass_cached_app=-1;}q->drag=-1;}
+void q_release(QDesktop *q){
+    q->pressed=0;
+    if(q->drag>=0){
+        int app=q->drag;
+        q->drag=-1;
+        if(q->drag_moved&&!q->windows[app].maximized&&q->mouse_y<=16)maximize_window(q,app);
+        q->dirty=1;q->drag_cache_valid=0;q->glass_cached_app=-1;
+    }
+    q->drag=-1;
+}
 void q_move(QDesktop *q,int x,int y){
     q->mouse_x=clamp(x,0,q->width-1);q->mouse_y=clamp(y,0,q->height-1);
     if(q->pressed&&q->drag>=0){
         QWindow *w=&q->windows[q->drag];
+        int dx=q->mouse_x-q->drag_start_x,dy=q->mouse_y-q->drag_start_y;
+        if(dx>8||dx< -8||dy>8||dy< -8)q->drag_moved=1;
+        if(w->maximized){
+            if(!q->drag_moved)return;
+            int anchor_x=(int)((int64_t)q->drag_start_x*w->restore_w/q->width);
+            w->w=w->restore_w;w->h=w->restore_h;
+            w->x=clamp(q->mouse_x-anchor_x,0,q->width-w->w);
+            w->y=12;w->maximized=0;
+            q->drag_x=anchor_x;q->drag_y=28;
+            q->dirty=1;q->hover_only=0;
+            q->drag_cache_valid=0;q->glass_cached_app=-1;
+        }
         int new_x=clamp(q->mouse_x-q->drag_x,0,q->width-w->w);
         int max_y=q->height-44;
         if(max_y<12)max_y=12;

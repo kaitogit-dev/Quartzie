@@ -70,6 +70,21 @@ int main(void){
     q_click(&ui,w->x+w->w-90,w->y+25);
     CHECK(!w->maximized&&w->x==original.x&&w->y==original.y&&w->w==original.w&&w->h==original.h);
     q_draw(&ui);
+    int title_x=w->x+210,title_y=w->y+25;
+    q_press(&ui,title_x,title_y);
+    q_move(&ui,title_x+85,6);
+    q_release(&ui);
+    CHECK(w->maximized&&w->x==0&&w->y==0&&w->w==ui.width&&w->h==ui.height);
+    q_draw(&ui);
+    q_press(&ui,260,25);
+    q_release(&ui);
+    CHECK(w->maximized);
+    q_press(&ui,260,25);
+    q_move(&ui,430,210);
+    CHECK(!w->maximized&&ui.drag==Q_NOTES&&w->w==original.w&&w->h==original.h);
+    q_release(&ui);
+    CHECK(ui.drag==-1&&!w->maximized&&w->x>0&&w->y>12);
+    q_draw(&ui);
     q_click(&ui,w->x+w->w-40,w->y+25);
     CHECK(!w->open);
     q_open(&ui,Q_FILES);
@@ -86,6 +101,6 @@ int main(void){
     q_draw(&ui);
     CHECK(ui.damage_valid);
     same_as_full();
-    puts("PASS: 1920x1080 edge-to-edge maximize, square corners, dark/light fill, restore, and dock hover");
+    puts("PASS: maximize, drag-to-top, drag-to-restore, square corners, dark/light fill, and dock hover");
     return 0;
 }
