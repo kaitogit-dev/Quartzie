@@ -76,9 +76,15 @@ int main(void){
     for(int y=0;y<256;y++)for(int x=0;x<256;x++)framebuffer[y*256+x]=x<128?0x303f61:0xa5b4d5;
     surface(&desktop,32,32,190,190,16,material(&desktop),180);
     uint32_t dark_left=framebuffer[128*256+90],dark_right=framebuffer[128*256+166];
-    CHECK(luminance(dark_left)<650);
-    CHECK(luminance(dark_right)<1000);
-    CHECK(luminance(dark_right)>luminance(dark_left)+28);
-    puts("PASS: undimmed wallpaper, real dark glass, dark dock, controls, and complete theme invalidation");
+    int dark_span=luminance(dark_right)-luminance(dark_left);
+    CHECK(luminance(dark_left)<800);
+    CHECK(luminance(dark_right)<1300);
+    CHECK(dark_span>400);
+    desktop.theme=0;
+    for(int y=0;y<256;y++)for(int x=0;x<256;x++)framebuffer[y*256+x]=x<128?0x303f61:0xa5b4d5;
+    surface(&desktop,32,32,190,190,16,material(&desktop),180);
+    int light_span=luminance(framebuffer[128*256+166])-luminance(framebuffer[128*256+90]);
+    CHECK(absval(dark_span-light_span)<100);
+    puts("PASS: matching dark/light glass translucency, undimmed wallpaper, and theme cache invalidation");
     return 0;
 }
