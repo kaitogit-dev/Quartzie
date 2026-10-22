@@ -1,4 +1,4 @@
-VERSION = 0.38.9
+VERSION = 0.38.10
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -67,6 +67,7 @@ test: build/start-test build/timing-test build/icons-test build/ntcore-test buil
 	./build/transitions-test
 verify: all test build/Quartzie.cur
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
+	$(PYTHON) tools/check_firmware.py build/BOOTX64.EFI
 	$(PYTHON) tools/check_app.py build/winapp.exe Quartzie-x64.iso Quartzie-x64-uefi.img
 	$(PYTHON) tools/verify_cursor.py build/Quartzie.cur assets/cursor.png.base64
 clean:
