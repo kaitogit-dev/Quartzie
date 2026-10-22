@@ -13,7 +13,7 @@ NAMES = (
     "volume", "wifi", "wifi_error",
 )
 
-SIZES = (64, 40, 43, 58)
+SIZES = (64, 25, 27, 28, 40, 43, 58)
 
 
 def build(archive, output):
@@ -49,6 +49,9 @@ def build(archive, output):
         "}",
         "const uint32_t *q_icon_pixels_sized(unsigned int id,int size){",
         "    if(id>=QI_COUNT)return 0;",
+        "    if(size==25)return atlas_25[id];",
+        "    if(size==27)return atlas_27[id];",
+        "    if(size==28)return atlas_28[id];",
         "    if(size==40)return atlas_40[id];",
         "    if(size==43)return atlas_43[id];",
         "    if(size==58)return atlas_58[id];",
