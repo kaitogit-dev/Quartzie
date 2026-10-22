@@ -54,10 +54,21 @@ int main(void){
     q_draw(&ui);
     QWindow *w=&ui.windows[Q_NOTES];
     q_click(&ui,w->x+w->w-90,w->y+25);
-    CHECK(w->maximized&&w->w==1896&&w->h==1056&&w->x==12&&w->y==12);
+    CHECK(w->maximized&&w->w==ui.width&&w->h==ui.height&&w->x==0&&w->y==0);
+    q_draw(&ui);
+    CHECK(canvas[0]!=background[0]);
+    CHECK(canvas[ui.width-1]!=background[ui.width-1]);
+    CHECK(canvas[(size_t)(ui.height-1)*ui.width]!=background[(size_t)(ui.height-1)*ui.width]);
+    CHECK(canvas[(size_t)ui.height*ui.width-1]!=background[(size_t)ui.height*ui.width-1]);
+    q_set_theme(&ui,1);
+    q_draw(&ui);
+    CHECK(canvas[0]!=background[0]);
+    CHECK(canvas[ui.width-1]!=background[ui.width-1]);
+    CHECK(canvas[(size_t)ui.height*ui.width-1]!=background[(size_t)ui.height*ui.width-1]);
+    q_set_theme(&ui,0);
     q_draw(&ui);
     q_click(&ui,w->x+w->w-90,w->y+25);
-    CHECK(!w->maximized&&w->w==original.w&&w->h==original.h);
+    CHECK(!w->maximized&&w->x==original.x&&w->y==original.y&&w->w==original.w&&w->h==original.h);
     q_draw(&ui);
     q_click(&ui,w->x+w->w-40,w->y+25);
     CHECK(!w->open);
@@ -75,6 +86,6 @@ int main(void){
     q_draw(&ui);
     CHECK(ui.damage_valid);
     same_as_full();
-    puts("PASS: 1920x1080 viewport, independent minimize maximize close, restore, partial dock hover");
+    puts("PASS: 1920x1080 edge-to-edge maximize, square corners, dark/light fill, restore, and dock hover");
     return 0;
 }
