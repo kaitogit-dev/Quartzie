@@ -737,7 +737,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.14",ink,2);
+        text(q,x,y,"Quartzie 0.38.15",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
