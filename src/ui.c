@@ -121,6 +121,9 @@ static uint32_t glass_final[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_cached[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_cached_full[Q_MAX_W * Q_MAX_H];
 
+static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
+static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
+static uint32_t scene_back[Q_MAX_W*Q_MAX_H];
 void q_ui_set_scratch(uint32_t *storage){(void)storage;}
 #endif
 static int glass_cache_cols,glass_cache_rows;
