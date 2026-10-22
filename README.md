@@ -1,4 +1,4 @@
-# Quartzie 0.38.14
+# Quartzie 0.38.15
 
 ## Memory
 
@@ -15,12 +15,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.38.14-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.38.15-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.38.14-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.15-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -36,6 +36,10 @@ Light and dark glass use the same backdrop/tint opacity curve, so wallpaper colo
 ## Dark glass theme
 
 Dark mode uses its own navy/graphite glass palette with cool, subtle edge highlights rather than a light-theme tint inversion. Wallpaper colors are identical in both modes. Window chrome, dock, Start, menus, tooltips, Calculator controls, Settings and Quick Settings all share dark materials. Switching the theme invalidates compositor caches and redraws all visible surfaces without a stale-frame animation.
+
+## Fullscreen maximize
+
+Maximized windows fill the entire Quartzie framebuffer edge to edge. Their outer corners become square and their drop shadow is removed, while the floating dock remains accessible above the window. The maximize/restore button and F11 preserve the original window position and dimensions.
 
 ## Desktop features
 
@@ -81,7 +85,7 @@ Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass 
 The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.38.14-x64.img program.exe Quartzie-custom.img
+python3 tools/replace_app.py Quartzie-0.38.15-x64.img program.exe Quartzie-custom.img
 ```
 
 Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
