@@ -38,6 +38,19 @@ int main(void){
     CHECK(ui.hover==Q_FILES);
     q_click(&ui,ui.mouse_x,ui.mouse_y);
     CHECK(ui.windows[Q_FILES].open&&!ui.menu);
+    q_click(&ui,files_x,start_y);
+    CHECK(ui.windows[Q_FILES].open&&ui.windows[Q_FILES].minimized&&ui.active==-1);
+    q_click(&ui,files_x,start_y);
+    CHECK(ui.windows[Q_FILES].open&&!ui.windows[Q_FILES].minimized&&ui.active==Q_FILES);
+    q_open(&ui,Q_NOTES);
+    CHECK(ui.active==Q_NOTES&&!ui.windows[Q_NOTES].minimized);
+    q_click(&ui,files_x,start_y);
+    CHECK(ui.active==Q_FILES&&!ui.windows[Q_FILES].minimized);
+    CHECK(ui.windows[Q_NOTES].open&&!ui.windows[Q_NOTES].minimized);
+    q_click(&ui,files_x,start_y);
+    CHECK(ui.windows[Q_FILES].minimized&&ui.active==Q_NOTES);
+    q_click(&ui,files_x,start_y);
+    CHECK(!ui.windows[Q_FILES].minimized&&ui.active==Q_FILES);
     q_click(&ui,ui.windows[Q_FILES].x+ui.windows[Q_FILES].w-40,ui.windows[Q_FILES].y+25);
     CHECK(!ui.windows[Q_FILES].open);
     q_draw(&ui);
@@ -101,6 +114,6 @@ int main(void){
     q_draw(&ui);
     CHECK(ui.damage_valid);
     same_as_full();
-    puts("PASS: maximize, drag-to-top, drag-to-restore, square corners, dark/light fill, and dock hover");
+    puts("PASS: dock toggle, focus, maximize, drag-to-top, drag-to-restore, theme fill, and hover");
     return 0;
 }

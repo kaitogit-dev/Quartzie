@@ -9,10 +9,10 @@ static int absval(int x){return x<0?-x:x;}
 static int hit(int px,int py,int x,int y,int w,int h){return px>=x&&py>=y&&px<x+w&&py<y+h;}
 static uint32_t rgb(int r,int g,int b){return (uint32_t)((r<<16)|(g<<8)|b);}
 static uint32_t blend(uint32_t a,uint32_t b,int alpha){
-    int inv=256-alpha;
-    return rgb(((a>>16&255)*inv+(b>>16&255)*alpha)>>8,
-               ((a>>8&255)*inv+(b>>8&255)*alpha)>>8,
-               ((a&255)*inv+(b&255)*alpha)>>8);
+    uint32_t inv=(uint32_t)(256-alpha),weight=(uint32_t)alpha;
+    uint32_t rb=(a&0x00ff00ffu)*inv+(b&0x00ff00ffu)*weight;
+    uint32_t green=(a&0x0000ff00u)*inv+(b&0x0000ff00u)*weight;
+    return ((rb>>8)&0x00ff00ffu)|((green>>8)&0x0000ff00u);
 }
 typedef struct {
     uint32_t ink,muted,material,inset,dock,hover,selected,tooltip;
@@ -142,13 +142,13 @@ void q_ui_set_scratch(uint32_t *storage){(void)storage;}
 static int glass_cache_cols,glass_cache_rows;
 static const int glass_weight[7]={1,2,3,4,3,2,1};
 static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
+    const uint32_t *source=q->render_topbar?q->wallpaper:q->pixels;
     for(int yy=0;yy<rows;yy++){
         int y=clamp(sy+yy*GLASS_SCALE,0,q->height-1);
         int y1=clamp(y+2,0,q->height-1);
         for(int xx=0;xx<cols;xx++){
             int x=clamp(sx+xx*GLASS_SCALE,0,q->width-1);
             int x1=clamp(x+2,0,q->width-1);
-            const uint32_t *source=q->render_topbar?q->wallpaper:q->pixels;
             uint32_t a=source[(size_t)y*q->width+x];
             uint32_t b=source[(size_t)y*q->width+x1];
             uint32_t c=source[(size_t)y1*q->width+x];
@@ -159,26 +159,24 @@ static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
         }
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
-        int r=0,g=0,b=0;
+        uint32_t rb=0,green=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_source[(size_t)yy*cols+clamp(xx+k,0,cols-1)];
-            int weight=glass_weight[k+3];
-            r+=(int)(c>>16&255)*weight;
-            g+=(int)(c>>8&255)*weight;
-            b+=(int)(c&255)*weight;
+            uint32_t weight=(uint32_t)glass_weight[k+3];
+            rb+=(c&0x00ff00ffu)*weight;
+            green+=(c&0x0000ff00u)*weight;
         }
-        glass_horizontal[(size_t)yy*cols+xx]=rgb(r/16,g/16,b/16);
+        glass_horizontal[(size_t)yy*cols+xx]=((rb>>4)&0x00ff00ffu)|((green>>4)&0x0000ff00u);
     }
     for(int yy=0;yy<rows;yy++)for(int xx=0;xx<cols;xx++){
-        int r=0,g=0,b=0;
+        uint32_t rb=0,green=0;
         for(int k=-3;k<=3;k++){
             uint32_t c=glass_horizontal[(size_t)clamp(yy+k,0,rows-1)*cols+xx];
-            int weight=glass_weight[k+3];
-            r+=(int)(c>>16&255)*weight;
-            g+=(int)(c>>8&255)*weight;
-            b+=(int)(c&255)*weight;
+            uint32_t weight=(uint32_t)glass_weight[k+3];
+            rb+=(c&0x00ff00ffu)*weight;
+            green+=(c&0x0000ff00u)*weight;
         }
-        glass_final[(size_t)yy*cols+xx]=rgb(r/16,g/16,b/16);
+        glass_final[(size_t)yy*cols+xx]=((rb>>4)&0x00ff00ffu)|((green>>4)&0x0000ff00u);
     }
 }
 static uint32_t glass_fetch(const uint32_t *buffer,int px,int py,int sx,int sy,int cols,int rows){
@@ -194,9 +192,11 @@ static uint32_t glass_fetch(const uint32_t *buffer,int px,int py,int sx,int sy,i
     uint32_t d=buffer[(size_t)by*cols+bx];
     int w00=(GLASS_SCALE-fx)*(GLASS_SCALE-fy);
     int w10=fx*(GLASS_SCALE-fy),w01=(GLASS_SCALE-fx)*fy,w11=fx*fy;
-    return rgb(((int)(a>>16&255)*w00+(int)(b>>16&255)*w10+(int)(c>>16&255)*w01+(int)(d>>16&255)*w11)/16,
-        ((int)(a>>8&255)*w00+(int)(b>>8&255)*w10+(int)(c>>8&255)*w01+(int)(d>>8&255)*w11)/16,
-        ((int)(a&255)*w00+(int)(b&255)*w10+(int)(c&255)*w01+(int)(d&255)*w11)/16);
+    uint32_t rb=(a&0x00ff00ffu)*(uint32_t)w00+(b&0x00ff00ffu)*(uint32_t)w10+
+        (c&0x00ff00ffu)*(uint32_t)w01+(d&0x00ff00ffu)*(uint32_t)w11;
+    uint32_t green=(a&0x0000ff00u)*(uint32_t)w00+(b&0x0000ff00u)*(uint32_t)w10+
+        (c&0x0000ff00u)*(uint32_t)w01+(d&0x0000ff00u)*(uint32_t)w11;
+    return ((rb>>4)&0x00ff00ffu)|((green>>4)&0x0000ff00u);
 }
 static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint,int alpha){
     if(w<=0||h<=0)return;
@@ -212,30 +212,34 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     int rows=cached?glass_cache_rows:(ey-sy+GLASS_SCALE-1)/GLASS_SCALE;
     if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS)return;
     if(!cached)glass_filter(q,sx,sy,cols,rows);
-    int bw=q->width;
-    for(int py=y0;py<y1;py++)for(int px=x0;px<x1;px++){
-        int dx=px-x,dy=py-y;
-        int cover=round_cover(dx,dy,w,h,radius);
-        if(!cover)continue;
-        size_t at=(size_t)py*bw+px;
-        uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
+    int bw=q->width,dark=q->theme;
+    uint32_t highlight=colors(q)->highlight,rim_color=colors(q)->rim;
+    int top_alpha=dark?28:100,edge_alpha=dark?14:47;
+    uint32_t lower_color=dark?0x050b14u:0x557099u;
+    int lower_alpha=dark?40:17;
+    for(int py=y0;py<y1;py++){
+        int dy=py-y;
         int sheen=dy<h/2?18*(h/2-dy)/(h/2+1):0;
         int material=clamp(alpha-44+sheen,12,190);
-        uint32_t c=blend(backdrop,tint,material);
-        int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
-        int rim=cover-inner;
-        if(q->theme){
-            if(dy<2)c=blend(c,colors(q)->highlight,28);
-            if(dx<2||dy<2)c=blend(c,colors(q)->rim,14);
-            if(dx>w-3||dy>h-3)c=blend(c,0x050b14,40);
-            if(rim>0)c=blend(c,colors(q)->rim,clamp(rim/5,0,48));
-        }else{
-            if(dy<2)c=blend(c,colors(q)->highlight,100);
-            if(dx<2||dy<2)c=blend(c,colors(q)->rim,47);
-            if(dx>w-3||dy>h-3)c=blend(c,0x557099,17);
-            if(rim>0)c=blend(c,colors(q)->rim,clamp(rim/3,0,72));
+        size_t row=(size_t)py*bw;
+        for(int px=x0;px<x1;px++){
+            int dx=px-x;
+            int cover=radius?round_cover(dx,dy,w,h,radius):256;
+            if(!cover)continue;
+            size_t at=row+px;
+            uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
+            uint32_t c=blend(backdrop,tint,material);
+            int rim=0;
+            if(radius){
+                int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
+                rim=cover-inner;
+            }else if(dx==0||dy==0||dx==w-1||dy==h-1)rim=256;
+            if(dy<2)c=blend(c,highlight,top_alpha);
+            if(dx<2||dy<2)c=blend(c,rim_color,edge_alpha);
+            if(dx>w-3||dy>h-3)c=blend(c,lower_color,lower_alpha);
+            if(rim>0)c=blend(c,rim_color,dark?clamp(rim/5,0,48):clamp(rim/3,0,72));
+            q->pixels[at]=cover==256?c:blend(q->pixels[at],c,cover);
         }
-        q->pixels[at]=blend(q->pixels[at],c,cover);
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
@@ -470,13 +474,13 @@ void q_enable_animations(QDesktop *q){
 }
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
     if(!q->animations_enabled)return;
-    if(elapsed_us>100000)elapsed_us=100000;
+    if(elapsed_us>250000)elapsed_us=250000;
     int frame_advance=0;
     if(q->scene_tween_active){
         if(q->drag>=0){
             q->scene_tween_active=0;q->scene_tween_pending=0;q->dirty=1;
         }else{
-            int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?145000:(q->scene_tween_kind==2)?165000:185000;
+            int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?110000:(q->scene_tween_kind==2)?125000:130000;
             uint32_t remaining=q->scene_elapsed_us<(uint32_t)duration?(uint32_t)duration-q->scene_elapsed_us:0;
             if(elapsed_us>=remaining)q->scene_elapsed_us=(uint32_t)duration;
             else q->scene_elapsed_us+=elapsed_us;
@@ -737,7 +741,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.16",ink,2);
+        text(q,x,y,"Quartzie 0.38.17",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -938,7 +942,7 @@ static void paint_window_geometry(QDesktop *q,int weight){
     clip_full(q);
 }
 static void paint_scene_tween(QDesktop *q){
-    int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?145000:q->scene_tween_kind==2?165000:185000;
+    int duration=(q->scene_tween_kind==1||q->scene_tween_kind==7)?110000:q->scene_tween_kind==2?125000:130000;
     int progress=clamp((int)((uint64_t)q->scene_elapsed_us*256/(uint32_t)duration),0,256);
     int weight=progress*progress*(768-2*progress)/(256*256);
     int x0=q->scene_x0,y0=q->scene_y0,x1=q->scene_x1,y1=q->scene_y1;
@@ -1181,7 +1185,12 @@ void q_click(QDesktop *q,int x,int y){
         q->dirty=1;
         return;
     }
-    if(dock>=0&&dock<Q_APPS){q_open(q,dock);return;}
+    if(dock>=0&&dock<Q_APPS){
+        QWindow *w=&q->windows[dock];
+        if(w->open&&!w->minimized&&q->active==dock)minimize_window(q,dock);
+        else q_open(q,dock);
+        return;
+    }
     if(dock==11){int was=q->notifications;close_popups(q);q->notifications=!was;begin_scene_tween(q,q->notifications?5:6);q->dirty=1;return;}
     if(dock==12){int was=q->quick;close_popups(q);q->quick=!was;begin_scene_tween(q,q->quick?5:6);q->dirty=1;return;}
     if(q->menu){

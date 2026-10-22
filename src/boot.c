@@ -313,7 +313,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         uint64_t now=read_clock();
         uint64_t delta=(now-last_tick)/clock_ticks_per_us;
         last_tick=now;
-        if(delta>100000)delta=100000;
+        if(delta>250000)delta=250000;
         q_tick_timed(&desktop,(uint32_t)delta);
         if(desktop.dirty){
             q_draw(&desktop);
@@ -323,6 +323,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             else present();
         }else if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
         pointer_sample(0);
-        bs->Stall(desktop.drag>=0?200:desktop.scene_tween_active?300:500);
+        bs->Stall(desktop.drag>=0?250:desktop.scene_tween_active?500:1500);
     }
 }

@@ -28,7 +28,7 @@ int main(void){
         q_tick_timed(&ui,16000);
         if(ui.dirty)q_draw(&ui);
     }
-    REQUIRE(ui.scene_elapsed_us==145000);
+    REQUIRE(ui.scene_elapsed_us==110000);
     REQUIRE(!ui.scene_tween_active);
     REQUIRE(ui.scene_tween_step>=8);
     REQUIRE(ui.scene_elapsed_us>elapsed);
@@ -41,7 +41,7 @@ int main(void){
         q_tick_timed(&ui,9000);
         if(ui.dirty)q_draw(&ui);
     }
-    REQUIRE(ui.scene_elapsed_us==165000&&!ui.scene_tween_active);
+    REQUIRE(ui.scene_elapsed_us==125000&&!ui.scene_tween_active);
     REQUIRE(w->maximized);
     puts("PASS: elapsed-time eased opening/maximizing, 16ms frame scheduling without render-time input work");
     return 0;
