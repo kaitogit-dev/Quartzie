@@ -101,11 +101,28 @@ static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int
 #define GLASS_SCALE 4
 #define GLASS_SIDE (Q_MAX_W / GLASS_SCALE + 16)
 #define GLASS_ROWS (Q_MAX_H / GLASS_SCALE + 16)
+#if defined(QUARTZIE_FIRMWARE)
+static uint32_t *glass_source,*glass_horizontal,*glass_final,*glass_cached,*glass_cached_full;
+static uint32_t *scene_from,*scene_to,*scene_back;
+void q_ui_set_scratch(uint32_t *storage){
+    glass_source=storage;
+    glass_horizontal=glass_source+GLASS_SIDE*GLASS_ROWS;
+    glass_final=glass_horizontal+GLASS_SIDE*GLASS_ROWS;
+    glass_cached=glass_final+GLASS_SIDE*GLASS_ROWS;
+    glass_cached_full=glass_cached+GLASS_SIDE*GLASS_ROWS;
+    scene_from=glass_cached_full+Q_MAX_W*Q_MAX_H;
+    scene_to=scene_from+Q_MAX_W*Q_MAX_H;
+    scene_back=scene_to+Q_MAX_W*Q_MAX_H;
+}
+#else
 static uint32_t glass_source[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_horizontal[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_final[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_cached[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_cached_full[Q_MAX_W * Q_MAX_H];
+
+void q_ui_set_scratch(uint32_t *storage){(void)storage;}
+#endif
 static int glass_cache_cols,glass_cache_rows;
 static const int glass_weight[7]={1,2,3,4,3,2,1};
 static void glass_filter(QDesktop *q,int sx,int sy,int cols,int rows){
