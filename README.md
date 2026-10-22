@@ -1,4 +1,4 @@
-# Quartzie 0.38.11
+# Quartzie 0.38.12
 
 ## Memory
 
@@ -15,12 +15,12 @@ make verify
 
 ## Run
 
-Boot `Quartzie-0.38.11-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
+Boot `Quartzie-0.38.12-x64.iso` with x86-64 QEMU and OVMF. Example Linux command:
 
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.38.11-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.38.12-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with GTK, if available. To fit 1920×1080 into a smaller host window, use **View → Zoom to Fit** in GTK-based QEMU. SDL display builds may require a larger host window or another display backend. The launcher tries hardware acceleration first and falls back to software emulation.
@@ -28,6 +28,16 @@ For Windows QEMU, use `tools/run-windows.ps1`. It enables display scaling with G
 ## Responsiveness and icon quality
 
 Relative mouse input uses calibrated movement at 400 units per reference pixel, with additional pointer sampling immediately after expensive redraws. Application icons are generated directly from their original 64-pixel artwork at native dock, launcher, and small UI sizes instead of repeatedly resampling 48-pixel intermediate images.
+
+## Desktop features
+
+The Start launcher has an app search field. Type to filter the six installed apps, use Up/Down to move selection, and Enter to launch. Its original 1-6 number shortcuts still work when search is empty.
+
+Calculator supports keyboard input, Enter to evaluate, Backspace to edit, C to clear, chained operations, and a three-entry calculation history. Calculations reject invalid input and division by zero rather than returning misleading values.
+
+F10 minimizes the active window, F11 maximizes or restores it, and F12 closes it.
+
+The About OS and Calculator icons use custom supplied artwork in the dock, Start launcher, and window headers.
 
 ## Cursor
 
@@ -63,7 +73,7 @@ Translucent surfaces use a downsampled, separable two-pass backdrop blur. Glass 
 The boot volume contains `QSTART.EXE`. To replace it with a PE32+ AMD64 executable, run:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.38.11-x64.img program.exe Quartzie-custom.img
+python3 tools/replace_app.py Quartzie-0.38.12-x64.img program.exe Quartzie-custom.img
 ```
 
 Use the ISO as input and output to create a custom ISO instead. Boot the resulting image in QEMU. The executable loader supports relocation, imports by name or ordinal through the resolver, and PE exports. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`.
