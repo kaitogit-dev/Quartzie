@@ -20,7 +20,9 @@ typedef struct {
     int menu,notifications,quick,active,drag,drag_x,drag_y;
     int pressed,last_button,frame_count,hover;
     int note_length,command_length,calc_length;
+    int menu_search_length,calc_history_count;
     char notes[2048],command[128],calc[64],answer[64],status[96];
+    char menu_search[24],calc_history[3][64];
     QWindow windows[Q_APPS];
     uint32_t *pixels,*wallpaper,*blurred;
     uint32_t *drag_base,*dock_background;
