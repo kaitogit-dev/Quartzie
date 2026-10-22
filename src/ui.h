@@ -52,6 +52,7 @@ void q_press(QDesktop *q,int x,int y);
 void q_release(QDesktop *q);
 void q_move(QDesktop *q,int x,int y);
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan);
+void q_set_theme(QDesktop *q,int dark);
 void q_open(QDesktop *q,int app);
 int q_dock_hit(QDesktop *q,int x,int y);
 #endif
