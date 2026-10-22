@@ -6,14 +6,22 @@
 #include "fileboot.h"
 #include "hostcursor.h"
 #include "cursor.h"
-static uint32_t backbuffer[Q_MAX_W*Q_MAX_H];
-static uint32_t wallpaper_buffer[Q_MAX_W*Q_MAX_H];
-static uint32_t frosted_buffer[Q_MAX_W*Q_MAX_H];
-static uint32_t drag_base_buffer[Q_MAX_W*Q_MAX_H];
-static uint32_t dock_base_buffer[659*137];
+static uint32_t *backbuffer;
+static uint32_t *wallpaper_buffer;
+static uint32_t *frosted_buffer;
+static uint32_t *drag_base_buffer;
+static uint32_t *dock_base_buffer;
 static QDesktop desktop;
-static QNtKernel native_kernel;
-static uint8_t executable_buffer[1024*1024];
+static QNtKernel *native_kernel;
+#define Q_EXECUTABLE_CAPACITY (1024u*1024u)
+static uint8_t *executable_buffer;
+static void *efi_alloc(EFI_BOOT_SERVICES *boot,size_t bytes){
+    if(!boot||!boot->AllocatePages||!bytes)return 0;
+    uint64_t address=0;
+    uint64_t pages=((uint64_t)bytes+4095u)/4096u;
+    if(boot->AllocatePages(0,2,pages,&address)!=0||!address)return 0;
+    return (void *)(uintptr_t)address;
+}
 extern const uint8_t q_winapp_data[];
 extern const size_t q_winapp_size;
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *video;
@@ -218,6 +226,21 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     screen=(uint32_t *)(uintptr_t)video->Mode->FrameBufferBase;
     host_cursor=q_host_cursor_enabled();
     if(host_cursor)serial_text("QUARTZIE-HOST-CURSOR\n");
+    size_t frame_bytes=(size_t)w*(size_t)h*sizeof(uint32_t);
+    backbuffer=efi_alloc(bs,frame_bytes);
+    wallpaper_buffer=efi_alloc(bs,frame_bytes);
+    frosted_buffer=efi_alloc(bs,frame_bytes);
+    drag_base_buffer=efi_alloc(bs,frame_bytes);
+    dock_base_buffer=efi_alloc(bs,659u*137u*sizeof(uint32_t));
+    uint32_t *ui_storage=efi_alloc(bs,(size_t)Q_UI_SCRATCH_PIXELS*sizeof(uint32_t));
+    native_kernel=efi_alloc(bs,sizeof(*native_kernel));
+    executable_buffer=efi_alloc(bs,Q_EXECUTABLE_CAPACITY);
+    if(!backbuffer||!wallpaper_buffer||!frosted_buffer||!drag_base_buffer||
+       !dock_base_buffer||!ui_storage||!native_kernel||!executable_buffer){
+        serial_text("QUARTZIE-MEMORY-FAILED\n");
+        return 6;
+    }
+    q_ui_set_scratch(ui_storage);
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     q_drag_buffers(&desktop,drag_base_buffer);
@@ -226,13 +249,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_enable_animations(&desktop);
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
-    qnt_init(&native_kernel);
+    qnt_init(native_kernel);
     size_t executable_size=0;
-    int has_disk_app=qefi_read_app(image,bs,executable_buffer,sizeof(executable_buffer),&executable_size)==0;
+    int has_disk_app=qefi_read_app(image,bs,executable_buffer,Q_EXECUTABLE_CAPACITY,&executable_size)==0;
     if(has_disk_app)serial_text("QUARTZIE-WIN32-FILE\n");
     const uint8_t *app=has_disk_app?executable_buffer:q_winapp_data;
     size_t app_size=has_disk_app?executable_size:q_winapp_size;
-    if(qwin_execute(&native_kernel,bs,app,app_size,serial_char)==QNT_OK)
+    if(qwin_execute(native_kernel,bs,app,app_size,serial_char)==QNT_OK)
         serial_text("QUARTZIE-WIN32-READY\n");
     else serial_text("QUARTZIE-WIN32-FAILED\n");
     serial_text("QUARTZIE-DESKTOP-READY\n");
@@ -286,7 +309,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             }
         }
         if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
-        qnt_tick(&native_kernel);
+        qnt_tick(native_kernel);
         uint64_t now=read_clock();
         uint64_t delta=(now-last_tick)/clock_ticks_per_us;
         last_tick=now;
