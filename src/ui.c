@@ -373,9 +373,6 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     wallpaper(q);
 }
 static void close_popups(QDesktop *q){q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;}
-static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
-static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
-static uint32_t scene_back[Q_MAX_W*Q_MAX_H];
 static void begin_scene_tween(QDesktop *q,int kind){
     if(!q->animations_enabled||q->drag>=0)return;
     size_t total=(size_t)q->width*q->height;
