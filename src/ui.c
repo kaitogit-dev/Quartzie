@@ -352,6 +352,8 @@ static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
     else if(app==Q_NOTES)icon_id=QI_TEXT;
     else if(app==Q_TERMINAL)icon_id=QI_CMD;
     else if(app==Q_SETTINGS)icon_id=QI_SETTINGS;
+    else if(app==Q_CALCULATOR)icon_id=QI_CALCULATOR;
+    else if(app==Q_ABOUT)icon_id=QI_ABOUT;
     if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
     else icon(q,cx,cy,app,color);
 }
