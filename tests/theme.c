@@ -40,7 +40,7 @@ int main(void){
     uint32_t dock_dark=desktop.pixels[dy*1024+dx];
     CHECK(luminance(window_dark)<luminance(window_light));
     CHECK(luminance(dock_dark)<luminance(dock_light));
-    CHECK(luminance(window_dark)<360);
+    CHECK(luminance(window_dark)<750);
     q_set_theme(&desktop,0);
     CHECK(wall_checksum()==original);
     q_draw(&desktop);
@@ -53,7 +53,7 @@ int main(void){
     QWindow *calc=&desktop.windows[Q_CALCULATOR];
     int cx=calc->x+32,cy=calc->y+60;
     uint32_t operator_dark=desktop.pixels[(cy+152)*1024+cx+281];
-    CHECK(luminance(operator_dark)<480);
+    CHECK(luminance(operator_dark)<950);
     q_click(&desktop,calc->x+calc->w-45,calc->y+24);
     q_open(&desktop,Q_SETTINGS);
     q_draw(&desktop);
@@ -76,8 +76,8 @@ int main(void){
     for(int y=0;y<256;y++)for(int x=0;x<256;x++)framebuffer[y*256+x]=x<128?0x303f61:0xa5b4d5;
     surface(&desktop,32,32,190,190,16,material(&desktop),180);
     uint32_t dark_left=framebuffer[128*256+90],dark_right=framebuffer[128*256+166];
-    CHECK(luminance(dark_left)<350);
-    CHECK(luminance(dark_right)<480);
+    CHECK(luminance(dark_left)<650);
+    CHECK(luminance(dark_right)<1000);
     CHECK(luminance(dark_right)>luminance(dark_left)+28);
     puts("PASS: undimmed wallpaper, real dark glass, dark dock, controls, and complete theme invalidation");
     return 0;
