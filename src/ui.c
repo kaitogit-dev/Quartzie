@@ -220,7 +220,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
         size_t at=(size_t)py*bw+px;
         uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
         int sheen=dy<h/2?18*(h/2-dy)/(h/2+1):0;
-        int material=q->theme?clamp(185+alpha/5+sheen/4,190,234):clamp(alpha-44+sheen,12,190);
+        int material=clamp(alpha-44+sheen,12,190);
         uint32_t c=blend(backdrop,tint,material);
         int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
         int rim=cover-inner;
