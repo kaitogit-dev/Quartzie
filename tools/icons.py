@@ -13,49 +13,50 @@ NAMES = (
     "volume", "wifi", "wifi_error",
 )
 
+SIZES = (64, 40, 43, 58)
+
 
 def build(archive, output):
-    lines = ['#include "icons.h"', 'static const uint32_t atlas[QI_COUNT][Q_ICON_SIZE*Q_ICON_SIZE] = {']
-    with zipfile.ZipFile(archive) as source:
-        found = set(source.namelist())
-        if found != {name + '.ico' for name in NAMES}:
-            raise ValueError('Icon archive contents do not match the expected set')
+    sources = []
+    with zipfile.ZipFile(archive) as icons:
+        if set(icons.namelist()) != {name + ".ico" for name in NAMES}:
+            raise ValueError("Icon archive contents do not match the expected set")
         for name in NAMES:
-            raw = source.read(name + '.ico')
-            icon = Image.open(BytesIO(raw))
-            icon = icon.ico.getimage((64, 64)).convert('RGBA')
-            icon = icon.resize((48, 48), Image.Resampling.LANCZOS)
-            lines.append('{')
-            pixels = list(icon.getdata())
-            for start in range(0, len(pixels), 16):
-                section = pixels[start:start+16]
-                lines.append(','.join(
-                    '0x%08x' % ((a << 24) | (r << 16) | (g << 8) | b)
-                    for r, g, b, a in section
-                ) + ',')
-            lines.append('},')
-    icon = Image.open(BytesIO(base64.b64decode(
+            original = Image.open(BytesIO(icons.read(name + ".ico")))
+            sources.append(original.ico.getimage((64, 64)).convert("RGBA"))
+    start = Image.open(BytesIO(base64.b64decode(
         pathlib.Path("assets/start-icon.png.base64").read_text().strip()
     ))).convert("RGBA")
-    if icon.size != (48, 48):
-        raise ValueError("Start logo atlas image must be 48 x 48")
-    lines.append("{")
-    pixels = list(icon.getdata())
-    for start in range(0, len(pixels), 16):
-        section = pixels[start:start + 16]
-        lines.append(",".join(
-            "0x%08x" % ((a << 24) | (r << 16) | (g << 8) | b)
-            for r, g, b, a in section
-        ) + ",")
-    lines.append("},")
+    sources.append(start.resize((64, 64), Image.Resampling.LANCZOS))
+    lines = ['#include "icons.h"']
+    for size in SIZES:
+        lines.append(f"static const uint32_t atlas_{size}[QI_COUNT][{size}*{size}] = {{")
+        for icon in sources:
+            resized = icon if size == 64 else icon.resize((size, size), Image.Resampling.LANCZOS)
+            pixels = list(resized.getdata())
+            lines.append("{")
+            for offset in range(0, len(pixels), 16):
+                sample = pixels[offset:offset+16]
+                lines.append(",".join(
+                    "0x%08x" % ((a << 24) | (r << 16) | (g << 8) | b)
+                    for r, g, b, a in sample
+                ) + ",")
+            lines.append("},")
+        lines.append("};")
     lines.extend((
-        '};',
-        'const uint32_t *q_icon_pixels(unsigned int id){',
-        '    return id<QI_COUNT ? atlas[id] : 0;',
-        '}',
+        "const uint32_t *q_icon_pixels(unsigned int id){",
+        "    return id<QI_COUNT ? atlas_64[id] : 0;",
+        "}",
+        "const uint32_t *q_icon_pixels_sized(unsigned int id,int size){",
+        "    if(id>=QI_COUNT)return 0;",
+        "    if(size==40)return atlas_40[id];",
+        "    if(size==43)return atlas_43[id];",
+        "    if(size==58)return atlas_58[id];",
+        "    return atlas_64[id];",
+        "}",
     ))
-    pathlib.Path(output).write_text('\n'.join(lines) + '\n')
+    pathlib.Path(output).write_text("\n".join(lines) + "\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     build(*sys.argv[1:3])
