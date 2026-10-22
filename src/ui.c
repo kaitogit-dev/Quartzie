@@ -327,17 +327,18 @@ static void icon(QDesktop *q,int cx,int cy,int id,uint32_t color){
     }
 }
 static void sprite(QDesktop *q,int cx,int cy,int sprite_id,int size){
-    const uint32_t *source=q_icon_pixels((unsigned int)sprite_id);
+    const uint32_t *source=q_icon_pixels_sized((unsigned int)sprite_id,size);
     if(!source||size<1)return;
+    int source_size=(size==40||size==43||size==58)?size:Q_ICON_SIZE;
     int x=cx-size/2,y=cy-size/2;
     int x0=clamp(x,q->clip_left,q->clip_right),x1=clamp(x+size,q->clip_left,q->clip_right);
     int y0=clamp(y,q->clip_top,q->clip_bottom),y1=clamp(y+size,q->clip_top,q->clip_bottom);
     if(x0>=x1||y0>=y1)return;
     for(int py=y0;py<y1;py++){
-        int sy=(py-y)*Q_ICON_SIZE/size;
+        int sy=(py-y)*source_size/size;
         for(int px=x0;px<x1;px++){
-            int sx=(px-x)*Q_ICON_SIZE/size;
-            uint32_t raw=source[sy*Q_ICON_SIZE+sx];
+            int sx=(px-x)*source_size/size;
+            uint32_t raw=source[sy*source_size+sx];
             int alpha=(int)(raw>>24);
             if(!alpha)continue;
             uint32_t *dst=q->pixels+(size_t)py*q->width+px;
