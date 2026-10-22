@@ -675,7 +675,7 @@ static void maximize_window(QDesktop *q,int app){
     int from_x=w->x,from_y=w->y,from_w=w->w,from_h=w->h;
     if(!w->maximized){
         w->restore_x=w->x;w->restore_y=w->y;w->restore_w=w->w;w->restore_h=w->h;
-        w->x=12;w->y=12;w->w=q->width-24;w->h=q->height-24;w->maximized=1;
+        w->x=0;w->y=0;w->w=q->width;w->h=q->height;w->maximized=1;
     }else{
         w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;w->maximized=0;
     }
@@ -753,7 +753,8 @@ static void draw_window(QDesktop *q,int app){
     if(!w->open||w->minimized)return;
     int previous_render_app=q->render_app;
     q->render_app=app;
-    pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?209:149);
+    if(w->maximized)surface(q,w->x,w->y,w->w,w->h,0,material(q),q->theme?209:149);
+    else pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?209:149);
     thin_rule(q,w->x+23,w->y+56,w->w-46,28);
     app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
     text(q,w->x+61,w->y+36,names[app],foreground(q),1);
