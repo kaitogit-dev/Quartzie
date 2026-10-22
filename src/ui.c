@@ -674,13 +674,22 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y,"Calculator",ink,2);
         surface(q,x,y+27,322,81,16,inner_material(q),q->theme?111:144);
         const char *output=q->calc_length?q->calc:q->answer;
-        text(q,x+22,y+80,output,ink,2);
+        string_limit(q,x+22,y+80,output,ink,2,285,1);
         const char *keys="789/456*123-C0=+";
         for(int i=0;i<16;i++){
             int bx=x+(i%4)*82,by=y+128+(i/4)*57;
             surface(q,bx,by,73,49,13,(i%4)==3?0xa4ddeb:inner_material(q),q->theme?121:151);
             char value[2]={keys[i],0};
             text(q,bx+(73-text_width(value,1))/2,by+32,value,ink,1);
+        }
+        int history_width=cw-350;
+        if(history_width>80){
+            surface(q,x+343,y+27,history_width+7,327,16,inner_material(q),q->theme?92:125);
+            text(q,x+355,y+59,"Recent",ink,0);
+            for(int i=0;i<q->calc_history_count;i++)
+                string_limit(q,x+355,y+99+i*77,q->calc_history[i],secondary(q),0,history_width-17,2);
+            if(!q->calc_history_count)
+                string_limit(q,x+355,y+100,"No history",secondary(q),0,history_width-17,1);
         }
     }else if(app==Q_SETTINGS){
         surface(q,x,y+36,cw,91,18,inner_material(q),q->theme?106:139);
@@ -1024,27 +1033,105 @@ void q_draw(QDesktop *q){
     q->frame_count++;
     q->dirty=0;
 }
-static void calc_input(QDesktop *q,char key){
-    if(key=='C'){q->calc_length=0;q->calc[0]=0;q->answer[0]='0';q->answer[1]=0;return;}
-    if(key=='='){
-        int a=0,b=0,at=0,sign=1;char op;
-        while(q->calc[at]>='0'&&q->calc[at]<='9'){a=clamp(a*10+q->calc[at++]-'0',0,1000000);}
-        op=q->calc[at++];if(q->calc[at]=='-'){sign=-1;at++;}
-        while(q->calc[at]>='0'&&q->calc[at]<='9'){b=clamp(b*10+q->calc[at++]-'0',0,1000000);}
-        b*=sign;
-        int n=op=='+'?a+b:op=='-'?a-b:op=='*'?a*b:op=='/'&&b?a/b:0;
-        if(op=='/'&&!b){q->answer[0]='E';q->answer[1]='R';q->answer[2]='R';q->answer[3]=0;}
-        else{
-            char digits[16];int length=0,pos=0,neg=n<0;
-            unsigned int v=neg?(unsigned int)(-(int64_t)n):(unsigned int)n;
-            do{digits[length++]=(char)('0'+v%10);v/=10;}while(v&&length<15);
-            if(neg)q->answer[pos++]='-';
-            while(length)q->answer[pos++]=digits[--length];
-            q->answer[pos]=0;
-        }
-        q->calc_length=0;q->calc[0]=0;return;
+static int calc_number(const char *expr,int *index,int64_t *out){
+    int sign=1,digits=0;
+    if(expr[*index]=='-'){sign=-1;(*index)++;}
+    int64_t value=0;
+    while(expr[*index]>='0'&&expr[*index]<='9'){
+        if(value>100000000)return 0;
+        value=value*10+expr[(*index)++]-'0';
+        digits++;
     }
-    if(q->calc_length<30){q->calc[q->calc_length++]=key;q->calc[q->calc_length]=0;}
+    if(!digits||value>1000000000)return 0;
+    *out=value*sign;
+    return 1;
+}
+static void calc_format(char *output,int64_t value){
+    char digits[24];
+    int negative=value<0,at=0,index=0;
+    uint64_t number=negative?(uint64_t)(-value):(uint64_t)value;
+    do{digits[at++]=(char)('0'+number%10);number/=10;}while(number&&at<23);
+    if(negative)output[index++]='-';
+    while(at)output[index++]=digits[--at];
+    output[index]=0;
+}
+static void calc_input(QDesktop *q,char key){
+    if(key=='C'){
+        q->calc_length=0;q->calc[0]=0;
+        q->answer[0]='0';q->answer[1]=0;return;
+    }
+    if(key=='B'){
+        if(q->calc_length)q->calc[--q->calc_length]=0;
+        return;
+    }
+    if(key=='='){
+        if(!q->calc_length)return;
+        int index=0;
+        int64_t left=0,right=0,result=0;
+        int valid=calc_number(q->calc,&index,&left);
+        char op=q->calc[index];
+        if(valid&&op){
+            if(op!='+'&&op!='-'&&op!='*'&&op!='/')valid=0;
+            else{
+                index++;
+                valid=calc_number(q->calc,&index,&right)&&q->calc[index]==0;
+            }
+        }
+        if(valid&&!op)valid=q->calc[index]==0;
+        if(valid){
+            if(!op)result=left;
+            else if(op=='+')result=left+right;
+            else if(op=='-')result=left-right;
+            else if(op=='*')result=left*right;
+            else if(op=='/'&&right)result=left/right;
+            else valid=0;
+        }
+        if(!valid||result>1000000000||result< -1000000000){
+            const char *err=valid?"OVERFLOW":"ERR";
+            int n=0;
+            while(err[n]){q->answer[n]=err[n];n++;}
+            q->answer[n]=0;
+        }else{
+            calc_format(q->answer,result);
+            for(int i=2;i>0;i--)for(int j=0;j<64;j++)q->calc_history[i][j]=q->calc_history[i-1][j];
+            char *history=q->calc_history[0];
+            int at=0;
+            for(int j=0;q->calc[j]&&at<44;j++)history[at++]=q->calc[j];
+            history[at++]=' ';history[at++]='=';history[at++]=' ';
+            for(int j=0;q->answer[j]&&at<63;j++)history[at++]=q->answer[j];
+            history[at]=0;
+            if(q->calc_history_count<3)q->calc_history_count++;
+        }
+        q->calc_length=0;q->calc[0]=0;
+        return;
+    }
+    if(key>='0'&&key<='9'){
+        if(q->calc_length<28){
+            q->calc[q->calc_length++]=key;
+            q->calc[q->calc_length]=0;
+        }
+        return;
+    }
+    if(key=='+'||key=='-'||key=='*'||key=='/'){
+        if(!q->calc_length){
+            if(q->answer[0]!='E'&&q->answer[0]!='O'){
+                int i=0;
+                while(q->answer[i]&&i<20){q->calc[i]=q->answer[i];i++;}
+                q->calc_length=i;q->calc[i]=0;
+            }
+            if(!q->calc_length&&key=='-'){
+                q->calc[0]='-';q->calc[1]=0;q->calc_length=1;return;
+            }
+        }
+        int last=q->calc_length?q->calc[q->calc_length-1]:0;
+        if((last=='+'||last=='-'||last=='*'||last=='/')&&key!='-'){
+            q->calc[q->calc_length-1]=key;return;
+        }
+        if(q->calc_length<28){
+            q->calc[q->calc_length++]=key;
+            q->calc[q->calc_length]=0;
+        }
+    }
 }
 void q_click(QDesktop *q,int x,int y){
     q->hover_only=0;
@@ -1210,6 +1297,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         return;
     }
     if(ch=='\r'){
+        if(q->active==Q_CALCULATOR){calc_input(q,'=');q->dirty=1;return;}
         if(q->active==Q_TERMINAL){
             if(q->command_length){
                 const char *msg="Unknown command";
@@ -1226,7 +1314,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     if(ch==8){
         if(q->active==Q_NOTES&&q->note_length)q->notes[--q->note_length]=0;
         else if(q->active==Q_TERMINAL&&q->command_length)q->command[--q->command_length]=0;
-        else if(q->active==Q_CALCULATOR&&q->calc_length)q->calc[--q->calc_length]=0;
+        else if(q->active==Q_CALCULATOR)calc_input(q,'B');
         q->dirty=1;return;
     }
     if(ch<32||ch>126)return;
