@@ -329,7 +329,7 @@ static void icon(QDesktop *q,int cx,int cy,int id,uint32_t color){
 static void sprite(QDesktop *q,int cx,int cy,int sprite_id,int size){
     const uint32_t *source=q_icon_pixels_sized((unsigned int)sprite_id,size);
     if(!source||size<1)return;
-    int source_size=(size==40||size==43||size==58)?size:Q_ICON_SIZE;
+    int source_size=(size==25||size==27||size==28||size==40||size==43||size==58)?size:Q_ICON_SIZE;
     int x=cx-size/2,y=cy-size/2;
     int x0=clamp(x,q->clip_left,q->clip_right),x1=clamp(x+size,q->clip_left,q->clip_right);
     int y0=clamp(y,q->clip_top,q->clip_bottom),y1=clamp(y+size,q->clip_top,q->clip_bottom);
