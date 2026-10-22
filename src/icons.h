@@ -25,6 +25,7 @@ enum {
     QI_START,
     QI_COUNT
 };
-#define Q_ICON_SIZE 48
+#define Q_ICON_SIZE 64
 const uint32_t *q_icon_pixels(unsigned int id);
+const uint32_t *q_icon_pixels_sized(unsigned int id,int size);
 #endif
