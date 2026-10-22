@@ -14,6 +14,8 @@ build:
 	mkdir -p build
 build/%.obj: src/%.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
+build/ui.obj: src/ui.c src/ui.h | build
+	$(CC) $(CFLAGS) -DQUARTZIE_FIRMWARE -c $< -o $@
 build/font.c: tools/font.py | build
 	$(PYTHON) tools/font.py $@ $(FONT_REGULAR) $(FONT_MEDIUM)
 build/font.obj: build/font.c src/font.h | build
