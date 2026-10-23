@@ -9,6 +9,11 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Export icon sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: quartzie-icon-sources
+          path: assets/icons.zip
       - name: Install dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lld xorriso ovmf qemu-system-x86 fonts-inter python3-pil
       - name: Build and verify
