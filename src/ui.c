@@ -849,19 +849,14 @@ static void draw_scene(QDesktop *q,int skip){
 }
 static void prepare_window_glass(QDesktop *q,int app,QWindow *w){
     if(q->drag==app&&q->glass_cached_app==app)return;
-    int x0=clamp((w->x-24)&~3,0,q->width);
-    int y0=clamp((w->y-24)&~3,0,q->height);
-    int x1=clamp((w->x+w->w+28+3)&~3,0,q->width);
-    int y1=clamp((w->y+w->h+28+3)&~3,0,q->height);
-    if(x0>=x1||y0>=y1){q->glass_cached_app=-1;return;}
-    int cols=(x1-x0+GLASS_SCALE-1)/GLASS_SCALE;
-    int rows=(y1-y0+GLASS_SCALE-1)/GLASS_SCALE;
+    int cols=(q->width+GLASS_SCALE-1)/GLASS_SCALE;
+    int rows=(q->height+GLASS_SCALE-1)/GLASS_SCALE;
     if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS){q->glass_cached_app=-1;return;}
-    glass_filter(q,x0,y0,cols,rows);
+    glass_filter(q,0,0,cols,rows);
     int left=clamp(w->x,0,q->width),top=clamp(w->y,0,q->height);
     int right=clamp(w->x+w->w,0,q->width),bottom=clamp(w->y+w->h,0,q->height);
     for(int py=top;py<bottom;py++)for(int px=left;px<right;px++)
-        glass_cached_full[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,x0,y0,cols,rows);
+        glass_cached_full[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,0,0,cols,rows);
     glass_cache_cols=cols;glass_cache_rows=rows;q->glass_cached_app=app;
 }
 void q_drag_buffers(QDesktop *q,uint32_t *background){
