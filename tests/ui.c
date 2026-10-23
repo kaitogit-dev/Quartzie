@@ -70,7 +70,15 @@ int main(void){
     check(desktop.active==Q_SETTINGS);
     int theme=desktop.theme;
     QWindow settings=desktop.windows[Q_SETTINGS];
-    q_click(&desktop,settings.x+60,settings.y+85+71);
+    int settings_x=settings.x+32,settings_y=settings.y+60;
+    int settings_sidebar=(settings.w-64)/4;
+    if(settings_sidebar<175)settings_sidebar=175;
+    if(settings_sidebar>220)settings_sidebar=220;
+    int settings_content=settings_x+settings_sidebar+25;
+    int settings_width=settings.w-64-settings_sidebar-25;
+    q_click(&desktop,settings_x+36,settings_y+128+2*43+19);
+    check(desktop.settings_page==2);
+    q_click(&desktop,settings_content+settings_width-43,settings_y+166);
     check(desktop.theme!=theme);
     q_draw(&desktop);shot("build/settings.ppm");
     q_key(&desktop,0,19);check(desktop.quick&&!desktop.notifications);
