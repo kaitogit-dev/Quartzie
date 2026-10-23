@@ -17,6 +17,21 @@ def clean(image):
 
 
 def clean_archive(path, check=False):
+    if check:
+        with zipfile.ZipFile(path) as archive:
+            for filename in archive.namelist():
+                if not filename.endswith(".ico"):
+                    raise ValueError(filename)
+                with Image.open(io.BytesIO(archive.read(filename))) as image:
+                    if set(image.info.get("sizes", [])) != set(SIZES):
+                        raise ValueError(filename)
+                    for size in SIZES:
+                        pixels = image.ico.getimage(size).convert("RGBA").tobytes()
+                        for offset in range(0, len(pixels), 4):
+                            r, g, b, alpha = pixels[offset:offset + 4]
+                            if (0 < alpha < 16) or (alpha == 0 and (r or g or b)):
+                                raise ValueError(filename)
+        return
     contents = {}
     with zipfile.ZipFile(path) as archive:
         for filename in archive.namelist():
@@ -37,8 +52,6 @@ def clean_archive(path, check=False):
             archive.writestr(info, binary, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     data = output.getvalue()
     if path.read_bytes() != data:
-        if check:
-            raise ValueError("Icon archive needs cleanup")
         path.write_bytes(data)
 
 
