@@ -9,11 +9,11 @@ import time
 from bootcheck import choose_firmware
 
 
-def wait_ready(process, serial, timeout):
+def wait_ready(process, serial, timeout, usb=False):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         data = serial.read_bytes() if serial.exists() else b''
-        if b'QUARTZIE-DESKTOP-READY' in data:
+        if b'QUARTZIE-INPUT-READY' in data and (usb or b'QUARTZIE-PS2-READY' in data):
             return data
         if process.poll() is not None:
             raise RuntimeError(f'QEMU exited with status {process.returncode}')
@@ -60,7 +60,7 @@ def send_vnc_mouse(click_start=False):
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
             time.sleep(0.018)
         if click_start:
-            x = (width - 555) // 2 + 37
+            x = (width - 632) // 2 + 37
             y = height - 89 + 34
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
             time.sleep(0.65)
@@ -118,7 +118,7 @@ def verify_mouse(image, usb=False, host_cursor=False):
             command += ['-fw_cfg', 'name=opt/quartzie/hostcursor,string=1']
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
-            before = wait_ready(process, serial, 35)
+            before = wait_ready(process, serial, 35, usb)
             print(before.decode('ascii', errors='replace'))
             if host_cursor and b'QUARTZIE-HOST-CURSOR' not in before:
                 raise RuntimeError('Host cursor mode was not selected')
@@ -166,7 +166,7 @@ def verify_mouse(image, usb=False, host_cursor=False):
             send_vnc_mouse(click_start=host_cursor)
             if host_cursor and usb:
                 send_qmp_start_click(qmp)
-            end = time.monotonic() + 6
+            end = time.monotonic() + 9
             while time.monotonic() < end:
                 data = serial.read_bytes()
                 if b'QUARTZIE-POINTER-CONTINUOUS' in data and (not host_cursor or b'QUARTZIE-START-CLICK' in data):

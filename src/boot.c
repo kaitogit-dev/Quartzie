@@ -284,6 +284,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     clock_ticks_per_us=(tick_after-tick_before)/10000;
     if(!clock_ticks_per_us)clock_ticks_per_us=1;
     uint64_t last_tick=read_clock();
+    serial_text("QUARTZIE-INPUT-READY\n");
     for(;;){
         pointer_sample(0);
         if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
