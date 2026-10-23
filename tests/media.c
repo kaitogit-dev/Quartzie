@@ -11,19 +11,19 @@ static QStorage storage;
 int main(void){
     qfs_init(&storage,0,0);
     CHECK(storage.count==1&&storage.ram_index==0);
-    CHECK(qfs_mkdir(&storage,0,"\\\\Pictures")==0);
-    CHECK(qfs_write(&storage,0,"\\\\Pictures\\\\test.txt","hello",5)==0);
+    CHECK(qfs_mkdir(&storage,0,"\\Pictures")==0);
+    CHECK(qfs_write(&storage,0,"\\Pictures\\test.txt","hello",5)==0);
     QFsEntry entries[QFS_ENTRIES];
-    CHECK(qfs_list(&storage,0,"\\\\",entries,QFS_ENTRIES)==1);
+    CHECK(qfs_list(&storage,0,"\\",entries,QFS_ENTRIES)==1);
     CHECK(entries[0].directory&&strcmp(entries[0].name,"Pictures")==0);
-    CHECK(qfs_list(&storage,0,"\\\\Pictures",entries,QFS_ENTRIES)==1);
+    CHECK(qfs_list(&storage,0,"\\Pictures",entries,QFS_ENTRIES)==1);
     CHECK(strcmp(entries[0].name,"test.txt")==0);
     char text_data[32];size_t text_len=0;
-    CHECK(qfs_read(&storage,0,"\\\\Pictures\\\\test.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==5);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==5);
     CHECK(memcmp(text_data,"hello",5)==0);
-    CHECK(qfs_delete(&storage,0,"\\\\Pictures")!=0);
-    CHECK(qfs_delete(&storage,0,"\\\\Pictures\\\\test.txt")==0);
-    CHECK(qfs_delete(&storage,0,"\\\\Pictures")==0);
+    CHECK(qfs_delete(&storage,0,"\\Pictures")!=0);
+    CHECK(qfs_delete(&storage,0,"\\Pictures\\test.txt")==0);
+    CHECK(qfs_delete(&storage,0,"\\Pictures")==0);
 
     char path[QFS_PATH];
     CHECK(qfs_join(path,sizeof(path),"\\","PHOTO.BMP")==0);
