@@ -848,7 +848,7 @@ static void draw_scene(QDesktop *q,int skip){
     draw_overlays(q);
 }
 static void prepare_window_glass(QDesktop *q,int app,QWindow *w){
-    if(q->drag==app&&q->glass_cached_app==app&&q->drag_cache_valid)return;
+    if(q->drag==app&&q->glass_cached_app==app)return;
     int x0=clamp((w->x-24)&~3,0,q->width);
     int y0=clamp((w->y-24)&~3,0,q->height);
     int x1=clamp((w->x+w->w+28+3)&~3,0,q->width);
