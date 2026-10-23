@@ -53,6 +53,23 @@ int main(void){
             sampled_blur(glass_final,x*4+1,y*4+2,64,64));
         require((c&0xff000000u)==0);
     }
-    puts("PASS: matching packed color math, backdrop blur and rounded edges");
+    int samples[6][2]={{79,70},{82,80},{120,135},{180,99},{220,178},{248,245}};
+    desktop.render_app=Q_FILES;
+    desktop.glass_cached_app=-1;
+    desktop.windows[Q_FILES].x=65;
+    desktop.windows[Q_FILES].y=60;
+    desktop.windows[Q_FILES].w=174;
+    desktop.windows[Q_FILES].h=150;
+    glass_filter(&desktop,0,0,64,64);
+    uint32_t reference[6];
+    for(int i=0;i<6;i++)reference[i]=glass_fetch(glass_final,samples[i][0],samples[i][1],0,0,64,64);
+    prepare_window_glass(&desktop,Q_FILES,&desktop.windows[Q_FILES]);
+    require(glass_cache_cols<64&&glass_cache_rows<64);
+    for(int i=0;i<6;i++){
+        int px=samples[i][0],py=samples[i][1];
+        if(px>=65&&px<239&&py>=60&&py<210)
+            require(desktop.blurred[(size_t)py*256+px]==reference[i]);
+    }
+    puts("PASS: matching packed color math, cropped glass sampling and rounded edges");
     return 0;
 }

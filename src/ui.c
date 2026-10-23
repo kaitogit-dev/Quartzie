@@ -979,7 +979,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y+45,"Quartzie 0.39.2",ink,2);
+        text(q,x,y+45,"Quartzie 0.39.3",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -1068,14 +1068,19 @@ static void draw_scene(QDesktop *q,int skip){
 }
 static void prepare_window_glass(QDesktop *q,int app,QWindow *w){
     if(q->drag==app&&q->glass_cached_app==app)return;
-    int cols=(q->width+GLASS_SCALE-1)/GLASS_SCALE;
-    int rows=(q->height+GLASS_SCALE-1)/GLASS_SCALE;
-    if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS){q->glass_cached_app=-1;return;}
-    glass_filter(q,0,0,cols,rows);
     int left=clamp(w->x,0,q->width),top=clamp(w->y,0,q->height);
     int right=clamp(w->x+w->w,0,q->width),bottom=clamp(w->y+w->h,0,q->height);
+    if(left>=right||top>=bottom){q->glass_cached_app=-1;return;}
+    int sx=clamp((left-24)&~3,0,q->width);
+    int sy=clamp((top-24)&~3,0,q->height);
+    int ex=clamp((right+27)&~3,0,q->width);
+    int ey=clamp((bottom+27)&~3,0,q->height);
+    int cols=(ex-sx+GLASS_SCALE-1)/GLASS_SCALE;
+    int rows=(ey-sy+GLASS_SCALE-1)/GLASS_SCALE;
+    if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS){q->glass_cached_app=-1;return;}
+    glass_filter(q,sx,sy,cols,rows);
     for(int py=top;py<bottom;py++)for(int px=left;px<right;px++)
-        q->blurred[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,0,0,cols,rows);
+        q->blurred[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,sx,sy,cols,rows);
     glass_cache_cols=cols;glass_cache_rows=rows;q->glass_cached_app=app;
 }
 void q_drag_buffers(QDesktop *q,uint32_t *background){

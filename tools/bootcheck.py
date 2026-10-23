@@ -49,6 +49,8 @@ def run_image(image, kind):
                         raise RuntimeError(f'{kind} did not load QSTART.EXE from EFI filesystem: {serial.read_text(errors="replace")}')
                     if b'QUARTZIE-WIN32-READY' not in serial.read_bytes() or b'Quartzie Win32 PE64 app' not in serial.read_bytes():
                         raise RuntimeError(f'{kind} did not execute imported Win32 APIs: {serial.read_text(errors="replace")}')
+                    if serial.read_bytes().find(b'QUARTZIE-WIN32-READY') > serial.read_bytes().find(b'QUARTZIE-DESKTOP-READY'):
+                        raise RuntimeError('Desktop became visible before the Win32 startup work finished')
                     if b'QUARTZIE-MODE-1920x1080' not in serial.read_bytes():
                         raise RuntimeError(f'{kind} did not select 1920x1080: {serial.read_text(errors="replace")}')
                     snapshot = ROOT / 'build' / f'{kind}-screen.ppm'

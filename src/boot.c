@@ -282,8 +282,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_attach_storage(&desktop,native_storage,media_memory,8u*1024u*1024u);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_dock_buffers(&desktop,dock_base_buffer);
-    q_draw(&desktop);present();
-    q_enable_animations(&desktop);
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
     qnt_init(native_kernel);
@@ -295,7 +293,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     if(qwin_execute(native_kernel,bs,app,app_size,serial_char)==QNT_OK)
         serial_text("QUARTZIE-WIN32-READY\n");
     else serial_text("QUARTZIE-WIN32-FAILED\n");
-    serial_text("QUARTZIE-DESKTOP-READY\n");
     EFI_SIMPLE_POINTER_PROTOCOL *mouse=0;
     EFI_ABSOLUTE_POINTER_PROTOCOL *absolute=0;
     bs->LocateProtocol((EFI_GUID *)&MOUSE_GUID,0,(void **)&mouse);
@@ -320,7 +317,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     uint64_t tick_after=read_clock();
     clock_ticks_per_us=(tick_after-tick_before)/10000;
     if(!clock_ticks_per_us)clock_ticks_per_us=1;
+    q_draw(&desktop);
+    present();
+    q_enable_animations(&desktop);
     uint64_t last_tick=read_clock();
+    serial_text("QUARTZIE-DESKTOP-READY\n");
     serial_text("QUARTZIE-INPUT-READY\n");
     for(;;){
         pointer_sample(0);
