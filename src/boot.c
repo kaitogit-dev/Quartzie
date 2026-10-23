@@ -79,7 +79,7 @@ static uint64_t read_clock(void){
 static void pointer_sample(void *context){
     (void)context;
     int moved=0;
-    if(!pointer_ps2_confirmed&&pointer_absolute&&pointer_absolute->GetState&&pointer_absolute->Mode){
+    if(pointer_absolute&&pointer_absolute->GetState&&pointer_absolute->Mode){
         EFI_ABSOLUTE_POINTER_STATE state;
         if(pointer_absolute->GetState(pointer_absolute,&state)==0){
             EFI_ABSOLUTE_POINTER_MODE *mode=pointer_absolute->Mode;
@@ -96,6 +96,7 @@ static void pointer_sample(void *context){
                 if(next_x!=pointer_x||next_y!=pointer_y||next_pressed!=pointer_pressed){
                     pointer_x=next_x;pointer_y=next_y;pointer_pressed=next_pressed;
                     pointer_ps2=0;
+                    pointer_ps2_confirmed=0;
                     moved=1;
                 }
             }
