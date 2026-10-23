@@ -5,7 +5,7 @@
 
 #define CHECK(value) do{if(!(value)){fprintf(stderr,"FAIL icon test at %d\n",__LINE__);exit(1);}}while(0)
 int main(void){
-    CHECK(QI_COUNT==23);
+    CHECK(QI_COUNT==25);
     CHECK(q_icon_pixels(QI_COUNT)==0);
     for(int i=0;i<QI_COUNT;i++){
         const uint32_t *icon=q_icon_pixels((unsigned int)i);
@@ -39,6 +39,8 @@ int main(void){
         }
     }
     CHECK(q_icon_pixels(QI_ABOUT)[32*Q_ICON_SIZE+32]!=q_icon_pixels(QI_CALCULATOR)[32*Q_ICON_SIZE+32]);
+    CHECK(q_icon_pixels(QI_NOTES)[32*Q_ICON_SIZE+32]!=q_icon_pixels(QI_TEXT)[32*Q_ICON_SIZE+32]);
+    CHECK(q_icon_pixels(QI_STORE)[32*Q_ICON_SIZE+32]!=q_icon_pixels(QI_FILE_EXPLORER)[32*Q_ICON_SIZE+32]);
     CHECK((q_icon_pixels(QI_ABOUT)[32*Q_ICON_SIZE+32]>>24)>128);
     CHECK((q_icon_pixels(QI_CALCULATOR)[20*Q_ICON_SIZE+32]>>24)>128);
     CHECK(q_icon_pixels_sized(QI_COUNT,40)==0);

@@ -49,7 +49,7 @@ int main(void){
     CHECK(ui.menu&&ui.active!=Q_CALCULATOR);
     key(8);key(8);
     CHECK(ui.menu_search_length==0);
-    q_click(&ui,(1024-510)/2+26+159*1+55,768-607+112+50);
+    q_click(&ui,(1024-510)/2+26+116*1+47,768-607+112+50);
     CHECK(ui.active==Q_NOTES);
     puts("PASS: searchable launcher, typed calculator history/editing, and F10-F12 window controls");
     return 0;

@@ -46,7 +46,7 @@ int main(void){
     q_draw(&desktop);check(desktop.frame_count==1&&!desktop.dirty);
     shot("build/desktop.ppm");
     q_draw(&desktop);check(desktop.frame_count==1);
-    int left=(1280-555)/2,top=720-89;
+    int left=(1280-632)/2,top=720-89;
     check(q_dock_hit(&desktop,left+38,top+28)==10);
     q_click(&desktop,left+38,top+28);check(desktop.menu&&!desktop.notifications);
     q_draw(&desktop);shot("build/start.ppm");
@@ -80,8 +80,8 @@ int main(void){
     check(strcmp(desktop.answer,"15")==0);
     q_draw(&desktop);shot("build/calculator.ppm");
     for(int i=0;i<Q_APPS;i++){
-        int tx=(1280-510)/2+26+(i%3)*159+55;
-        int ty=720-607+112+(i/3)*144+60;
+        int tx=(1280-510)/2+26+(i%4)*116+47;
+        int ty=720-607+112+(i/4)*144+60;
         q_click(&desktop,left+38,top+28);
         check(desktop.menu);
         q_click(&desktop,tx,ty);

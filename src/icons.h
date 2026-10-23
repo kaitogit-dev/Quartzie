@@ -25,6 +25,8 @@ enum {
     QI_START,
     QI_ABOUT,
     QI_CALCULATOR,
+    QI_NOTES,
+    QI_STORE,
     QI_COUNT
 };
 #define Q_ICON_SIZE 64

@@ -5,7 +5,7 @@
 #include <string.h>
 static uint32_t canvas[1920*1080],background[1920*1080],blur[1920*1080],drag[1920*1080];
 static QDesktop ui;
-static uint32_t dock_backdrop[659*137];
+static uint32_t dock_backdrop[736*137];
 static uint32_t reference_pixels[1920*1080],reference_blur[1920*1080];
 static void same_as_full(void){
     QDesktop reference=ui;
@@ -25,8 +25,8 @@ int main(void){
     q_drag_buffers(&ui,drag);
     q_dock_buffers(&ui,dock_backdrop);
     CHECK(ui.width==1920&&ui.height==1080);
-    int start_x=(ui.width-555)/2+37,start_y=ui.height-89+35;
-    int files_x=(ui.width-555)/2+107;
+    int start_x=(ui.width-632)/2+37,start_y=ui.height-89+35;
+    int files_x=(ui.width-632)/2+107;
     CHECK(q_dock_hit(&ui,start_x,start_y)==10);
     CHECK(q_dock_hit(&ui,files_x,start_y)==Q_FILES);
     q_move(&ui,start_x,start_y);
@@ -61,7 +61,7 @@ int main(void){
     q_click(&ui,min_x,min_y);
     CHECK(ui.windows[Q_NOTES].open&&ui.windows[Q_NOTES].minimized&&ui.active!=Q_NOTES);
     q_draw(&ui);
-    int dock_left=(ui.width-555)/2,dock_top=ui.height-89;
+    int dock_left=(ui.width-632)/2,dock_top=ui.height-89;
     q_click(&ui,dock_left+77+77+30,dock_top+32);
     CHECK(ui.windows[Q_NOTES].open&&!ui.windows[Q_NOTES].minimized&&ui.active==Q_NOTES);
     q_draw(&ui);

@@ -231,7 +231,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     wallpaper_buffer=efi_alloc(bs,frame_bytes);
     frosted_buffer=efi_alloc(bs,frame_bytes);
     drag_base_buffer=efi_alloc(bs,frame_bytes);
-    dock_base_buffer=efi_alloc(bs,659u*137u*sizeof(uint32_t));
+    dock_base_buffer=efi_alloc(bs,736u*137u*sizeof(uint32_t));
     uint32_t *ui_storage=efi_alloc(bs,(size_t)Q_UI_SCRATCH_PIXELS*sizeof(uint32_t));
     native_kernel=efi_alloc(bs,sizeof(*native_kernel));
     executable_buffer=efi_alloc(bs,Q_EXECUTABLE_CAPACITY);

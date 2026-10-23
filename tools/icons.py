@@ -28,7 +28,7 @@ def build(archive, output):
         pathlib.Path("assets/start-icon.png.base64").read_text().strip()
     ))).convert("RGBA")
     sources.append(start.resize((64, 64), Image.Resampling.LANCZOS))
-    for name in ("about-icon", "calculator-icon"):
+    for name in ("about-icon", "calculator-icon", "notes-icon", "store-icon"):
         raw = base64.b64decode(pathlib.Path(f"assets/{name}.png.base64").read_text().strip())
         custom = Image.open(BytesIO(raw)).convert("RGBA")
         if custom.size != (64, 64):

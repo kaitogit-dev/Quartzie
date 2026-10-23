@@ -7,7 +7,7 @@
 
 static uint32_t scene[1280*720],wall[1280*720],blur[1280*720];
 static uint32_t reference[1280*720],reference_blur[1280*720];
-static uint32_t dock_cache[659*137];
+static uint32_t dock_cache[736*137];
 static QDesktop ui;
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL Start tween line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 
@@ -38,7 +38,7 @@ int main(void){
     q_draw(&ui);
     CHECK(ui.dock_cache_valid);
     CHECK(q_icon_pixels(QI_START)!=0);
-    int x=(ui.width-555)/2+37,y=ui.height-89+36;
+    int x=(ui.width-632)/2+37,y=ui.height-89+36;
     CHECK(q_dock_hit(&ui,x,y)==10);
     CHECK(!ui.start_hover&&!ui.start_lift);
     q_enable_animations(&ui);
@@ -66,7 +66,7 @@ int main(void){
     CHECK(ui.menu);
     int mx=(ui.width-510)/2,my=ui.height-607;
     for(int i=0;i<Q_APPS;i++){
-        int bx=mx+26+(i%3)*159,by=my+112+(i/3)*144;
+        int bx=mx+26+(i%4)*116,by=my+112+(i/4)*144;
         q_move(&ui,bx+70,by+49);
         CHECK(ui.menu_hover==i);
         q_draw(&ui);

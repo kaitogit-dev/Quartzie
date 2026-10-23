@@ -4,13 +4,14 @@
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+4*Q_MAX_W*Q_MAX_H)
-#define Q_APPS 6
+#define Q_APPS 7
 #define Q_FILES 0
 #define Q_NOTES 1
 #define Q_TERMINAL 2
 #define Q_CALCULATOR 3
 #define Q_SETTINGS 4
 #define Q_ABOUT 5
+#define Q_STORE 6
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;

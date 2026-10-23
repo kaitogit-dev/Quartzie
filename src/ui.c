@@ -213,6 +213,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS)return;
     if(!cached)glass_filter(q,sx,sy,cols,rows);
     int bw=q->width,dark=q->theme;
+    int texture=radius>=16&&w>=150&&h>=60;
     uint32_t highlight=colors(q)->highlight,rim_color=colors(q)->rim;
     int top_alpha=dark?28:100,edge_alpha=dark?14:47;
     uint32_t lower_color=dark?0x050b14u:0x557099u;
@@ -229,6 +230,11 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
             size_t at=row+px;
             uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
             uint32_t c=blend(backdrop,tint,material);
+            if(texture){
+                uint32_t noise=(uint32_t)px*0x9e3779b1u^(uint32_t)py*0x85ebca6bu;
+                noise^=noise>>15;
+                c=blend(c,(noise&1u)?0xffffffu:0x000000u,(int)((noise>>5)&3u));
+            }
             int rim=0;
             if(radius){
                 int inner=round_cover(dx-1,dy-1,w-2,h-2,radius>1?radius-1:0);
@@ -243,7 +249,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
     }
 }
 static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alpha){
-    soft_shadow(q,x,y,w,h,r,32,40);
+    soft_shadow(q,x,y,w,h,r,32,46);
     surface(q,x,y,w,h,r,tint,alpha);
 }
 static void string_limit(QDesktop *q,int x,int baseline,const char *s,uint32_t color,int style,int max_width,int max_lines){
@@ -372,19 +378,20 @@ static void sprite(QDesktop *q,int cx,int cy,int sprite_id,int size){
 static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
     int icon_id=-1;
     if(app==Q_FILES)icon_id=QI_FILE_EXPLORER;
-    else if(app==Q_NOTES)icon_id=QI_TEXT;
+    else if(app==Q_NOTES)icon_id=QI_NOTES;
     else if(app==Q_TERMINAL)icon_id=QI_CMD;
     else if(app==Q_SETTINGS)icon_id=QI_SETTINGS;
     else if(app==Q_CALCULATOR)icon_id=QI_CALCULATOR;
     else if(app==Q_ABOUT)icon_id=QI_ABOUT;
+    else if(app==Q_STORE)icon_id=QI_STORE;
     if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
     else icon(q,cx,cy,app,color);
 }
-static int dock_x(QDesktop *q){return (q->width-555)/2;}
+static int dock_x(QDesktop *q){return (q->width-632)/2;}
 static int dock_y(QDesktop *q){return q->height-89;}
 static int menu_x(QDesktop *q){return (q->width-510)/2;}
 static int menu_y(QDesktop *q){return clamp(q->height-607,54,q->height-100);}
-static const char *names[Q_APPS]={"Files","Notes","Terminal","Calculator","Settings","About"};
+static const char *names[Q_APPS]={"Files","Notes","Terminal","Calculator","Settings","About","Store"};
 static int menu_match(QDesktop *q,int app){
     if(!q->menu_search_length)return 1;
     const char *name=names[app];
@@ -572,7 +579,7 @@ int q_dock_hit(QDesktop *q,int x,int y){
 }
 static void draw_dock(QDesktop *q){
     int x=dock_x(q),y=dock_y(q);
-    pane(q,x,y,555,70,25,colors(q)->dock,q->theme?190:112);
+    pane(q,x,y,632,70,25,colors(q)->dock,q->theme?205:133);
     int start_lift=q->animations_enabled?q->start_lift*5/256:0;
     if(q->menu||q->start_hover||q->start_lift>0)
         surface(q,x+7,y+7-start_lift,60,54,17,colors(q)->hover,q->theme?174:144);
@@ -615,14 +622,14 @@ static void draw_menu(QDesktop *q){
         int app=menu_app_at(q,slot);
         if(app<0)break;
         matches++;
-        int bx=x+26+(slot%3)*159,by=y+112+(slot/3)*144;
+        int bx=x+26+(slot%4)*116,by=y+112+(slot/4)*144;
         int lift=q->animations_enabled?q->menu_lift[app]*6/256:0;
         int selected=q->menu_hover==app||q->menu_lift[app]>0;
-        surface(q,bx,by-lift,141,126,19,selected?colors(q)->selected:inner_material(q),selected?(q->theme?190:173):(q->theme?168:128));
-        if(selected)thin_rule(q,bx+18,by+117-lift,105,q->theme?74:112);
-        app_icon(q,bx+70,by+49-lift,app,58,q->theme?0xecfaff:0xffffff);
+        surface(q,bx,by-lift,107,126,19,selected?colors(q)->selected:inner_material(q),selected?(q->theme?190:173):(q->theme?168:128));
+        if(selected)thin_rule(q,bx+14,by+117-lift,79,q->theme?74:112);
+        app_icon(q,bx+53,by+49-lift,app,58,q->theme?0xecfaff:0xffffff);
         int width=text_width(names[app],1);
-        text(q,bx+(141-width)/2,by+104-lift,names[app],foreground(q),1);
+        text(q,bx+(107-width)/2,by+104-lift,names[app],foreground(q),1);
     }
     if(!matches)text(q,x+42,y+166,"No matching applications",secondary(q),1);
 }
@@ -740,8 +747,20 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             circular(q,bx,y+198,15,(uint32_t[]){0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85}[i],255);
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
+    }else if(app==Q_STORE){
+        text(q,x,y+5,"Quartzie Store",ink,2);
+        text(q,x,y+40,"Library",muted,0);
+        const int entries[4]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL};
+        for(int i=0;i<4;i++){
+            int pitch=w->w>650?230:190;
+            int bx=x+(i%2)*pitch,by=y+112+(i/2)*118;
+            surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
+            app_icon(q,bx+39,by+39,entries[i],43,ink);
+            text(q,bx+72,by+40,names[entries[i]],ink,0);
+            text(q,bx+72,by+69,"Open",accent(q),0);
+        }
     }else{
-        text(q,x,y,"Quartzie 0.38.17",ink,2);
+        text(q,x,y,"Quartzie 0.38.18",ink,2);
         text(q,x,y+54,"A space to create.",ink,1);
         thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
         text(q,x,y+118,"Keyboard",muted,0);
@@ -752,16 +771,18 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y+262,"Esc  Close overlays",ink,0);
     }
 }
+static void prepare_window_glass(QDesktop *q,int app,QWindow *w);
 static void draw_window(QDesktop *q,int app){
     QWindow *w=&q->windows[app];
     if(!w->open||w->minimized)return;
     int previous_render_app=q->render_app;
     q->render_app=app;
+    prepare_window_glass(q,app,w);
     if(w->maximized)surface(q,w->x,w->y,w->w,w->h,0,material(q),q->theme?209:149);
     else pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?209:149);
     thin_rule(q,w->x+23,w->y+56,w->w-46,28);
     app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
-    text(q,w->x+61,w->y+36,names[app],foreground(q),1);
+    text(q,w->x+61,w->y+36,app==Q_STORE?"Quartzie Store":names[app],foreground(q),1);
     surface(q,w->x+w->w-157,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-108,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
     surface(q,w->x+w->w-59,w->y+13,36,29,10,colors(q)->close_button,q->theme?185:166);
@@ -810,8 +831,8 @@ static void cache_dock_background(QDesktop *q){
     int x=dock_x(q)-52,y=dock_y(q)-53;
     for(int row=0;row<137;row++){
         size_t src=(size_t)(y+row)*q->width+x;
-        size_t dst=(size_t)row*659;
-        for(int col=0;col<659;col++)q->dock_background[dst+col]=q->pixels[src+col];
+        size_t dst=(size_t)row*736;
+        for(int col=0;col<736;col++)q->dock_background[dst+col]=q->pixels[src+col];
     }
     q->dock_cache_valid=1;
 }
@@ -825,6 +846,23 @@ static void draw_overlays(QDesktop *q){
 static void draw_scene(QDesktop *q,int skip){
     draw_base(q,skip);
     draw_overlays(q);
+}
+static void prepare_window_glass(QDesktop *q,int app,QWindow *w){
+    if(q->drag==app&&q->glass_cached_app==app&&q->drag_cache_valid)return;
+    int x0=clamp((w->x-24)&~3,0,q->width);
+    int y0=clamp((w->y-24)&~3,0,q->height);
+    int x1=clamp((w->x+w->w+28+3)&~3,0,q->width);
+    int y1=clamp((w->y+w->h+28+3)&~3,0,q->height);
+    if(x0>=x1||y0>=y1){q->glass_cached_app=-1;return;}
+    int cols=(x1-x0+GLASS_SCALE-1)/GLASS_SCALE;
+    int rows=(y1-y0+GLASS_SCALE-1)/GLASS_SCALE;
+    if(cols<1||rows<1||cols>GLASS_SIDE||rows>GLASS_ROWS){q->glass_cached_app=-1;return;}
+    glass_filter(q,x0,y0,cols,rows);
+    int left=clamp(w->x,0,q->width),top=clamp(w->y,0,q->height);
+    int right=clamp(w->x+w->w,0,q->width),bottom=clamp(w->y+w->h,0,q->height);
+    for(int py=top;py<bottom;py++)for(int px=left;px<right;px++)
+        glass_cached_full[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,x0,y0,cols,rows);
+    glass_cache_cols=cols;glass_cache_rows=rows;q->glass_cached_app=app;
 }
 void q_drag_buffers(QDesktop *q,uint32_t *background){
     q->drag_base=background;
@@ -860,7 +898,7 @@ static void drag_redraw(QDesktop *q){
     int x1=clamp((w->x>q->drag_prev_x?w->x:q->drag_prev_x)+w->w+pad,0,q->width);
     int y1=clamp((w->y>q->drag_prev_y?w->y:q->drag_prev_y)+w->h+pad,0,q->height);
     int dx=dock_x(q)-52,dy=dock_y(q)-53;
-    int dx2=dock_x(q)+607,dy2=dock_y(q)+84;
+    int dx2=dock_x(q)+684,dy2=dock_y(q)+84;
     if(x0<dx2&&x1>dx&&y0<dy2&&y1>dy){
         x0=clamp(x0<dx-32?x0:dx-32,0,q->width);
         x1=clamp(x1>dx2+32?x1:dx2+32,0,q->width);
@@ -1039,7 +1077,7 @@ void q_draw(QDesktop *q){
         else drag_capture(q);
     }else if(q->hover_only){
         q->drag_cache_valid=0;
-        int x0=dock_x(q)-52,x1=dock_x(q)+607;
+        int x0=dock_x(q)-52,x1=dock_x(q)+684;
         int y0=dock_y(q)-53,y1=dock_y(q)+84;
         if(q->menu){
             int mx=menu_x(q),my=menu_y(q);
@@ -1051,8 +1089,8 @@ void q_draw(QDesktop *q){
             int bx=dock_x(q)-52,by=dock_y(q)-53;
             for(int row=0;row<137;row++){
                 size_t dst=(size_t)(by+row)*q->width+bx;
-                size_t src=(size_t)row*659;
-                for(int col=0;col<659;col++)q->pixels[dst+col]=q->dock_background[src+col];
+                size_t src=(size_t)row*736;
+                for(int col=0;col<736;col++)q->pixels[dst+col]=q->dock_background[src+col];
             }
             draw_dock(q);
         }else{
@@ -1199,7 +1237,7 @@ void q_click(QDesktop *q,int x,int y){
             for(int slot=0;slot<Q_APPS;slot++){
                 int app=menu_app_at(q,slot);
                 if(app<0)break;
-                if(hit(x,y,mx+26+slot%3*159,my+112+slot/3*144,141,126)){q_open(q,app);return;}
+                if(hit(x,y,mx+26+slot%4*116,my+112+slot/4*144,107,126)){q_open(q,app);return;}
             }
             return;
         }
@@ -1236,7 +1274,11 @@ void q_click(QDesktop *q,int x,int y){
             return;
         }
         int bx=w->x+32,by=w->y+60;
-        if(chosen==Q_SETTINGS){
+        if(chosen==Q_STORE){
+            for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+112+(i/2)*118,174,102)){
+                q_open(q,(int[]){Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL}[i]);return;
+            }
+        }else if(chosen==Q_SETTINGS){
             if(hit(x,y,bx,by+36,w->w-64,91)){q_set_theme(q,!q->theme);}
             else if(hit(x,y,bx,by+143,w->w-64,97)){
                 if(x>=bx+160&&x<=bx+360)q->accent=clamp((x-(bx+150))/50,0,3);
@@ -1302,7 +1344,7 @@ void q_move(QDesktop *q,int x,int y){
         for(int slot=0;slot<Q_APPS;slot++){
             int app=menu_app_at(q,slot);
             if(app<0)break;
-            if(hit(q->mouse_x,q->mouse_y,mx+26+(slot%3)*159,my+112+(slot/3)*144,141,126)){
+            if(hit(q->mouse_x,q->mouse_y,mx+26+(slot%4)*116,my+112+(slot/4)*144,107,126)){
                 menu_hover=app;break;
             }
         }

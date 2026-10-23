@@ -4,7 +4,7 @@
 #include <string.h>
 #include "../src/ui.c"
 static QDesktop desktop;
-static uint32_t framebuffer[1024*768],wall[1024*768],work[1024*768],dock_cache[659*137];
+static uint32_t framebuffer[1024*768],wall[1024*768],work[1024*768],dock_cache[736*137];
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL dark theme line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static int luminance(uint32_t color){return (int)(color>>16&255)*3+(int)(color>>8&255)*6+(int)(color&255);}
 static uint64_t wall_checksum(void){
@@ -18,7 +18,7 @@ int main(void){
     uint64_t original=wall_checksum();
     q_draw(&desktop);
     CHECK(desktop.dock_cache_valid);
-    int dx=(desktop.width-555)/2+85,dy=desktop.height-89+16;
+    int dx=(desktop.width-632)/2+85,dy=desktop.height-89+16;
     uint32_t dock_light=desktop.pixels[dy*1024+dx];
     q_open(&desktop,Q_SETTINGS);
     q_draw(&desktop);
