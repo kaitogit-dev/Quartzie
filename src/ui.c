@@ -1081,8 +1081,10 @@ void q_draw(QDesktop *q){
         int y0=dock_y(q)-53,y1=dock_y(q)+84;
         if(q->menu){
             int mx=menu_x(q),my=menu_y(q);
-            x0=mx-42;x1=mx+552;
-            y0=my-42;y1=dock_y(q)+84;
+            x0=clamp(x0<mx-42?x0:mx-42,0,q->width);
+            x1=clamp(x1>mx+552?x1:mx+552,0,q->width);
+            y0=clamp(y0<my-42?y0:my-42,0,q->height);
+            y1=clamp(dock_y(q)+84,0,q->height);
         }
         clip_region(q,x0,y0,x1,y1);
         if(q->dock_cache_valid&&q->dock_background&&!q->menu){
