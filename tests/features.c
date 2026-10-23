@@ -51,6 +51,16 @@ int main(void){
     CHECK(ui.menu_search_length==0);
     q_click(&ui,(1024-510)/2+26+116*1+47,768-607+112+50);
     CHECK(ui.active==Q_NOTES);
-    puts("PASS: searchable launcher, typed calculator history/editing, and F10-F12 window controls");
+    q_open(&ui,Q_STORE);
+    CHECK(ui.active==Q_STORE&&ui.windows[Q_STORE].open);
+    q_draw(&ui);
+    QWindow *store=&ui.windows[Q_STORE];
+    q_click(&ui,store->x+32+87,store->y+60+78+51);
+    CHECK(ui.active==Q_NOTES&&ui.windows[Q_NOTES].open);
+    q_open(&ui,Q_STORE);
+    q_draw(&ui);
+    q_click(&ui,store->x+32+230+87,store->y+60+78+51);
+    CHECK(ui.active==Q_CALCULATOR&&ui.windows[Q_CALCULATOR].open);
+    puts("PASS: app launcher, calculator editing, Store cards, and F10-F12 window controls");
     return 0;
 }

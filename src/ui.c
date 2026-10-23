@@ -714,7 +714,6 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x+22,y+162,">",0x88d8e5,1);
         text(q,x+48,y+162,q->command,0xf8feff,1);
     }else if(app==Q_CALCULATOR){
-        text(q,x,y,"Calculator",ink,2);
         surface(q,x,y+27,322,81,16,inner_material(q),q->theme?111:144);
         const char *output=q->calc_length?q->calc:q->answer;
         string_limit(q,x+22,y+80,output,ink,2,285,1);
@@ -746,27 +745,26 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
         }
     }else if(app==Q_STORE){
-        text(q,x,y+5,"Quartzie Store",ink,2);
-        text(q,x,y+40,"Library",muted,0);
+        text(q,x,y+47,"Library",muted,0);
         const int entries[4]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL};
         for(int i=0;i<4;i++){
             int pitch=w->w>650?230:190;
-            int bx=x+(i%2)*pitch,by=y+112+(i/2)*118;
+            int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
             surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
             app_icon(q,bx+39,by+39,entries[i],43,ink);
             text(q,bx+72,by+40,names[entries[i]],ink,0);
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y,"Quartzie 0.38.18",ink,2);
-        text(q,x,y+54,"A space to create.",ink,1);
-        thin_rule(q,x,y+79,clamp(cw-28,1,cw),55);
-        text(q,x,y+118,"Keyboard",muted,0);
-        text(q,x,y+150,"F1-F6  Open applications",ink,0);
-        text(q,x,y+178,"F7  Applications",ink,0);
-        text(q,x,y+206,"F8  Notifications",ink,0);
-        text(q,x,y+234,"F9  Control center",ink,0);
-        text(q,x,y+262,"Esc  Close overlays",ink,0);
+        text(q,x,y+45,"Quartzie 0.38.19",ink,2);
+        text(q,x,y+97,"A space to create.",ink,1);
+        thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
+        text(q,x,y+160,"Keyboard",muted,0);
+        text(q,x,y+192,"F1-F6  Open applications",ink,0);
+        text(q,x,y+220,"F7  Applications",ink,0);
+        text(q,x,y+248,"F8  Notifications",ink,0);
+        text(q,x,y+276,"F9  Control center",ink,0);
+        text(q,x,y+304,"Esc  Close overlays",ink,0);
     }
 }
 static void prepare_window_glass(QDesktop *q,int app,QWindow *w);
@@ -1270,7 +1268,7 @@ void q_click(QDesktop *q,int x,int y){
         }
         int bx=w->x+32,by=w->y+60;
         if(chosen==Q_STORE){
-            for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+112+(i/2)*118,174,102)){
+            for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+78+(i/2)*118,174,102)){
                 q_open(q,(int[]){Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL}[i]);return;
             }
         }else if(chosen==Q_SETTINGS){
