@@ -15,6 +15,7 @@ static QDesktop desktop;
 static QNtKernel *native_kernel;
 static QStorage *native_storage;
 static uint8_t *media_memory;
+static uint8_t *codec_memory;
 static void speaker_out(unsigned short port,unsigned char value){
     __asm__ volatile("outb %0,%1"::"a"(value),"Nd"(port));
 }
@@ -270,14 +271,16 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     executable_buffer=efi_alloc(bs,Q_EXECUTABLE_CAPACITY);
     native_storage=efi_alloc(bs,sizeof(*native_storage));
     media_memory=efi_alloc(bs,8u*1024u*1024u);
+    codec_memory=efi_alloc(bs,48u*1024u*1024u);
     if(!backbuffer||!wallpaper_buffer||!frosted_buffer||!drag_base_buffer||
-       !dock_base_buffer||!ui_storage||!native_kernel||!executable_buffer||!native_storage||!media_memory){
+       !dock_base_buffer||!ui_storage||!native_kernel||!executable_buffer||!native_storage||!media_memory||!codec_memory){
         serial_text("QUARTZIE-MEMORY-FAILED\n");
         return 6;
     }
     q_ui_set_scratch(ui_storage);
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
+    qc_memory(codec_memory,48u*1024u*1024u);
     qfs_init(native_storage,image,bs);
     q_attach_storage(&desktop,native_storage,media_memory,8u*1024u*1024u);
     q_drag_buffers(&desktop,drag_base_buffer);

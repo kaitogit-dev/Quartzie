@@ -760,7 +760,11 @@ static void files_open(QDesktop *q,int index){
         q->note_volume=q->file_volume;
         q_open(q,Q_NOTES);return;
     }
-    if(file_suffix(entry->name,".bmp")||file_suffix(entry->name,".wav")||file_suffix(entry->name,".avi")){
+    if(file_suffix(entry->name,".bmp")||file_suffix(entry->name,".png")||
+       file_suffix(entry->name,".jpg")||file_suffix(entry->name,".jpeg")||
+       file_suffix(entry->name,".gif")||file_suffix(entry->name,".tga")||
+       file_suffix(entry->name,".wav")||file_suffix(entry->name,".mp3")||
+       file_suffix(entry->name,".avi")){
         size_t length=0;
         if(!q->media_buffer||!q->storage||qfs_read(q->storage,q->file_volume,path,q->media_buffer,q->media_capacity,&length)!=0){
             files_message(q,"Media file exceeds memory or cannot be opened");return;
@@ -859,8 +863,11 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         }
         if(row>0)thin_rule(q,x+47,ry,cw-65,q->theme?24:42);
         sprite(q,x+23,ry+18,entry->directory?QI_FOLDER:
-            file_suffix(entry->name,".bmp")?QI_IMAGE:
-            (file_suffix(entry->name,".wav")||file_suffix(entry->name,".avi"))?QI_MEDIA_PLAYER:QI_TEXT,28);
+            (file_suffix(entry->name,".bmp")||file_suffix(entry->name,".png")||
+             file_suffix(entry->name,".jpg")||file_suffix(entry->name,".jpeg")||
+             file_suffix(entry->name,".gif")||file_suffix(entry->name,".tga"))?QI_IMAGE:
+            (file_suffix(entry->name,".wav")||file_suffix(entry->name,".mp3")||
+             file_suffix(entry->name,".avi"))?QI_MEDIA_PLAYER:QI_TEXT,28);
         string_limit(q,x+46,ry+23,entry->name,ink,0,cw-152,1);
         if(entry->directory)text(q,x+cw-98,ry+23,"Folder",muted,0);
         else{
@@ -1038,7 +1045,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.39.4",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.0",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -1266,7 +1273,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y+45,"Quartzie 0.39.4",ink,2);
+        text(q,x,y+45,"Quartzie 0.40.0",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);

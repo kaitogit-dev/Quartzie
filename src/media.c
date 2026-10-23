@@ -1,4 +1,5 @@
 #include "media.h"
+#include "codecs.h"
 static uint16_t u16(const uint8_t *p){return (uint16_t)p[0]|((uint16_t)p[1]<<8);}
 static uint32_t u32(const uint8_t *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
 static int32_t s32(const uint8_t *p){return (int32_t)u32(p);}
@@ -74,8 +75,22 @@ int qm_open(QMedia *m,const void *bytes,size_t length){
     if(!m||!bytes||length<12)return -1;
     clear(m);m->data=(const uint8_t *)bytes;m->length=length;
     const uint8_t *d=m->data;
-    if(d[0]=='B'&&d[1]=='M')return image_info(m,d,length);
-    if(!four(d,"RIFF"))return -1;
+    if(d[0]=='B'&&d[1]=='M'&&image_info(m,d,length)==0)return 0;
+    if(!four(d,"RIFF")){
+        uint32_t *pixels=0;int width=0,height=0;
+        if(qc_image(d,length,&pixels,&width,&height)==0){
+            m->kind=QM_IMAGE;m->width=width;m->height=height;
+            m->rgba=(const uint8_t *)(const void *)pixels;m->decoded_image=1;m->frame_count=1;
+            return 0;
+        }
+        if((four(d,"ID3")||(d[0]==0xff&&(d[1]&0xe0)==0xe0))&&
+            qc_mp3(d,length,(uint8_t **)&m->pcm8,&m->pcm_count,&m->sample_rate)==0){
+            m->kind=QM_AUDIO;m->channels=1;m->sample_bits=8;
+            m->audio_size=(uint32_t)m->pcm_count;
+            return 0;
+        }
+        return -1;
+    }
     if(four(d+8,"WAVE"))return wav_info(m);
     if(!four(d+8,"AVI "))return -1;
     if(avi_chunks(m,12,length,0)!=0||m->width<1||m->height<1||m->width>1920||m->height>1080||(m->bpp!=24&&m->bpp!=32)||m->frame_count<1)return -1;
@@ -86,6 +101,14 @@ int qm_open(QMedia *m,const void *bytes,size_t length){
 }
 uint32_t qm_pixel(const QMedia *m,int x,int y){
     if(!m||(m->kind!=QM_IMAGE&&m->kind!=QM_VIDEO)||x<0||y<0||x>=m->width||y>=m->height)return 0;
+    if(m->decoded_image&&m->rgba){
+        size_t p=((size_t)y*(size_t)m->width+(size_t)x)*4;
+        uint32_t alpha=m->rgba[p+3];
+        uint32_t red=(m->rgba[p]*alpha+16u*(255u-alpha))/255u;
+        uint32_t green=(m->rgba[p+1]*alpha+24u*(255u-alpha))/255u;
+        uint32_t blue=(m->rgba[p+2]*alpha+39u*(255u-alpha))/255u;
+        return (red<<16)|(green<<8)|blue;
+    }
     int stride=(int)((((uint64_t)m->width*m->bpp+31)/32)*4);
     int row=m->topdown?y:m->height-y-1;
     size_t base=m->kind==QM_VIDEO?m->frame_start[m->frame]:m->pixels_offset;
@@ -95,10 +118,12 @@ uint32_t qm_pixel(const QMedia *m,int x,int y){
     return ((uint32_t)p[2]<<16)|((uint32_t)p[1]<<8)|p[0];
 }
 uint64_t qm_audio_count(const QMedia *m){
+    if(m&&m->pcm8)return m->pcm_count;
     return m&&m->kind==QM_AUDIO?m->audio_size/(m->channels*(m->sample_bits/8)):0;
 }
 uint8_t qm_audio_sample(const QMedia *m,uint64_t n){
     if(!m||m->kind!=QM_AUDIO||n>=qm_audio_count(m))return 128;
+    if(m->pcm8)return m->pcm8[n];
     size_t offset=m->audio_start+(size_t)(n*m->channels*(m->sample_bits/8));
     int value=0;
     for(uint32_t c=0;c<m->channels;c++){

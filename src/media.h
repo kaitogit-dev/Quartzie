@@ -2,6 +2,7 @@
 #define QUARTZIE_MEDIA_H
 #include <stddef.h>
 #include <stdint.h>
+#include "codecs.h"
 #define QM_FRAMES 192
 enum {QM_NONE=0,QM_IMAGE=1,QM_AUDIO=2,QM_VIDEO=3};
 typedef struct {
@@ -11,6 +12,10 @@ typedef struct {
     int frame_count,fps,playing,frame;
     uint32_t frame_start[QM_FRAMES],frame_size[QM_FRAMES];
     size_t pixels_offset;
+    const uint8_t *rgba;
+    const uint8_t *pcm8;
+    int decoded_image;
+    size_t pcm_count;
     uint32_t sample_rate,channels,sample_bits,audio_start,audio_size;
     uint64_t elapsed_us;
 } QMedia;

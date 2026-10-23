@@ -45,7 +45,7 @@ Drag a window title bar to move it, or to the top edge to maximize. Drag a maxim
 
 Files uses single-click selection and double-click opening, with Enter opening the selected entry. Files enumerates UEFI-readable FAT volumes, including the boot volume and attached FAT-formatted disks. A writable Home RAM volume is also available for files and folders during the current session; its contents reset after reboot. Browse folders, create text files or directories, delete entries, and open text files in Notes. Notes saves to the selected writable file.
 
-Photos opens uncompressed 24/32-bit BMP images. Media Player supports PCM WAV (8/16-bit mono or stereo) and uncompressed AVI video with 24/32-bit BGR frames. WAV playback uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. Compressed MP3, H.264 and MP4 are not supported by the native decoder.
+Photos opens BMP, PNG, JPEG, GIF (first frame), and TGA. Media Player supports MP3, PCM WAV (8/16-bit mono or stereo), and uncompressed AVI video with 24/32-bit BGR frames. Audio uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. MP4, H.264, and AAC remain unsupported.
 
 The boot volume includes `PHOTO.BMP`, `SOUND.WAV`, and `CLIP.AVI` as viewer test files. Photos and Media Player are available from Start and are not pinned to the dock. To keep files across ISO boots, attach a separate writable FAT-formatted disk.
 
@@ -66,4 +66,4 @@ The loader implements relocation, import resolution by name and ordinal, and PE 
 - `tests/` — native behavior and rendering tests
 - `assets/` — original icon and cursor artwork
 
-The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`.
+The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`. Media codec notices are in `LICENSES/media-codecs.txt`.
