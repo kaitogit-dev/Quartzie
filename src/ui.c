@@ -428,7 +428,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     for(size_t n=0;n<sizeof(*q);n++)data[n]=0;
     q->width=w;q->height=h;q->pixels=pixels;q->wallpaper=wallpaper_pixels;q->blurred=workspace;
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
-    q->file_selected=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;
+    q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;
     q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
@@ -481,6 +481,12 @@ void q_enable_animations(QDesktop *q){
     q->animations_enabled=1;
 }
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
+    if(q->file_click_index>=0){
+        if(elapsed_us>=420000u-q->file_click_elapsed_us){
+            q->file_click_index=-1;
+            q->file_click_elapsed_us=0;
+        }else q->file_click_elapsed_us+=elapsed_us;
+    }
     if(qm_advance(&q->media,elapsed_us)&&q->media.kind==QM_VIDEO){q->dirty=1;q->hover_only=0;}
     if(!q->animations_enabled)return;
     if(elapsed_us>250000)elapsed_us=250000;
@@ -702,6 +708,7 @@ static void files_message(QDesktop *q,const char *message){
 }
 static void files_refresh(QDesktop *q){
     q->file_count=0;q->file_selected=-1;q->file_scroll=0;q->file_confirm=0;
+    q->file_click_index=-1;q->file_click_elapsed_us=0;
     if(!q->storage||q->storage->count<1){files_message(q,"No mounted volumes");return;}
     int n=qfs_list(q->storage,q->file_volume,q->file_path,q->files,QFS_ENTRIES);
     if(n<0){files_message(q,"Cannot open this folder");return;}
@@ -761,6 +768,20 @@ static void files_open(QDesktop *q,int index){
     }
     files_message(q,"No associated viewer for this format");
 }
+static void files_select(QDesktop *q,int index){
+    if(index<0||index>=q->file_count)return;
+    if(q->file_click_index==index&&q->file_click_elapsed_us<420000u){
+        q->file_click_index=-1;
+        q->file_click_elapsed_us=0;
+        files_open(q,index);
+        return;
+    }
+    q->file_selected=index;
+    q->file_confirm=0;
+    q->file_click_index=index;
+    q->file_click_elapsed_us=0;
+    q->dirty=1;
+}
 static void files_parent(QDesktop *q){
     int end=0;while(q->file_path[end])end++;
     if(end<=1)return;
@@ -816,12 +837,22 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     else if(q->file_status[0])string_limit(q,x+3,y+133,q->file_status,muted,0,cw-10,1);
     if(!q->storage||!q->storage->count)return;
     int count=files_rows(w);
+    surface(q,x,y+139,cw,count*40+8,15,inner_material(q),q->theme?102:127);
     for(int row=0;row<count;row++){
         int index=q->file_scroll+row;
         if(index>=q->file_count)break;
         QFsEntry *entry=&q->files[index];
         int ry=y+143+row*40;
-        surface(q,x,ry,cw,36,10,index==q->file_selected?colors(q)->selected:inner_material(q),q->theme?(index==q->file_selected?155:89):120);
+        if(index==q->file_selected){
+            int x0=clamp(x+2,q->clip_left,q->clip_right),x1=clamp(x+cw-2,q->clip_left,q->clip_right);
+            int y0=clamp(ry+2,q->clip_top,q->clip_bottom),y1=clamp(ry+38,q->clip_top,q->clip_bottom);
+            for(int yy=y0;yy<y1;yy++){
+                uint32_t *line=q->pixels+(size_t)yy*q->width;
+                for(int xx=x0;xx<x1;xx++)line[xx]=blend(line[xx],colors(q)->selected,q->theme?79:108);
+            }
+            rectangle(q,x+2,ry+5,3,30,accent(q));
+        }
+        if(row>0)thin_rule(q,x+47,ry,cw-65,q->theme?24:42);
         sprite(q,x+23,ry+18,entry->directory?QI_FOLDER:
             file_suffix(entry->name,".bmp")?QI_IMAGE:
             (file_suffix(entry->name,".wav")||file_suffix(entry->name,".avi"))?QI_MEDIA_PLAYER:QI_TEXT,28);
@@ -948,7 +979,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y+45,"Quartzie 0.39.1",ink,2);
+        text(q,x,y+45,"Quartzie 0.39.2",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -1452,6 +1483,7 @@ void q_click(QDesktop *q,int x,int y){
         if(hit(x,y,w->x+w->w-59,w->y+13,36,29)){close_window(q,chosen);return;}
         if(hit(x,y,w->x+w->w-108,w->y+13,36,29)){maximize_window(q,chosen);return;}
         if(hit(x,y,w->x+w->w-157,w->y+13,36,29)){minimize_window(q,chosen);return;}
+        int files_was_focused=q->active==Q_FILES;
         q_open(q,chosen);
         if((!w->maximized||q->pressed)&&hit(x,y,w->x,w->y,w->w-175,55)){
             q->drag=chosen;q->drag_x=x-w->x;q->drag_y=y-w->y;
@@ -1471,6 +1503,15 @@ void q_click(QDesktop *q,int x,int y){
                 q->dirty=1;
             }
         }else if(chosen==Q_FILES){
+            int rows=files_rows(w);
+            if(!files_was_focused)q->file_click_index=-1;
+            for(int i=0;i<rows;i++)if(hit(x,y,bx,by+143+i*40,w->w-64,40)&&q->file_scroll+i<q->file_count){
+                files_select(q,q->file_scroll+i);return;
+            }
+            q->file_click_index=-1;
+            if(hit(x,y,bx,by+139,w->w-64,rows*40+8)){
+                q->file_selected=-1;q->file_confirm=0;q->dirty=1;return;
+            }
             if(hit(x,y,bx,by+25,112,43)){
                 if(q->storage&&q->storage->count){q->file_volume=(q->file_volume+1)%q->storage->count;q->file_path[0]='\\';q->file_path[1]=0;files_refresh(q);}
                 return;
@@ -1490,10 +1531,6 @@ void q_click(QDesktop *q,int x,int y){
                     }
                 }
                 return;
-            }
-            int rows=files_rows(w);
-            for(int i=0;i<rows;i++)if(hit(x,y,bx,by+143+i*40,w->w-64,36)){
-                files_open(q,q->file_scroll+i);return;
             }
             int bottom=by+143+rows*40+10;
             if(hit(x,y,bx,bottom,100,34)){
@@ -1635,6 +1672,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     }
     if(ch=='\r'){
         if(q->active==Q_FILES){
+            q->file_click_index=-1;
             files_open(q,q->file_selected);return;
         }
         if(q->active==Q_CALCULATOR){calc_input(q,'=');q->dirty=1;return;}

@@ -7,6 +7,51 @@ static QDesktop ui;
 static uint32_t framebuffer[1024*768],wallpaper[1024*768],scratch[1024*768];
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"FAIL feature test line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static void key(char c){q_key(&ui,(uint16_t)c,0);}
+static QStorage selection_storage;
+static QDesktop selection_ui;
+static uint32_t selection_pixels[1024*768],selection_wall[1024*768],selection_workspace[1024*768];
+static void check_file_selection(void){
+    qfs_init(&selection_storage,0,0);
+    CHECK(qfs_mkdir(&selection_storage,0,"\\FolderA")==0);
+    CHECK(qfs_write(&selection_storage,0,"\\alpha.txt","first",5)==0);
+    CHECK(qfs_write(&selection_storage,0,"\\beta.txt","second",6)==0);
+    q_init(&selection_ui,1024,768,selection_pixels,selection_wall,selection_workspace);
+    q_attach_storage(&selection_ui,&selection_storage,0,0);
+    q_open(&selection_ui,Q_FILES);
+    CHECK(selection_ui.file_count==3&&selection_ui.file_selected==-1);
+    QWindow *w=&selection_ui.windows[Q_FILES];
+    int x=w->x+32+110,y=w->y+60+143+20;
+    q_click(&selection_ui,x,y);
+    CHECK(selection_ui.active==Q_FILES&&selection_ui.file_selected==0);
+    CHECK(!strcmp(selection_ui.file_path,"\\"));
+    q_tick_timed(&selection_ui,200000);
+    q_click(&selection_ui,x,y);
+    CHECK(!strcmp(selection_ui.file_path,"\\FolderA"));
+    CHECK(selection_ui.file_selected==-1&&selection_ui.file_click_index==-1);
+    q_key(&selection_ui,8,0);
+    CHECK(!strcmp(selection_ui.file_path,"\\")&&selection_ui.file_count==3);
+    q_click(&selection_ui,x,y+40);
+    CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
+    q_tick_timed(&selection_ui,450000);
+    q_click(&selection_ui,x,y+40);
+    CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
+    q_tick_timed(&selection_ui,200000);
+    q_click(&selection_ui,x,y+80);
+    CHECK(selection_ui.file_selected==2&&selection_ui.active==Q_FILES);
+    q_click(&selection_ui,x,y+40);
+    CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
+    q_tick_timed(&selection_ui,100000);
+    q_click(&selection_ui,x,y+40);
+    CHECK(selection_ui.active==Q_NOTES&&selection_ui.note_length==5);
+    CHECK(!memcmp(selection_ui.notes,"first",5));
+    q_open(&selection_ui,Q_FILES);
+    q_click(&selection_ui,x,y+80);
+    CHECK(selection_ui.file_selected==2&&selection_ui.active==Q_FILES);
+    q_key(&selection_ui,'\r',0);
+    CHECK(selection_ui.active==Q_NOTES&&selection_ui.note_length==6);
+    CHECK(!memcmp(selection_ui.notes,"second",6));
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -61,6 +106,7 @@ int main(void){
     q_draw(&ui);
     q_click(&ui,store->x+32+230+87,store->y+60+78+51);
     CHECK(ui.active==Q_CALCULATOR&&ui.windows[Q_CALCULATOR].open);
-    puts("PASS: app launcher, calculator editing, Store cards, and F10-F12 window controls");
+    check_file_selection();
+    puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }
