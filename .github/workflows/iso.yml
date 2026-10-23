@@ -3,32 +3,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Export icon sources
-        uses: actions/upload-artifact@v4
-        with:
-          name: quartzie-icon-sources
-          path: assets/icons.zip
-      - name: Repair icon archive
-        run: |
-          python3 -c "import PIL" || python3 -m pip install --break-system-packages Pillow
-          python3 tools/clean_icons.py
-          if ! git diff --quiet -- assets/icons.zip; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add assets/icons.zip
-            git commit -m "Clean icons"
-            git push origin HEAD:main
-          fi
       - name: Install dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lld xorriso ovmf qemu-system-x86 fonts-inter python3-pil
+      - name: Check icon archive
+        run: python3 tools/clean_icons.py --check
       - name: Build and verify
         run: make verify
       - name: Boot ISO in OVMF
