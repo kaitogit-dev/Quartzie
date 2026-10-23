@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq lld xorriso ovmf qemu-system-x86 fonts-inter python3-pil
+        run: sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends lld xorriso ovmf qemu-system-x86 fonts-inter python3-pil
       - name: Check icon archive
         run: python3 tools/clean_icons.py --check
       - name: Build and verify
