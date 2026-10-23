@@ -35,9 +35,9 @@ build/embed_app.c: build/winapp.exe tools/embed.py
 	$(PYTHON) tools/embed.py build/winapp.exe $@
 build/embed_app.obj: build/embed_app.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
-build/esp.img: build/BOOTX64.EFI build/winapp.exe tools/esp.py
+build/esp.img: build/BOOTX64.EFI build/winapp.exe tools/esp.py tools/media_samples.py
 	$(PYTHON) tools/esp.py build/BOOTX64.EFI $@ build/winapp.exe
-build/esp-iso.img: build/BOOTX64.EFI build/winapp.exe tools/compact_esp.py
+build/esp-iso.img: build/BOOTX64.EFI build/winapp.exe tools/compact_esp.py tools/media_samples.py
 	$(PYTHON) tools/compact_esp.py build/BOOTX64.EFI $@ build/winapp.exe
 Quartzie-x64-uefi.img: build/esp.img tools/gpt.py
 	$(PYTHON) tools/gpt.py build/esp.img $@

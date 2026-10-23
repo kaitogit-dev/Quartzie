@@ -12,4 +12,4 @@ $variablesCopy = Join-Path $env:TEMP "quartzie-0.39.0-vars.fd"
 Copy-Item $variables $variablesCopy -Force
 $displays = (& $executable -display help 2>&1 | Out-String)
 $display = if ($displays -match "(?m)^\s*gtk\s*$") { "gtk,zoom-to-fit=on,show-cursor=off" } else { "sdl,show-cursor=off" }
-& $executable -machine q35 -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -nic none
+& $executable -machine "q35,pcspk-audiodev=quartzie" -audiodev "dsound,id=quartzie" -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -nic none

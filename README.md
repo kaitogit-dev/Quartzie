@@ -47,7 +47,7 @@ Files enumerates UEFI-readable FAT volumes, including the boot volume and attach
 
 Photos opens uncompressed 24/32-bit BMP images. Media Player supports PCM WAV (8/16-bit mono or stereo) and uncompressed AVI video with 24/32-bit BGR frames. WAV playback uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. Compressed MP3, H.264 and MP4 are not supported by the native decoder.
 
-Photos and Media Player are available from Start and are not pinned to the dock. To keep files across ISO boots, attach a separate writable FAT-formatted disk.
+The boot volume includes `PHOTO.BMP`, `SOUND.WAV`, and `CLIP.AVI` as viewer test files. Photos and Media Player are available from Start and are not pinned to the dock. To keep files across ISO boots, attach a separate writable FAT-formatted disk.
 
 ## PE32+ support
 

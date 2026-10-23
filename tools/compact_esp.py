@@ -2,6 +2,7 @@ import math
 import pathlib
 import struct
 import sys
+from media_samples import samples
 
 SECTORS = 8192
 FAT_SECTORS = 32
@@ -23,7 +24,9 @@ def create(path, application):
     executable = pathlib.Path(application).read_bytes()
     count = math.ceil(len(binary) / 512)
     app_count = math.ceil(len(executable) / 512)
-    if count + app_count > 8000:
+    media = samples()
+    media_clusters = sum(math.ceil(len(data) / 512) for _, data in media)
+    if count + app_count + media_clusters > 8000:
         raise ValueError('EFI image capacity exceeded')
     image = bytearray(SECTORS * 512)
     sector = memoryview(image)[:512]
@@ -43,6 +46,14 @@ def create(path, application):
     app_cluster = 4 + count
     for i in range(app_count):
         struct.pack_into('<H', fat, (app_cluster + i) * 2, app_cluster + i + 1 if i + 1 < app_count else 0xffff)
+    next_cluster = app_cluster + app_count
+    media_positions = []
+    for name, contents in media:
+        used = math.ceil(len(contents) / 512)
+        media_positions.append((name, next_cluster, contents))
+        for i in range(used):
+            struct.pack_into("<H", fat, (next_cluster + i) * 2, next_cluster + i + 1 if i + 1 < used else 0xffff)
+        next_cluster += used
     image[512:(1 + FAT_SECTORS) * 512] = fat
     image[(1 + FAT_SECTORS) * 512:(1 + 2 * FAT_SECTORS) * 512] = fat
 
@@ -60,6 +71,9 @@ def create(path, application):
     image[cluster(3) + 64:cluster(3) + 96] = entry('BOOTX64 EFI', 0x20, 4, len(binary))
     image[cluster(4):cluster(4) + len(binary)] = binary
     image[cluster(app_cluster):cluster(app_cluster) + len(executable)] = executable
+    for i, (name, first, contents) in enumerate(media_positions):
+        image[root + 64 + i * 32:root + 96 + i * 32] = entry(name, 0x20, first, len(contents))
+        image[cluster(first):cluster(first) + len(contents)] = contents
     return image
 
 

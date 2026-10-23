@@ -2,6 +2,7 @@ import math
 import pathlib
 import struct
 import sys
+from media_samples import samples
 
 SECTORS = 131072
 RESERVED = 32
@@ -24,7 +25,9 @@ def create(efi, application):
     executable = pathlib.Path(application).read_bytes()
     clusters = math.ceil(len(file) / 512)
     app_clusters = math.ceil(len(executable) / 512)
-    if clusters < 1 or clusters + app_clusters >= 10000:
+    media = samples()
+    media_clusters = sum(math.ceil(len(data) / 512) for _, data in media)
+    if clusters < 1 or clusters + app_clusters + media_clusters >= 10000:
         raise ValueError('EFI image size out of range')
     data = bytearray(SECTORS * 512)
     boot = memoryview(data)[:512]
@@ -51,6 +54,14 @@ def create(efi, application):
     start = 5 + clusters
     for i in range(app_clusters):
         struct.pack_into('<I', fat, (start + i) * 4, start + i + 1 if i + 1 < app_clusters else 0x0fffffff)
+    next_cluster = start + app_clusters
+    media_positions = []
+    for name, contents in media:
+        used = math.ceil(len(contents) / 512)
+        media_positions.append((name, next_cluster, contents))
+        for i in range(used):
+            struct.pack_into("<I", fat, (next_cluster + i) * 4, next_cluster + i + 1 if i + 1 < used else 0x0fffffff)
+        next_cluster += used
     data[RESERVED * 512:(RESERVED + FAT_SECTORS) * 512] = fat
     data[(RESERVED + FAT_SECTORS) * 512:DATA_START * 512] = fat
 
@@ -67,6 +78,9 @@ def create(efi, application):
     data[cluster_pos(4)+64:cluster_pos(4)+96] = directory_entry('BOOTX64 EFI', 0x20, 5, len(file))
     data[cluster_pos(5):cluster_pos(5)+len(file)] = file
     data[cluster_pos(start):cluster_pos(start)+len(executable)] = executable
+    for i, (name, first, contents) in enumerate(media_positions):
+        data[cluster_pos(2)+64+i*32:cluster_pos(2)+96+i*32] = directory_entry(name, 0x20, first, len(contents))
+        data[cluster_pos(first):cluster_pos(first)+len(contents)] = contents
     return data
 
 
