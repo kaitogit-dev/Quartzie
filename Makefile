@@ -15,7 +15,7 @@ build:
 build/%.obj: src/%.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 build/codecs.obj: src/codecs.c src/codecs.h src/vendor/stb_image.h src/vendor/minimp3.h | build
-	$(CC) $(CFLAGS) -Wno-error -c $< -o $@
+	$(CC) $(CFLAGS) -mno-stack-arg-probe -Wno-error -c $< -o $@
 build/ui.obj: src/ui.c src/ui.h src/storage.h src/media.h src/codecs.h | build
 	$(CC) $(CFLAGS) -DQUARTZIE_FIRMWARE -c $< -o $@
 build/font.c: tools/font.py | build
