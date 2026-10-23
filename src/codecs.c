@@ -5,6 +5,8 @@ void *memcpy(void *dst,const void *src,size_t n);
 void *memset(void *dst,int value,size_t n);
 void *memmove(void *dst,const void *src,size_t n);
 int memcmp(const void *a,const void *b,size_t n);
+static int qc_abs(int value){return value<0?-value:value;}
+#define abs qc_abs
 static uint8_t *pool;
 static size_t pool_length,pool_used;
 void qc_memory(void *memory,size_t size){
@@ -57,7 +59,7 @@ void *memmove(void *dst,const void *src,size_t n){
     unsigned char *d=(unsigned char *)dst;
     const unsigned char *s=(const unsigned char *)src;
     if(d<=s||d>=s+n)return memcpy(dst,src,n);
-    while(n)d[--n]=s[n];
+    while(n){n--;d[n]=s[n];}
     return dst;
 }
 int memcmp(const void *a,const void *b,size_t n){
