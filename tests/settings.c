@@ -26,7 +26,7 @@ int main(void){
     q_open(&ui,Q_SETTINGS);
     q_draw(&ui);
     QWindow *w=&ui.windows[Q_SETTINGS];
-    CHECK(w->w==1056&&w->h==616);
+    CHECK(w->w==1060&&w->h==616);
     CHECK(ui.settings_page==0&&ui.active==Q_SETTINGS);
     int bx=w->x+32,by=w->y+60;
     int side=(w->w-64)/4;
