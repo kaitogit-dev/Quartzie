@@ -1,6 +1,6 @@
 # Quartzie
 
-An x86-64 UEFI desktop with a framebuffer compositor, native applications, an NT-style services core, and an experimental PE32+ executable loader.
+An x86-64 UEFI desktop with a framebuffer compositor, native applications, a UEFI filesystem browser, an NT-style services core, and an experimental PE32+ executable loader.
 
 ## Build
 
@@ -30,7 +30,7 @@ For Windows QEMU, use `tools/run-windows.ps1`.
 
 | Input | Action |
 | --- | --- |
-| F1–F6 | Open an application |
+| F1–F6 | Open a pinned application |
 | F7 | Application launcher |
 | F8 | Notifications |
 | F9 | Control center |
@@ -40,6 +40,14 @@ For Windows QEMU, use `tools/run-windows.ps1`.
 | Esc | Dismiss overlays |
 
 Drag a window title bar to move it, or to the top edge to maximize. Drag a maximized title bar downward to restore the window. The launcher supports search, arrow-key selection, and Enter.
+
+## Files and media
+
+Files enumerates UEFI-readable FAT volumes, including the boot volume and attached FAT-formatted disks. Browse folders, create text files or directories, delete entries, and open text files in Notes. Notes saves to the selected writable file.
+
+Photos opens uncompressed 24/32-bit BMP images. Media Player supports PCM WAV (8/16-bit mono or stereo) and uncompressed AVI video with 24/32-bit BGR frames. WAV playback uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. Compressed MP3, H.264 and MP4 are not supported by the native decoder.
+
+Photos and Media Player are available from Start and are not pinned to the dock. To keep files across ISO boots, attach a separate writable FAT-formatted disk.
 
 ## PE32+ support
 

@@ -1,10 +1,14 @@
 #ifndef QUARTZIE_UI_H
 #define QUARTZIE_UI_H
 #include <stdint.h>
+#include <stddef.h>
+#include "storage.h"
+#include "media.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
-#define Q_APPS 7
+#define Q_APPS 9
+#define Q_DOCK_APPS 7
 #define Q_FILES 0
 #define Q_NOTES 1
 #define Q_TERMINAL 2
@@ -12,6 +16,8 @@
 #define Q_SETTINGS 4
 #define Q_ABOUT 5
 #define Q_STORE 6
+#define Q_PHOTOS 7
+#define Q_MEDIA 8
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
@@ -26,6 +32,14 @@ typedef struct {
     char notes[2048],command[128],calc[64],answer[64],status[96];
     char menu_search[24],calc_history[3][64];
     QWindow windows[Q_APPS];
+    QStorage *storage;
+    QFsEntry files[QFS_ENTRIES];
+    int file_volume,file_count,file_scroll,file_selected,file_confirm;
+    char file_path[QFS_PATH],file_status[80],note_path[QFS_PATH],media_name[72];
+    int note_volume,media_volume;
+    uint8_t *media_buffer;
+    size_t media_capacity;
+    QMedia media;
     uint32_t *pixels,*wallpaper,*blurred;
     uint32_t *drag_base,*dock_background;
     int dock_cache_valid;
@@ -44,6 +58,7 @@ typedef struct {
 void q_ui_set_scratch(uint32_t *storage);
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
+void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
 void q_enable_animations(QDesktop *q);
 void q_tick(QDesktop *q);
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us);

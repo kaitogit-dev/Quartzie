@@ -81,7 +81,7 @@ int main(void){
     q_draw(&desktop);shot("build/calculator.ppm");
     for(int i=0;i<Q_APPS;i++){
         int tx=(1280-510)/2+26+(i%4)*116+47;
-        int ty=720-607+112+(i/4)*144+60;
+        int ty=720-607+112+(i/4)*103+42;
         q_click(&desktop,left+38,top+28);
         check(desktop.menu);
         q_click(&desktop,tx,ty);

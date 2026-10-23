@@ -13,6 +13,38 @@ static uint32_t *drag_base_buffer;
 static uint32_t *dock_base_buffer;
 static QDesktop desktop;
 static QNtKernel *native_kernel;
+static QStorage *native_storage;
+static uint8_t *media_memory;
+static void speaker_out(unsigned short port,unsigned char value){
+    __asm__ volatile("outb %0,%1"::"a"(value),"Nd"(port));
+}
+static unsigned char speaker_in(unsigned short port){
+    unsigned char value;
+    __asm__ volatile("inb %1,%0":"=a"(value):"Nd"(port));
+    return value;
+}
+static void speaker_off(void){
+    speaker_out(0x61,(unsigned char)(speaker_in(0x61)&~3u));
+}
+static void audio_pump(EFI_BOOT_SERVICES *bs){
+    static int was_playing;
+    if(desktop.media.kind!=QM_AUDIO||!desktop.media.playing){
+        if(was_playing){speaker_off();was_playing=0;}
+        return;
+    }
+    was_playing=1;
+    for(int i=0;i<8;i++){
+        uint64_t at=(desktop.media.elapsed_us+(uint64_t)i*125u)*desktop.media.sample_rate/1000000u;
+        if(at>=qm_audio_count(&desktop.media))break;
+        uint8_t sample=qm_audio_sample(&desktop.media,at);
+        uint16_t pulse=(uint16_t)(5u+(uint16_t)sample*112u/255u);
+        speaker_out(0x43,0xb0);
+        speaker_out(0x42,(unsigned char)pulse);
+        speaker_out(0x42,0);
+        speaker_out(0x61,(unsigned char)(speaker_in(0x61)|3u));
+        bs->Stall(125);
+    }
+}
 #define Q_EXECUTABLE_CAPACITY (1024u*1024u)
 static uint8_t *executable_buffer;
 static void *efi_alloc(EFI_BOOT_SERVICES *boot,size_t bytes){
@@ -235,14 +267,18 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     uint32_t *ui_storage=efi_alloc(bs,(size_t)Q_UI_SCRATCH_PIXELS*sizeof(uint32_t));
     native_kernel=efi_alloc(bs,sizeof(*native_kernel));
     executable_buffer=efi_alloc(bs,Q_EXECUTABLE_CAPACITY);
+    native_storage=efi_alloc(bs,sizeof(*native_storage));
+    media_memory=efi_alloc(bs,8u*1024u*1024u);
     if(!backbuffer||!wallpaper_buffer||!frosted_buffer||!drag_base_buffer||
-       !dock_base_buffer||!ui_storage||!native_kernel||!executable_buffer){
+       !dock_base_buffer||!ui_storage||!native_kernel||!executable_buffer||!native_storage||!media_memory){
         serial_text("QUARTZIE-MEMORY-FAILED\n");
         return 6;
     }
     q_ui_set_scratch(ui_storage);
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
+    qfs_init(native_storage,image,bs);
+    q_attach_storage(&desktop,native_storage,media_memory,8u*1024u*1024u);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_dock_buffers(&desktop,dock_base_buffer);
     q_draw(&desktop);present();
@@ -324,6 +360,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
             else present();
         }else if(cursor_old_x!=pointer_x||cursor_old_y!=pointer_y)cursor_draw(pointer_x,pointer_y);
         pointer_sample(0);
-        bs->Stall(desktop.drag>=0?250:desktop.scene_tween_active?500:1500);
+        audio_pump(bs);
+        bs->Stall(desktop.drag>=0?250:desktop.scene_tween_active?500:desktop.media.playing&&desktop.media.kind==QM_AUDIO?125:1500);
     }
 }

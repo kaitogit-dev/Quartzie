@@ -66,8 +66,8 @@ int main(void){
     CHECK(ui.menu);
     int mx=(ui.width-510)/2,my=ui.height-607;
     for(int i=0;i<Q_APPS;i++){
-        int bx=mx+26+(i%4)*116,by=my+112+(i/4)*144;
-        q_move(&ui,bx+70,by+49);
+        int bx=mx+26+(i%4)*116,by=my+112+(i/4)*103;
+        q_move(&ui,bx+53,by+37);
         CHECK(ui.menu_hover==i);
         q_draw(&ui);
         q_tick_timed(&ui,16000);
