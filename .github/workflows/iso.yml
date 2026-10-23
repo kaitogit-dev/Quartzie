@@ -28,12 +28,12 @@ jobs:
       - name: Publish artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Quartzie-0.39.3-x64-UEFI
+          name: Quartzie-0.39.4-x64-UEFI
           if-no-files-found: error
           compression-level: 9
           path: |
-            Quartzie-0.39.3-x64.iso
-            Quartzie-0.39.3-x64.img
+            Quartzie-0.39.4-x64.iso
+            Quartzie-0.39.4-x64.img
             build/BOOTX64.EFI
             build/Quartzie.cur
             assets/icons.zip

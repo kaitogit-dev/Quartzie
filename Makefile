@@ -1,4 +1,4 @@
-VERSION = 0.39.3
+VERSION = 0.39.4
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -51,7 +51,8 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c build/font.c build/icons.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c build/font.c build/icons.c -o $@
-test: build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+	./build/settings-test
 	./build/media-test
 	./build/theme-test
 	./build/features-test
@@ -105,4 +106,6 @@ build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/storage.c src/media.c build/font.c build/icons.c -o $@
 build/media-test: tests/media.c src/media.c src/media.h src/storage.c src/storage.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/media.c src/media.c src/storage.c -o $@
+build/settings-test: tests/settings.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/settings.c src/ui.c src/storage.c src/media.c build/font.c build/icons.c -o $@
 .PHONY: all release test verify clean

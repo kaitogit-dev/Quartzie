@@ -435,6 +435,11 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
         a->x=(w-a->w)/2+(i%3)*18-18;a->y=(h-a->h)/2+(i%3)*16-16;
     }
+    QWindow *settings=&q->windows[Q_SETTINGS];
+    settings->w=clamp(w-124,640,1060);
+    settings->h=clamp(h-104,470,750);
+    settings->x=(w-settings->w)/2;
+    settings->y=(h-settings->h)/2;
     wallpaper(q);
 }
 static void close_popups(QDesktop *q){
@@ -918,6 +923,297 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     }
     text(q,x+cw-166,y+86+height,"Browse files",muted,0);
 }
+
+static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About"};
+static int settings_sidebar_width(int width){return clamp(width/4,175,220);}
+static int settings_find(const char *haystack,const char *needle){
+    if(!needle[0])return 1;
+    for(int start=0;haystack[start];start++){
+        int n=0;
+        while(needle[n]&&haystack[start+n]){
+            char a=haystack[start+n],b=needle[n];
+            if(a>='A'&&a<='Z')a+=32;
+            if(b>='A'&&b<='Z')b+=32;
+            if(a!=b)break;
+            n++;
+        }
+        if(!needle[n])return 1;
+    }
+    return 0;
+}
+static int settings_result(QDesktop *q,int page){
+    if(settings_find(settings_pages[page],q->settings_search))return 1;
+    const char *keywords[Q_SETTINGS_PAGES]={
+        "welcome quick settings desktop",
+        "display resolution motion animation performance",
+        "theme light dark accent color appearance",
+        "installed applications open launch store photos media",
+        "drives volumes home files disk",
+        "device version hardware system information"
+    };
+    return settings_find(keywords[page],q->settings_search);
+}
+static void settings_navigate(QDesktop *q,int page){
+    if(page<0||page>=Q_SETTINGS_PAGES)return;
+    q->settings_page=page;
+    q->settings_search_length=0;
+    q->settings_search[0]=0;
+    q->dirty=1;
+    q->hover_only=0;
+}
+static void settings_motion(QDesktop *q,int enabled){
+    enabled=enabled!=0;
+    if(q->animations_enabled==enabled)return;
+    q->animations_enabled=enabled;
+    q->scene_tween_pending=0;
+    q->scene_tween_active=0;
+    q->scene_elapsed_us=0;
+    q->scene_paint_us=0;
+    q->drag_cache_valid=0;
+    q->dock_cache_valid=0;
+    q->glass_cached_app=-1;
+    q->hover_only=0;
+    q->damage_valid=0;
+    for(int i=0;i<Q_APPS;i++){
+        q->windows[i].tween_kind=0;
+        q->windows[i].tween_step=0;
+        if(!enabled)q->dock_lift[i]=q->dock_pulse[i]=q->menu_lift[i]=0;
+    }
+    if(!enabled)q->start_lift=q->start_pulse=0;
+    q->dirty=1;
+}
+static void settings_number(char *out,int value){
+    char reverse[12];int n=0,j=0;
+    if(value<0)value=0;
+    do{reverse[n++]=(char)('0'+value%10);value/=10;}while(value&&n<11);
+    while(n)out[j++]=reverse[--n];
+    out[j]=0;
+}
+static void settings_resolution(QDesktop *q,char *out){
+    char w[12],h[12];settings_number(w,q->width);settings_number(h,q->height);
+    int i=0,j=0;
+    while(w[j])out[i++]=w[j++];
+    out[i++]=' ';out[i++]='x';out[i++]=' ';
+    j=0;while(h[j])out[i++]=h[j++];
+    out[i]=0;
+}
+static void settings_switch(QDesktop *q,int x,int y,int on){
+    surface(q,x,y,54,29,15,on?accent(q):colors(q)->rule,on?221:142);
+    circular(q,x+(on?39:15),y+14,10,on?0xffffff:foreground(q),255);
+}
+static void settings_card(QDesktop *q,int x,int y,int w,int h,const char *heading,const char *description,int arrow){
+    if(w<20||h<20)return;
+    surface(q,x,y,w,h,16,inner_material(q),q->theme?126:160);
+    text(q,x+19,y+31,heading,foreground(q),1);
+    string_limit(q,x+19,y+55,description,secondary(q),0,w-(arrow?68:36),1);
+    if(arrow){
+        int right=x+w-27,mid=y+h/2;
+        segment(q,right-5,mid-6,right+1,mid,secondary(q));
+        segment(q,right+1,mid,right-5,mid+6,secondary(q));
+    }
+}
+static void settings_icon(QDesktop *q,int x,int y,int page){
+    uint32_t ink=page==q->settings_page?accent(q):secondary(q);
+    circular(q,x,y,13,ink,48);
+    const char *letters[Q_SETTINGS_PAGES]={"H","S","P","A","D","i"};
+    text(q,x-5,y+5,letters[page],ink,0);
+}
+static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
+    int side=settings_sidebar_width(cw);
+    int left=x+side+25;
+    int width=cw-side-25;
+    int nav_bottom=w->h-82;
+    surface(q,x,y+11,side,nav_bottom-11,19,inner_material(q),q->theme?131:127);
+    app_icon(q,x+38,y+47,Q_SETTINGS,40,foreground(q));
+    text(q,x+68,y+42,"Quartzie",foreground(q),1);
+    text(q,x+69,y+64,"Local device",secondary(q),0);
+    surface(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
+    string_limit(q,x+27,y+105,q->settings_search_length?q->settings_search:"Find a setting",q->settings_search_length?foreground(q):secondary(q),0,side-51,1);
+    for(int i=0;i<Q_SETTINGS_PAGES;i++){
+        int yy=y+128+i*43;
+        if(q->settings_page==i){
+            surface(q,x+10,yy,side-20,38,10,colors(q)->selected,q->theme?182:167);
+            rectangle(q,x+11,yy+8,3,22,accent(q));
+        }
+        settings_icon(q,x+32,yy+19,i);
+        text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
+    }
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.39.4",secondary(q),0);
+    if(q->settings_search_length){
+        text(q,left,y+39,"Search results",foreground(q),2);
+        int row=0;
+        for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){
+            int yy=y+76+row*75;
+            if(yy+67>y+w->h-76)break;
+            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and theme","Installed applications","Volumes and drives","Device information"};
+            settings_card(q,left,yy,width,66,settings_pages[i],subtitles[i],1);
+            row++;
+        }
+        if(!row)text(q,left+8,y+116,"No matching settings",secondary(q),1);
+        return;
+    }
+    int page=q->settings_page;
+    text(q,left,y+39,settings_pages[page],foreground(q),2);
+    const char *subtitles[Q_SETTINGS_PAGES]={
+        "Your space, your settings",
+        "Display and performance",
+        "Make Quartzie yours",
+        "Open your applications",
+        "Manage local storage",
+        "Device information"
+    };
+    text(q,left,y+69,subtitles[page],secondary(q),0);
+    if(page==0){
+        surface(q,left,y+92,width,105,18,colors(q)->selected,q->theme?171:174);
+        app_icon(q,left+52,y+143,Q_SETTINGS,62,foreground(q));
+        text(q,left+103,y+140,"Quartzie",foreground(q),2);
+        text(q,left+104,y+168,"Ready for your next idea",secondary(q),0);
+        const int targets[4]={1,2,3,4};
+        const char *descriptions[4]={"Display and motion","Colors and appearance","Your apps","Files and drives"};
+        int gap=12,tile=(width-gap)/2;
+        int tile_y=w->h<550?201:210,step=w->h<550?93:102,tile_h=w->h<550?80:91;
+        for(int i=0;i<4;i++){
+            int bx=left+(i%2)*(tile+gap),by=y+tile_y+(i/2)*step;
+            settings_card(q,bx,by,tile,tile_h,settings_pages[targets[i]],descriptions[i],1);
+        }
+    }else if(page==1){
+        char resolution[32];settings_resolution(q,resolution);
+        settings_card(q,left,y+92,width,77,"Display resolution",resolution,0);
+        settings_card(q,left,y+181,width,82,"Window animations",q->animations_enabled?"On":"Off",0);
+        settings_switch(q,left+width-74,y+207,q->animations_enabled);
+        settings_card(q,left,y+275,width,77,"Personalization","Theme and accent colors",1);
+        if(w->h>=560)settings_card(q,left,y+364,width,77,"About","System details",1);
+    }else if(page==2){
+        surface(q,left,y+92,width,123,18,inner_material(q),q->theme?124:166);
+        text(q,left+20,y+125,"Choose your mode",foreground(q),1);
+        int bx=left+19,button=(width-48)/2;
+        for(int i=0;i<2;i++){
+            int xx=bx+i*(button+10),selected=q->theme==i;
+            surface(q,xx,y+144,button,52,13,selected?colors(q)->selected:material(q),selected?201:121);
+            if(selected)rectangle(q,xx+13,y+159,4,22,accent(q));
+            text(q,xx+27,y+176,i?"Dark":"Light",foreground(q),1);
+        }
+        surface(q,left,y+230,width,116,18,inner_material(q),q->theme?124:166);
+        text(q,left+20,y+263,"Accent color",foreground(q),1);
+        const uint32_t accents[4]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85};
+        for(int i=0;i<4;i++){
+            int cx=left+44+i*61;
+            circular(q,cx,y+307,18,accents[i],255);
+            if(i==q->accent){
+                circular(q,cx,y+307,8,0xffffff,226);
+                circular(q,cx,y+307,4,accents[i],255);
+            }
+        }
+        if(w->h>=550)settings_card(q,left,y+358,width,72,"Window animations","Change motion in System",1);
+    }else if(page==3){
+        const int apps[5]={Q_FILES,Q_NOTES,Q_PHOTOS,Q_MEDIA,Q_STORE};
+        const char *descriptions[5]={"Browse your drives","Edit text files","View pictures","Play audio and video","Explore available apps"};
+        int row_h=clamp((w->h-230)/5,45,64);
+        for(int i=0;i<5;i++){
+            int yy=y+92+i*(row_h+9);
+            surface(q,left,yy,width,row_h,14,inner_material(q),q->theme?125:158);
+            app_icon(q,left+31,yy+row_h/2,apps[i],32,foreground(q));
+            text(q,left+62,yy+27,names[apps[i]],foreground(q),1);
+            if(row_h>=58)string_limit(q,left+62,yy+48,descriptions[i],secondary(q),0,width-109,1);
+            segment(q,left+width-33,yy+row_h/2-5,left+width-27,yy+row_h/2,secondary(q));
+            segment(q,left+width-27,yy+row_h/2,left+width-33,yy+row_h/2+5,secondary(q));
+        }
+    }else if(page==4){
+        int count=q->storage?q->storage->count:0;
+        if(!count){
+            settings_card(q,left,y+92,width,84,"No drives available","Open Files to browse storage",1);
+        }else{
+            text(q,left+3,y+109,"Available drives",secondary(q),0);
+            int max_rows=w->h>=550?4:3;
+            int rows=count<max_rows?count:max_rows;
+            for(int i=0;i<rows;i++){
+                const char *label=q->storage->volumes[i].label;
+                const char *description=i==q->storage->ram_index?"Temporary session storage":"Mounted volume";
+                settings_card(q,left,y+124+i*79,width,69,label,description,1);
+            }
+        }
+        text(q,left+5,y+w->h-109,"Select a drive to browse it in Files.",secondary(q),0);
+    }else if(page==5){
+        surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
+        app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
+        text(q,left+95,y+145,"Quartzie",foreground(q),2);
+        text(q,left+96,y+173,"Version 0.39.4",secondary(q),0);
+        char resolution[32];settings_resolution(q,resolution);
+        settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
+        settings_card(q,left,y+313,width,74,"Current display",resolution,0);
+        if(w->h>=580)settings_card(q,left,y+399,width,74,"Interface","Quartz glass",0);
+    }
+}
+static void settings_click(QDesktop *q,QWindow *w,int x,int y){
+    int bx=w->x+32,by=w->y+60,cw=w->w-64;
+    int side=settings_sidebar_width(cw);
+    int left=bx+side+25,width=cw-side-25;
+    for(int i=0;i<Q_SETTINGS_PAGES;i++){
+        if(hit(x,y,bx+10,by+128+i*43,side-20,38)){settings_navigate(q,i);return;}
+    }
+    if(hit(x,y,bx+14,by+82,side-28,36)){q->dirty=1;return;}
+    if(q->settings_search_length){
+        int row=0;
+        for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){
+            int yy=by+76+row*75;
+            if(yy+67>by+w->h-76)break;
+            if(hit(x,y,left,yy,width,66)){settings_navigate(q,i);return;}
+            row++;
+        }
+        return;
+    }
+    switch(q->settings_page){
+        case 0:{
+            const int pages[4]={1,2,3,4};
+            int tile=(width-12)/2;
+            int tile_y=w->h<550?201:210,step=w->h<550?93:102,tile_h=w->h<550?80:91;
+            for(int i=0;i<4;i++)if(hit(x,y,left+(i%2)*(tile+12),by+tile_y+(i/2)*step,tile,tile_h)){
+                settings_navigate(q,pages[i]);return;
+            }
+            break;
+        }
+        case 1:
+            if(hit(x,y,left,by+181,width,82)){settings_motion(q,!q->animations_enabled);return;}
+            if(hit(x,y,left,by+275,width,77)){settings_navigate(q,2);return;}
+            if(w->h>=560&&hit(x,y,left,by+364,width,77)){settings_navigate(q,5);return;}
+            break;
+        case 2:{
+            int button=(width-48)/2;
+            for(int i=0;i<2;i++)if(hit(x,y,left+19+i*(button+10),by+144,button,52)){q_set_theme(q,i);return;}
+            for(int i=0;i<4;i++){
+                int cx=left+44+i*61;
+                if(hit(x,y,cx-22,by+285,44,44)){
+                    if(q->accent!=i){
+                        q->accent=i;q->dirty=1;q->hover_only=0;
+                        q->drag_cache_valid=0;q->dock_cache_valid=0;q->glass_cached_app=-1;
+                    }
+                    return;
+                }
+            }
+            if(w->h>=550&&hit(x,y,left,by+358,width,72)){settings_navigate(q,1);return;}
+            break;
+        }
+        case 3:{
+            const int apps[5]={Q_FILES,Q_NOTES,Q_PHOTOS,Q_MEDIA,Q_STORE};
+            int row_h=clamp((w->h-230)/5,45,64);
+            for(int i=0;i<5;i++)if(hit(x,y,left,by+92+i*(row_h+9),width,row_h)){
+                q_open(q,apps[i]);return;
+            }
+            break;
+        }
+        case 4:{
+            int count=q->storage?q->storage->count:0;
+            int max_rows=w->h>=550?4:3;
+            int rows=count<max_rows?count:max_rows;
+            for(int i=0;i<rows;i++)if(hit(x,y,left,by+124+i*79,width,69)){
+                q->file_volume=i;q->file_path[0]='\\';q->file_path[1]=0;
+                files_refresh(q);q_open(q,Q_FILES);return;
+            }
+            if(!count&&hit(x,y,left,by+92,width,84)){q_open(q,Q_FILES);return;}
+            break;
+        }
+    }
+}
 static void window_content(QDesktop *q,int app,QWindow *w){
     int x=w->x+32,y=w->y+60,cw=w->w-64;
     uint32_t ink=foreground(q),muted=secondary(q);
@@ -955,16 +1251,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
                 string_limit(q,x+355,y+100,"No history",secondary(q),0,history_width-17,1);
         }
     }else if(app==Q_SETTINGS){
-        surface(q,x,y+36,cw,91,18,inner_material(q),q->theme?106:139);
-        text(q,x+24,y+72,"Appearance",ink,1);
-        text(q,x+24,y+102,q->theme?"Dark glass":"Light glass",muted,0);
-        surface(q,x,y+143,cw,97,18,inner_material(q),q->theme?106:139);
-        text(q,x+24,y+178,"Accent color",ink,1);
-        for(int i=0;i<4;i++){
-            int bx=x+175+i*50;
-            circular(q,bx,y+198,15,(uint32_t[]){0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85}[i],255);
-            if(q->accent==i)circular(q,bx,y+198,5,0xfaffff,205);
-        }
+        draw_settings(q,w,x,y,cw);
     }else if(app==Q_PHOTOS||app==Q_MEDIA){
         draw_viewer(q,app,w,x,y,cw,ink,muted);
     }else if(app==Q_STORE){
@@ -979,7 +1266,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y+45,"Quartzie 0.39.3",ink,2);
+        text(q,x,y+45,"Quartzie 0.39.4",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -1501,12 +1788,7 @@ void q_click(QDesktop *q,int x,int y){
                 q_open(q,(int[]){Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL}[i]);return;
             }
         }else if(chosen==Q_SETTINGS){
-            if(hit(x,y,bx,by+36,w->w-64,91)){q_set_theme(q,!q->theme);}
-            else if(hit(x,y,bx,by+143,w->w-64,97)){
-                if(x>=bx+160&&x<=bx+360)q->accent=clamp((x-(bx+150))/50,0,3);
-                else q->accent=(q->accent+1)%4;
-                q->dirty=1;
-            }
+            settings_click(q,w,x,y);
         }else if(chosen==Q_FILES){
             int rows=files_rows(w);
             if(!files_was_focused)q->file_click_index=-1;
@@ -1627,6 +1909,9 @@ void q_move(QDesktop *q,int x,int y){
 }
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     q->hover_only=0;
+    if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
+        q->settings_search_length=0;q->settings_search[0]=0;q->dirty=1;return;
+    }
     if(scan==23||ch==27){int had=q->menu||q->notifications||q->quick;close_popups(q);if(had)begin_scene_tween(q,6);q->dirty=1;return;}
     if(scan>=20&&scan<=22){
         int app=q->active;
@@ -1674,6 +1959,24 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
             q->menu_hover=-1;q->dirty=1;
         }
         return;
+    }
+    if(q->active==Q_SETTINGS){
+        if(ch==8&&q->settings_search_length){
+            q->settings_search[--q->settings_search_length]=0;
+            q->dirty=1;return;
+        }
+        if(ch==27&&q->settings_search_length){
+            q->settings_search_length=0;q->settings_search[0]=0;q->dirty=1;return;
+        }
+        if(ch=='\r'&&q->settings_search_length){
+            for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){settings_navigate(q,i);break;}
+            return;
+        }
+        if(ch>=32&&ch<=126&&q->settings_search_length<(int)sizeof(q->settings_search)-1){
+            q->settings_search[q->settings_search_length++]=(char)ch;
+            q->settings_search[q->settings_search_length]=0;
+            q->dirty=1;return;
+        }
     }
     if(ch=='\r'){
         if(q->active==Q_FILES){

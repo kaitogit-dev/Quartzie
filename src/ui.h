@@ -18,6 +18,7 @@
 #define Q_STORE 6
 #define Q_PHOTOS 7
 #define Q_MEDIA 8
+#define Q_SETTINGS_PAGES 6
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
@@ -29,6 +30,8 @@ typedef struct {
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,command_length,calc_length;
     int menu_search_length,calc_history_count;
+    int settings_page,settings_search_length;
+    char settings_search[32];
     char notes[2048],command[128],calc[64],answer[64],status[96];
     char menu_search[24],calc_history[3][64];
     QWindow windows[Q_APPS];

@@ -58,7 +58,12 @@ int main(void){
     q_open(&desktop,Q_SETTINGS);
     q_draw(&desktop);
     window=&desktop.windows[Q_SETTINGS];
-    q_click(&desktop,window->x+60,window->y+60+36+32);
+    int sx=window->x+32,sy=window->y+60;
+    int side=settings_sidebar_width(window->w-64);
+    int content=sx+side+25;
+    q_click(&desktop,sx+36,sy+128+2*43+19);
+    CHECK(desktop.settings_page==2);
+    q_click(&desktop,content+43,sy+168);
     CHECK(desktop.theme==0);
     CHECK(wall_checksum()==original);
     q_key(&desktop,0,19);
