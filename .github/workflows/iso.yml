@@ -34,5 +34,6 @@ jobs:
             Quartzie-0.39.0-x64.img
             build/BOOTX64.EFI
             build/Quartzie.cur
+            assets/icons.zip
             build/*-screen.ppm
             build/settings.ppm
