@@ -6,6 +6,8 @@
 #define QFS_VOLUMES 8
 #define QFS_ENTRIES 48
 #define QFS_PATH 192
+#define QFS_MEMORY_FILES 24
+#define QFS_MEMORY_BYTES 4096
 typedef struct {
     char name[72];
     uint64_t size;
@@ -17,9 +19,16 @@ typedef struct {
     int readonly;
 } QFsVolume;
 typedef struct {
+    int active,directory;
+    char path[QFS_PATH];
+    size_t length;
+    uint8_t data[QFS_MEMORY_BYTES];
+} QMemoryFile;
+typedef struct {
     EFI_BOOT_SERVICES *boot;
     QFsVolume volumes[QFS_VOLUMES];
-    int count;
+    int count,ram_index;
+    QMemoryFile memory[QFS_MEMORY_FILES];
 } QStorage;
 void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot);
 int qfs_list(QStorage *s,int volume,const char *path,QFsEntry *entries,int limit);

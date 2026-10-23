@@ -7,7 +7,24 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL media line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static void u16(uint8_t *b,int off,int v){b[off]=(uint8_t)v;b[off+1]=(uint8_t)(v>>8);}
 static void u32(uint8_t *b,int off,unsigned v){u16(b,off,v&65535);u16(b,off+2,v>>16);}
+static QStorage storage;
 int main(void){
+    qfs_init(&storage,0,0);
+    CHECK(storage.count==1&&storage.ram_index==0);
+    CHECK(qfs_mkdir(&storage,0,"\\\\Pictures")==0);
+    CHECK(qfs_write(&storage,0,"\\\\Pictures\\\\test.txt","hello",5)==0);
+    QFsEntry entries[QFS_ENTRIES];
+    CHECK(qfs_list(&storage,0,"\\\\",entries,QFS_ENTRIES)==1);
+    CHECK(entries[0].directory&&strcmp(entries[0].name,"Pictures")==0);
+    CHECK(qfs_list(&storage,0,"\\\\Pictures",entries,QFS_ENTRIES)==1);
+    CHECK(strcmp(entries[0].name,"test.txt")==0);
+    char text_data[32];size_t text_len=0;
+    CHECK(qfs_read(&storage,0,"\\\\Pictures\\\\test.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==5);
+    CHECK(memcmp(text_data,"hello",5)==0);
+    CHECK(qfs_delete(&storage,0,"\\\\Pictures")!=0);
+    CHECK(qfs_delete(&storage,0,"\\\\Pictures\\\\test.txt")==0);
+    CHECK(qfs_delete(&storage,0,"\\\\Pictures")==0);
+
     char path[QFS_PATH];
     CHECK(qfs_join(path,sizeof(path),"\\","PHOTO.BMP")==0);
     CHECK(strcmp(path,"\\PHOTO.BMP")==0);

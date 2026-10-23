@@ -43,7 +43,7 @@ Drag a window title bar to move it, or to the top edge to maximize. Drag a maxim
 
 ## Files and media
 
-Files enumerates UEFI-readable FAT volumes, including the boot volume and attached FAT-formatted disks. Browse folders, create text files or directories, delete entries, and open text files in Notes. Notes saves to the selected writable file.
+Files enumerates UEFI-readable FAT volumes, including the boot volume and attached FAT-formatted disks. A writable Home RAM volume is also available for files and folders during the current session; its contents reset after reboot. Browse folders, create text files or directories, delete entries, and open text files in Notes. Notes saves to the selected writable file.
 
 Photos opens uncompressed 24/32-bit BMP images. Media Player supports PCM WAV (8/16-bit mono or stereo) and uncompressed AVI video with 24/32-bit BGR frames. WAV playback uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. Compressed MP3, H.264 and MP4 are not supported by the native decoder.
 
