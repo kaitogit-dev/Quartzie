@@ -45,6 +45,17 @@ int main(void){
     CHECK((q_icon_pixels(QI_CALCULATOR)[20*Q_ICON_SIZE+32]>>24)>128);
     CHECK(q_icon_pixels_sized(QI_COUNT,40)==0);
     CHECK(q_icon_pixels_sized(QI_COUNT,25)==0);
+    const int sizes[]={25,27,28,40,43,58,64};
+    for(int id=0;id<QI_START;id++)for(int j=0;j<7;j++){
+        int size=sizes[j];
+        const uint32_t *pixels=q_icon_pixels_sized((unsigned int)id,size);
+        CHECK(pixels!=0);
+        for(int k=0;k<size*size;k++){
+            uint32_t alpha=pixels[k]>>24;
+            CHECK(alpha==0||alpha>=16);
+            if(!alpha)CHECK((pixels[k]&0xffffffu)==0);
+        }
+    }
     puts("PASS: native 64px source and transparent 40/43/58px app icons");
     return 0;
 }

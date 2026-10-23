@@ -948,7 +948,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
     }else{
-        text(q,x,y+45,"Quartzie 0.39.0",ink,2);
+        text(q,x,y+45,"Quartzie 0.39.1",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);

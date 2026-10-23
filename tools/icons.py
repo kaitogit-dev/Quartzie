@@ -4,6 +4,7 @@ import sys
 import zipfile
 from io import BytesIO
 from PIL import Image
+from clean_icons import clean
 
 NAMES = (
     "1bar_volume", "1bar_wifi", "2bar_volume", "2bar_wifi",
@@ -23,7 +24,7 @@ def build(archive, output):
             raise ValueError("Icon archive contents do not match the expected set")
         for name in NAMES:
             original = Image.open(BytesIO(icons.read(name + ".ico")))
-            sources.append(original.ico.getimage((64, 64)).convert("RGBA"))
+            sources.append(clean(original.ico.getimage((64, 64))))
     start = Image.open(BytesIO(base64.b64decode(
         pathlib.Path("assets/start-icon.png.base64").read_text().strip()
     ))).convert("RGBA")
@@ -38,7 +39,7 @@ def build(archive, output):
     for size in SIZES:
         lines.append(f"static const uint32_t atlas_{size}[QI_COUNT][{size}*{size}] = {{")
         for icon in sources:
-            resized = icon if size == 64 else icon.resize((size, size), Image.Resampling.LANCZOS)
+            resized = clean(icon if size == 64 else icon.resize((size, size), Image.Resampling.LANCZOS))
             pixels = list(resized.getdata())
             lines.append("{")
             for offset in range(0, len(pixels), 16):
