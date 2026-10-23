@@ -3,7 +3,7 @@
 #include <stdint.h>
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
-#define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+4*Q_MAX_W*Q_MAX_H)
+#define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
 #define Q_APPS 7
 #define Q_FILES 0
 #define Q_NOTES 1

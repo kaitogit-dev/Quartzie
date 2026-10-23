@@ -115,15 +115,14 @@ static void soft_shadow(QDesktop *q,int x,int y,int w,int h,int r,int spread,int
 #define GLASS_SIDE (Q_MAX_W / GLASS_SCALE + 16)
 #define GLASS_ROWS (Q_MAX_H / GLASS_SCALE + 16)
 #if defined(QUARTZIE_FIRMWARE)
-static uint32_t *glass_source,*glass_horizontal,*glass_final,*glass_cached,*glass_cached_full;
+static uint32_t *glass_source,*glass_horizontal,*glass_final,*glass_cached;
 static uint32_t *scene_from,*scene_to,*scene_back;
 void q_ui_set_scratch(uint32_t *storage){
     glass_source=storage;
     glass_horizontal=glass_source+GLASS_SIDE*GLASS_ROWS;
     glass_final=glass_horizontal+GLASS_SIDE*GLASS_ROWS;
     glass_cached=glass_final+GLASS_SIDE*GLASS_ROWS;
-    glass_cached_full=glass_cached+GLASS_SIDE*GLASS_ROWS;
-    scene_from=glass_cached_full+Q_MAX_W*Q_MAX_H;
+    scene_from=glass_cached+GLASS_SIDE*GLASS_ROWS;
     scene_to=scene_from+Q_MAX_W*Q_MAX_H;
     scene_back=scene_to+Q_MAX_W*Q_MAX_H;
 }
@@ -132,7 +131,6 @@ static uint32_t glass_source[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_horizontal[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_final[GLASS_SIDE * GLASS_ROWS];
 static uint32_t glass_cached[GLASS_SIDE * GLASS_ROWS];
-static uint32_t glass_cached_full[Q_MAX_W * Q_MAX_H];
 
 static uint32_t scene_from[Q_MAX_W*Q_MAX_H];
 static uint32_t scene_to[Q_MAX_W*Q_MAX_H];
@@ -228,7 +226,7 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
             int cover=radius?round_cover(dx,dy,w,h,radius):256;
             if(!cover)continue;
             size_t at=row+px;
-            uint32_t backdrop=cached?glass_cached_full[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
+            uint32_t backdrop=cached?q->blurred[at]:glass_fetch(glass_final,px,py,sx,sy,cols,rows);
             uint32_t c=blend(backdrop,tint,material);
             if(texture){
                 uint32_t noise=(uint32_t)px*0x9e3779b1u^(uint32_t)py*0x85ebca6bu;
@@ -856,7 +854,7 @@ static void prepare_window_glass(QDesktop *q,int app,QWindow *w){
     int left=clamp(w->x,0,q->width),top=clamp(w->y,0,q->height);
     int right=clamp(w->x+w->w,0,q->width),bottom=clamp(w->y+w->h,0,q->height);
     for(int py=top;py<bottom;py++)for(int px=left;px<right;px++)
-        glass_cached_full[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,0,0,cols,rows);
+        q->blurred[(size_t)py*q->width+px]=glass_fetch(glass_final,px,py,0,0,cols,rows);
     glass_cache_cols=cols;glass_cache_rows=rows;q->glass_cached_app=app;
 }
 void q_drag_buffers(QDesktop *q,uint32_t *background){
@@ -877,7 +875,7 @@ static void drag_capture(QDesktop *q){
     glass_cache_rows=(q->height+GLASS_SCALE-1)/GLASS_SCALE;
     glass_filter(q,0,0,glass_cache_cols,glass_cache_rows);
     for(int i=0;i<glass_cache_cols*glass_cache_rows;i++)glass_cached[i]=glass_final[i];
-    for(int y=0;y<q->height;y++)for(int x=0;x<q->width;x++)glass_cached_full[(size_t)y*q->width+x]=glass_fetch(glass_cached,x,y,0,0,glass_cache_cols,glass_cache_rows);
+    for(int y=0;y<q->height;y++)for(int x=0;x<q->width;x++)q->blurred[(size_t)y*q->width+x]=glass_fetch(glass_cached,x,y,0,0,glass_cache_cols,glass_cache_rows);
     q->glass_cached_app=app;
     draw_window(q,app);
     draw_overlays(q);
