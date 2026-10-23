@@ -306,7 +306,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     QPs2Mouse ps2={0};
     int ps2_active=0,ps2_wait=0,ps2_tries=0,ever_moved=0,ps2_logged=0;
     int pointer_updates=0;
-    if(!mouse&&!absolute){
+    if(!absolute){
         ps2_active=q_ps2_enable();
         if(ps2_active)pointer_ps2=&ps2;
         serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");
@@ -333,7 +333,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
         left=(uint8_t)pointer_pressed;
-        if(!ps2_active&&!ever_moved&&ps2_tries<2&&++ps2_wait>=400){
+        if(!ps2_active&&!ever_moved&&!mouse&&!absolute&&ps2_tries<2&&++ps2_wait>=400){
             ps2_tries++;
             ps2_active=q_ps2_enable();
             if(ps2_active){pointer_ps2=&ps2;pointer_relative=0;serial_text("QUARTZIE-PS2-READY\n");}
