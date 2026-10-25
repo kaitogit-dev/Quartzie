@@ -910,7 +910,7 @@ static void notes_vertical(QDesktop *q,int direction){
 }
 static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
     surface(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
-    int row=0,advance=0,used=0,cursor_row=0,cursor_x=0;
+    int row=0,advance=0,cursor_row=0,cursor_x=0;
     int max_width=cw-47;
     for(int i=0;i<=q->note_length;i++){
         if(i==q->note_cursor){cursor_row=row;cursor_x=advance;}
@@ -921,7 +921,7 @@ static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             if(!c)break;
             if(c=='\n')continue;
         }
-        advance+=width;used++;
+        advance+=width;
     }
     int visible=clamp((w->h-205)/26,3,22);
     if(cursor_row<q->note_scroll)q->note_scroll=cursor_row;
