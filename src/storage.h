@@ -10,8 +10,8 @@
 #define QFS_MEMORY_BYTES 4096
 typedef struct {
     char name[72];
-    uint64_t size;
-    int directory;
+    uint64_t size,modified;
+    int directory,hidden;
 } QFsEntry;
 typedef struct {
     EFI_HANDLE handle;
@@ -22,12 +22,14 @@ typedef struct {
     int active,directory;
     char path[QFS_PATH];
     size_t length;
+    uint64_t modified;
     uint8_t data[QFS_MEMORY_BYTES];
 } QMemoryFile;
 typedef struct {
     EFI_BOOT_SERVICES *boot;
     QFsVolume volumes[QFS_VOLUMES];
     int count,ram_index;
+    uint64_t change_counter;
     QMemoryFile memory[QFS_MEMORY_FILES];
 } QStorage;
 void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot);

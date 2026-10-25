@@ -110,7 +110,7 @@ static int ram_add(QStorage *s,const char *path,int directory,const void *buffer
         zero(f,sizeof(*f));f->active=1;f->directory=directory;
         int j=0;for(;path[j]&&j<QFS_PATH-1;j++)f->path[j]=path[j];
         if(path[j]){f->active=0;return -1;}
-        f->length=length;
+        f->length=length;f->modified=++s->change_counter;
         for(size_t k=0;k<length;k++)f->data[k]=((const uint8_t *)buffer)[k];
         return 0;
     }
@@ -128,6 +128,7 @@ static int ram_list(QStorage *s,const char *path,QFsEntry *entries,int limit){
         for(const char *p=basename;*p;p++)if(*p=='\\')basename=p+1;
         int j=0;for(;basename[j]&&j<71;j++)e->name[j]=basename[j];
         e->size=s->memory[i].length;e->directory=s->memory[i].directory;
+        e->modified=s->memory[i].modified;e->hidden=basename[0]=='.';
         count++;
     }
     for(int i=1;i<count;i++){
@@ -190,7 +191,14 @@ int qfs_list(QStorage *s,int volume,const char *path,QFsEntry *entries,int limit
             entry->name[i]=name[i]<128?(char)name[i]:'?';
         if(!entry->name[0])continue;
         entry->size=*(uint64_t *)(void *)(data.bytes+8);
-        entry->directory=(*(uint64_t *)(void *)(data.bytes+72)&0x10u)!=0;
+        uint64_t attributes=*(uint64_t *)(void *)(data.bytes+72);
+        entry->directory=(attributes&0x10u)!=0;
+        entry->hidden=(attributes&2u)!=0||entry->name[0]=='.';
+        const uint8_t *when=data.bytes+56;
+        uint64_t year=(uint64_t)when[0]+((uint64_t)when[1]<<8);
+        entry->modified=year*10000000000ull+(uint64_t)when[2]*100000000ull+
+            (uint64_t)when[3]*1000000ull+(uint64_t)when[4]*10000ull+
+            (uint64_t)when[5]*100ull+when[6];
         count++;
     }
     if(directory->Close)directory->Close(directory);
@@ -238,7 +246,7 @@ int qfs_write(QStorage *s,int volume,const char *path,const void *data,size_t le
         int i=ram_find(s,path);
         if(i<0)return ram_add(s,path,0,data,length);
         if(s->memory[i].directory||length>QFS_MEMORY_BYTES)return -1;
-        QMemoryFile *f=&s->memory[i];f->length=length;
+        QMemoryFile *f=&s->memory[i];f->length=length;f->modified=++s->change_counter;
         for(size_t j=0;j<length;j++)f->data[j]=((const uint8_t *)data)[j];
         return 0;
     }

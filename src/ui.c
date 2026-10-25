@@ -1091,6 +1091,8 @@ static int files_compare(QDesktop *q,int a,int b){
         if(!order&&*x!=*y)order=*x?1:-1;
     }else if(q->file_sort==2&&left->size!=right->size)
         order=left->size<right->size?-1:1;
+    else if(q->file_sort==3&&left->modified!=right->modified)
+        order=left->modified<right->modified?-1:1;
     if(!order){
         const char *x=left->name,*y=right->name;
         while(*x&&*y){
@@ -1120,7 +1122,7 @@ static int files_page(QDesktop *q,QWindow *w){
 static void files_rebuild(QDesktop *q){
     q->file_visible_count=0;
     for(int i=0;i<q->file_count;i++){
-        if(!q->file_show_hidden&&q->files[i].name[0]=='.')continue;
+        if(!q->file_show_hidden&&q->files[i].hidden)continue;
         if(!files_contains(q->files[i].name,q->file_search))continue;
         int j=q->file_visible_count++;
         while(j>0&&files_compare(q,i,q->file_order[j-1])<0){
@@ -1357,13 +1359,13 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     }
     if(q->file_menu){
         const char *const new_items[]={"Folder","Text document"};
-        const char *const sort_items[]={"Name","Type","Size","Ascending","Descending"};
+        const char *const sort_items[]={"Name","Type","Size","Date modified","Ascending","Descending"};
         const char *const view_items[]={"Extra large icons","Large icons","Medium icons","Small icons","List","Details","Tiles","Content","Show >"};
         const char *const show_items[]={"Navigation pane","Compact view","Item check boxes","File extensions","Hidden items"};
         const char *const more_items[]={"Select all","Select none","Invert selection","Properties","Refresh"};
         int mx=left+(q->file_menu==1?5:q->file_menu==2?407:q->file_menu==3?500:595),my=top+94;
         if(q->file_menu==1)files_popup(q,mx,my,190,2,new_items,-1);
-        else if(q->file_menu==2)files_popup(q,mx,my,178,5,sort_items,q->file_sort);
+        else if(q->file_menu==2)files_popup(q,mx,my,178,6,sort_items,q->file_sort);
         else if(q->file_menu==3){
             mx=clamp(mx,left,left+full-439);
             files_popup(q,mx,my,226,9,view_items,q->file_view);
@@ -2428,7 +2430,7 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
             files_rebuild(q);return 1;
         }
         int width=group==1?190:group==2?178:group==3?226:188;
-        int height=group==1?82:group==2?187:group==3?327:187;
+        int height=group==1?82:group==2?222:group==3?327:187;
         if(hit(x,y,mx,my,width,height)){
             int option=(y-my-6)/35;
             if(group==1){
@@ -2436,9 +2438,9 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
                 if(option>=0&&option<2)files_begin(q,option+1);
             }else if(group==2){
                 q->file_menu=0;
-                if(option>=0&&option<3)q->file_sort=option;
-                if(option==3)q->file_desc=0;
-                if(option==4)q->file_desc=1;
+                if(option>=0&&option<4)q->file_sort=option;
+                if(option==4)q->file_desc=0;
+                if(option==5)q->file_desc=1;
                 files_rebuild(q);
             }else if(group==3){
                 if(option==8){q->file_submenu=!q->file_submenu;q->dirty=1;}

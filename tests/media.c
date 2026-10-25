@@ -16,6 +16,11 @@ int main(void){
     QFsEntry entries[QFS_ENTRIES];
     CHECK(qfs_list(&storage,0,"\\",entries,QFS_ENTRIES)==1);
     CHECK(entries[0].directory&&strcmp(entries[0].name,"Pictures")==0);
+    CHECK(entries[0].modified!=0);
+    CHECK(qfs_write(&storage,0,"\\.hidden.txt","hidden",6)==0);
+    CHECK(qfs_list(&storage,0,"\\",entries,QFS_ENTRIES)==2);
+    CHECK(entries[0].name[0]=='.'&&entries[0].hidden);
+    CHECK(qfs_delete(&storage,0,"\\.hidden.txt")==0);
     CHECK(qfs_list(&storage,0,"\\Pictures",entries,QFS_ENTRIES)==1);
     CHECK(strcmp(entries[0].name,"test.txt")==0);
     char text_data[32];size_t text_len=0;
