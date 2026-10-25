@@ -1204,72 +1204,168 @@ static void files_size(const QFsEntry *entry,char *out){
     int j=0;while(at)out[j++]=reverse[--at];
     out[j++]=' ';for(int i=0;unit[i];i++)out[j++]=unit[i];out[j]=0;
 }
-static int files_rows(QWindow *w){return clamp((w->h-235)/40,3,10);}
+
+static void files_button(QDesktop *q,int x,int y,int w,const char *label,int active){
+    if(active)surface(q,x,y,w,33,7,colors(q)->selected,q->theme?180:156);
+    string_limit(q,x+10,y+23,label,active?accent(q):foreground(q),0,w-15,1);
+}
+static void files_popup(QDesktop *q,int x,int y,int w,int n,const char *const *labels,int selected){
+    surface(q,x,y,w,n*35+12,10,q->theme?0x272b32:0xe4eff9,247);
+    for(int i=0;i<n;i++){
+        if(i==selected)surface(q,x+5,y+6+i*35,w-10,33,6,colors(q)->selected,185);
+        string_limit(q,x+12,y+30+i*35,labels[i],foreground(q),0,w-22,1);
+    }
+}
 static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
-    surface(q,x,y+25,112,43,12,inner_material(q),q->theme?169:166);
+    int left=x-17,top=y,full=cw+34;
+    int side=q->file_nav?188:0;
+    int main_x=left+side+9,main_w=full-side-16-(q->file_details?188:0);
+    int sidebar_y=top+103,footer=w->y+w->h-31;
+    surface(q,left,top,full,44,7,inner_material(q),q->theme?115:139);
+    const char *navigation[]={"<",">","^","Refresh"};
+    const int nav_x[]={0,40,80,120},nav_w[]={35,35,35,70};
+    for(int i=0;i<4;i++)files_button(q,left+nav_x[i],top+6,nav_w[i],navigation[i],0);
+    int search_w=clamp(full/4,144,225),address_x=left+195;
+    int address_w=full-203-search_w-8;
+    if(address_w<72)address_w=72;
+    surface(q,address_x,top+6,address_w,34,6,q->theme?0x333d4b:0xf0f7ff,218);
+    char location[QFS_PATH+38];int p=0;
     const char *volume=q->storage&&q->storage->count?q->storage->volumes[q->file_volume].label:"Drives";
-    text(q,x+14,y+52,volume,ink,0);
-    surface(q,x+122,y+25,cw-122,43,12,inner_material(q),q->theme?123:146);
-    string_limit(q,x+134,y+53,q->file_path,ink,0,cw-149,1);
-    const char *buttons[]={"Up","Refresh","New folder","New text","Delete"};
-    int offsets[]={0,66,157,278,385},widths[]={57,82,112,98,78};
-    for(int i=0;i<5;i++){
-        if(offsets[i]+widths[i]>cw)continue;
-        surface(q,x+offsets[i],y+79,widths[i],35,11,inner_material(q),q->theme?152:153);
-        text(q,x+offsets[i]+9,y+102,buttons[i],i==4&&q->file_confirm?0xd96977:ink,0);
+    if(q->file_location)volume="This PC";
+    while(volume[p]&&p<25){location[p]=volume[p];p++;}
+    if(!q->file_location){
+        location[p++]=' ';location[p++]='>';
+        for(int i=0;q->file_path[i]&&p<QFS_PATH+29;i++)location[p++]=q->file_path[i]=='\\'?'/':q->file_path[i];
     }
-    if(q->file_confirm)text(q,x+3,y+133,"Press Delete again",0xcc6477,0);
-    else if(q->file_status[0])string_limit(q,x+3,y+133,q->file_status,muted,0,cw-10,1);
-    if(!q->storage||!q->storage->count)return;
-    int count=files_rows(w);
-    surface(q,x,y+139,cw,count*40+8,15,inner_material(q),q->theme?102:127);
-    for(int row=0;row<count;row++){
-        int index=q->file_scroll+row;
-        if(index>=q->file_count)break;
-        QFsEntry *entry=&q->files[index];
-        int ry=y+143+row*40;
-        if(index==q->file_selected){
-            int x0=clamp(x+2,q->clip_left,q->clip_right),x1=clamp(x+cw-2,q->clip_left,q->clip_right);
-            int y0=clamp(ry+2,q->clip_top,q->clip_bottom),y1=clamp(ry+38,q->clip_top,q->clip_bottom);
-            for(int yy=y0;yy<y1;yy++){
-                uint32_t *line=q->pixels+(size_t)yy*q->width;
-                for(int xx=x0;xx<x1;xx++)line[xx]=blend(line[xx],colors(q)->selected,q->theme?79:108);
+    location[p]=0;
+    string_limit(q,address_x+11,top+29,q->file_address_active?q->file_address:location,ink,0,address_w-18,1);
+    surface(q,left+full-search_w,top+6,search_w,34,6,q->theme?0x333d4b:0xf0f7ff,213);
+    string_limit(q,left+full-search_w+11,top+29,q->file_search_length?q->file_search:"Search this folder",q->file_search_length?ink:muted,0,search_w-18,1);
+    thin_rule(q,left,top+50,full,35);
+    const char *tools[]={"New v","Cut","Copy","Paste","Rename","Delete","Sort v","View v","..."};
+    const int tx[]={5,83,131,186,249,326,407,500,595},tw[]={74,45,52,55,75,76,85,88,45};
+    for(int i=0;i<9;i++)if(tx[i]+tw[i]<=full)
+        files_button(q,left+tx[i],top+57,tw[i],tools[i],q->file_menu==((i==0)?1:(i==6)?2:(i==7)?3:(i==8)?4:0));
+    thin_rule(q,left,top+97,full,31);
+    int canvas_y=top+109,canvas_h=footer-canvas_y;
+    if(q->file_nav){
+        surface(q,left,sidebar_y,side-6,footer-sidebar_y,8,inner_material(q),q->theme?117:143);
+        const char *shortcuts[]={"Home","Desktop","Documents","Pictures","Music","Videos","This PC","Network"};
+        const int icons[]={QI_FILE_EXPLORER,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_WIFI};
+        for(int i=0;i<8;i++){
+            int py=sidebar_y+12+i*36+(i>=6?18:0);
+            int chosen=(i==0&&q->storage&&q->file_volume==q->storage->ram_index&&files_equal(q->file_path,"\\"))||
+                (i==6&&q->file_location)||
+                (i>=1&&i<=5&&q->storage&&q->file_volume==q->storage->ram_index&&files_contains(q->file_path,shortcuts[i]));
+            if(chosen)surface(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
+            sprite(q,left+22,py+13,icons[i],25);
+            string_limit(q,left+41,py+20,shortcuts[i],ink,0,side-49,1);
+        }
+        thin_rule(q,left+13,sidebar_y+328,side-31,44);
+        int count=q->storage?q->storage->count:0;
+        for(int i=0;i<count&&i<5;i++){
+            int py=sidebar_y+344+i*35;
+            if(py+30>=footer)break;
+            if(!q->file_location&&q->file_volume==i)surface(q,left+5,py-1,side-17,33,6,colors(q)->selected,131);
+            sprite(q,left+22,py+14,QI_FILE_EXPLORER,25);
+            string_limit(q,left+41,py+21,q->storage->volumes[i].label,ink,0,side-49,1);
+        }
+    }
+    if(q->file_details){
+        int dx=left+full-183;
+        surface(q,dx,canvas_y+3,181,canvas_h-4,8,inner_material(q),q->theme?131:143);
+        text(q,dx+13,canvas_y+33,"Details",ink,1);
+        if(q->file_selected>=0&&q->file_selected<q->file_count){
+            QFsEntry *entry=&q->files[q->file_selected];
+            sprite(q,dx+90,canvas_y+105,files_icon(entry),64);
+            char name[72],size[32];files_display_name(q,entry,name);files_size(entry,size);
+            string_limit(q,dx+13,canvas_y+165,name,ink,0,155,2);
+            string_limit(q,dx+13,canvas_y+205,files_type(entry),muted,0,155,2);
+            if(!entry->directory)text(q,dx+13,canvas_y+248,size,muted,0);
+        }else text(q,dx+13,canvas_y+78,"Select an item",muted,0);
+    }
+    if(q->file_location){
+        text(q,main_x+12,canvas_y+32,"Devices and drives",ink,1);
+        if(q->storage)for(int i=0;i<q->storage->count;i++){
+            int dx=main_x+8+(i%2)*225,dy=canvas_y+53+(i/2)*90;
+            if(dx+210>main_x+main_w)break;
+            surface(q,dx,dy,210,76,9,inner_material(q),q->theme?131:133);
+            sprite(q,dx+32,dy+37,QI_FILE_EXPLORER,43);
+            string_limit(q,dx+62,dy+37,q->storage->volumes[i].label,ink,0,139,1);
+            text(q,dx+62,dy+59,"Open drive",muted,0);
+        }
+    }else{
+        int cols=files_columns(q,w),item_h=files_item_height(q);
+        int page=files_page(q,w),pitch=cols==1?main_w-10:(main_w-14)/cols;
+        int size=q->file_view==0?82:q->file_view==1?64:q->file_view==2?48:q->file_view==3?35:30;
+        if(q->file_view==5){
+            surface(q,main_x+4,canvas_y+2,main_w-5,33,5,inner_material(q),q->theme?123:148);
+            text(q,main_x+42,canvas_y+25,"Name",muted,0);
+            text(q,main_x+main_w/2,canvas_y+25,"Type",muted,0);
+            text(q,main_x+main_w-100,canvas_y+25,"Size",muted,0);
+            canvas_y+=37;
+        }
+        for(int slot=0;slot<page;slot++){
+            int shown=q->file_scroll+slot;
+            if(shown>=q->file_visible_count)break;
+            int index=q->file_order[shown];QFsEntry *entry=&q->files[index];
+            int ix=main_x+6+(slot%cols)*pitch,iy=canvas_y+(slot/cols)*item_h,iw=pitch-5;
+            if(iy+item_h>footer-5)break;
+            if(q->file_checked[index]||index==q->file_selected)
+                surface(q,ix,iy,iw,item_h-4,6,colors(q)->selected,q->theme?154:143);
+            char name[72],size_label[32];files_display_name(q,entry,name);files_size(entry,size_label);
+            if(q->file_view>=4){
+                sprite(q,ix+19,iy+item_h/2-2,files_icon(entry),30);
+                string_limit(q,ix+42,iy+item_h/2+5,name,ink,0,
+                    q->file_view==5?main_w/2-46:iw-48,1);
+                if(q->file_view==5){
+                    string_limit(q,main_x+main_w/2,iy+item_h/2+5,files_type(entry),muted,0,main_w/2-117,1);
+                    text(q,main_x+main_w-98,iy+item_h/2+5,size_label,muted,0);
+                }else if(q->file_view>=6)
+                    string_limit(q,ix+42,iy+item_h/2+25,files_type(entry),muted,0,iw-50,1);
+            }else{
+                sprite(q,ix+iw/2,iy+size/2+6,files_icon(entry),size);
+                string_limit(q,ix+6,iy+size+26,name,ink,0,iw-12,2);
             }
-            rectangle(q,x+2,ry+5,3,30,accent(q));
         }
-        if(row>0)thin_rule(q,x+47,ry,cw-65,q->theme?24:42);
-        sprite(q,x+23,ry+18,entry->directory?QI_FOLDER:
-            (file_suffix(entry->name,".bmp")||file_suffix(entry->name,".png")||
-             file_suffix(entry->name,".jpg")||file_suffix(entry->name,".jpeg")||
-             file_suffix(entry->name,".gif")||file_suffix(entry->name,".tga"))?QI_IMAGE:
-            (file_suffix(entry->name,".wav")||file_suffix(entry->name,".mp3")||
-             file_suffix(entry->name,".avi"))?QI_MEDIA_PLAYER:QI_TEXT,28);
-        string_limit(q,x+46,ry+23,entry->name,ink,0,cw-152,1);
-        if(entry->directory)text(q,x+cw-98,ry+23,"Folder",muted,0);
-        else{
-            char size[18];uint64_t n=entry->size;
-            int j=0;
-            if(n>=1048576){n/=1048576;size[j++]=(char)('0'+(n/100)%10);size[j++]=(char)('0'+(n/10)%10);size[j++]=(char)('0'+n%10);size[j++]=' ';size[j++]='M';}
-            else if(n>=1024){n/=1024;size[j++]=(char)('0'+(n/100)%10);size[j++]=(char)('0'+(n/10)%10);size[j++]=(char)('0'+n%10);size[j++]=' ';size[j++]='K';}
-            else{size[j++]=(char)('0'+(n/100)%10);size[j++]=(char)('0'+(n/10)%10);size[j++]=(char)('0'+n%10);size[j++]=' ';size[j++]='B';}
-            size[j]=0;text(q,x+cw-88,ry+23,size,muted,0);
-        }
+        if(!q->file_visible_count)
+            text(q,main_x+30,canvas_y+59,q->file_search_length?"No matching items":"This folder is empty",muted,1);
     }
-    int bottom=y+143+count*40+10;
-    if(q->file_count>count){
-        text(q,x+14,bottom+18,"Previous",q->file_scroll?ink:muted,0);
-        text(q,x+121,bottom+18,"Next",q->file_scroll+count<q->file_count?ink:muted,0);
-    }
-    if(q->file_selected>=0&&q->file_selected<q->file_count)
-        text(q,x+250,bottom+18,"Rename",ink,0);
+    thin_rule(q,left,footer-8,full,42);
+    char count[38],rev[16];int at=0,n=0;
+    uint64_t value=q->file_location&&q->storage?(uint64_t)q->storage->count:(uint64_t)q->file_visible_count;
+    do{rev[n++]=(char)('0'+value%10);value/=10;}while(value&&n<15);
+    while(n)count[at++]=rev[--n];
+    const char *suffix=" items";for(int i=0;suffix[i];i++)count[at++]=suffix[i];count[at]=0;
+    text(q,left+9,footer+13,count,muted,0);
+    if(q->file_checked_count)text(q,left+107,footer+13,"Selected",muted,0);
+    if(q->file_status[0])string_limit(q,left+222,footer+13,q->file_status,muted,0,full-233,1);
     if(q->file_operation){
-        int dx=x+35,dy=y+149,dw=cw-70;
-        pane(q,dx,dy,dw,134,16,material(q),q->theme?242:208);
-        const char *label=q->file_operation==1?"New folder":q->file_operation==2?"New text file":"Rename item";
-        text(q,dx+16,dy+30,label,ink,1);
-        surface(q,dx+14,dy+43,dw-28,42,9,inner_material(q),q->theme?192:181);
-        string_limit(q,dx+25,dy+71,q->file_input_length?q->file_input:"Type a name",q->file_input_length?ink:muted,0,dw-52,1);
-        text(q,dx+17,dy+112,"Enter to save    Esc to cancel",muted,0);
+        int dw=clamp(full-96,310,530),dx=left+(full-dw)/2,dy=top+135;
+        pane(q,dx,dy,dw,154,13,material(q),q->theme?239:213);
+        text(q,dx+18,dy+35,q->file_operation==1?"New folder":q->file_operation==2?"New text document":"Rename",ink,1);
+        surface(q,dx+17,dy+51,dw-34,43,7,inner_material(q),197);
+        string_limit(q,dx+27,dy+79,q->file_input_length?q->file_input:"Enter a name",q->file_input_length?ink:muted,0,dw-52,1);
+        text(q,dx+18,dy+128,"Enter  Save         Esc  Cancel",muted,0);
+    }
+    if(q->file_menu){
+        const char *const new_items[]={"Folder","Text document"};
+        const char *const sort_items[]={"Name","Type","Size","Ascending","Descending"};
+        const char *const view_items[]={"Extra large icons","Large icons","Medium icons","Small icons","List","Details","Tiles","Content"};
+        const char *const show_items[]={"Navigation pane","Details pane","Compact view","File extensions","Hidden items"};
+        const char *const more_items[]={"Select all","Select none","Invert selection","Properties","Refresh"};
+        int mx=left+(q->file_menu==1?5:q->file_menu==2?407:q->file_menu==3?500:595),my=top+94;
+        if(q->file_menu==1)files_popup(q,mx,my,190,2,new_items,-1);
+        else if(q->file_menu==2)files_popup(q,mx,my,178,5,sort_items,q->file_sort);
+        else if(q->file_menu==3){
+            mx=clamp(mx,left,left+full-424);
+            files_popup(q,mx,my,222,8,view_items,q->file_view);
+            files_popup(q,mx+222,my,196,5,show_items,-1);
+            for(int i=0;i<5;i++){
+                int active=i==0?q->file_nav:i==1?q->file_details:i==2?q->file_compact:i==3?q->file_extensions:q->file_show_hidden;
+                if(active)text(q,mx+395,my+30+i*35,"*",accent(q),0);
+            }
+        }else if(q->file_menu==4)files_popup(q,clamp(mx,left,left+full-193),my,188,5,more_items,-1);
     }
 }
 static void draw_media_canvas(QDesktop *q,int x,int y,int w,int h){
