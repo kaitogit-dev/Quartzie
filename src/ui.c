@@ -2327,7 +2327,8 @@ static void files_paste(QDesktop *q){
                 for(int i=0;clip->name[i]&&at<71;i++)candidate[at++]=clip->name[i];
                 candidate[at]=0;
                 if(!files_destination_exists(q,candidate)){
-                    for(int i=0;i<=at;i++)name[i]=candidate[i];found=1;break;
+                    for(int i=0;i<=at;i++){name[i]=candidate[i];}
+                    found=1;break;
                 }
                 attempt++;
             }
