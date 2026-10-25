@@ -1006,7 +1006,7 @@ static void terminal_run(QDesktop *q){
         if(!n){terminal_log(q,"Folder is empty");return;}
         for(int i=0;i<n;i++){char label[96];int at=0;
             if(operation_entries[i].directory){const char *prefix="<DIR> ";for(int j=0;prefix[j];j++)label[at++]=prefix[j];}
-            for(int j=0;operation_entries[i].name[j]&&at<95;j++)label[at++]=listing[i].name[j];
+            for(int j=0;operation_entries[i].name[j]&&at<95;j++)label[at++]=operation_entries[i].name[j];
             label[at]=0;terminal_log(q,label);
         }
         return;
