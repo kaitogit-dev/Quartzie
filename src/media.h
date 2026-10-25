@@ -22,6 +22,8 @@ typedef struct {
 int qm_open(QMedia *media,const void *data,size_t length);
 uint32_t qm_pixel(const QMedia *media,int x,int y);
 int qm_advance(QMedia *media,uint32_t microseconds);
+uint64_t qm_duration(const QMedia *media);
+void qm_seek(QMedia *media,uint64_t microseconds);
 uint8_t qm_audio_sample(const QMedia *media,uint64_t index);
 uint64_t qm_audio_count(const QMedia *media);
 #endif

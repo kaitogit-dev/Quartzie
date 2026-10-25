@@ -148,3 +148,24 @@ int qm_advance(QMedia *m,uint32_t elapsed){
     }
     return 0;
 }
+
+uint64_t qm_duration(const QMedia *m){
+    if(!m)return 0;
+    if(m->kind==QM_AUDIO&&m->sample_rate)
+        return qm_audio_count(m)*1000000u/m->sample_rate;
+    if(m->kind==QM_VIDEO&&m->fps>0)
+        return (uint64_t)m->frame_count*1000000u/(uint32_t)m->fps;
+    return 0;
+}
+void qm_seek(QMedia *m,uint64_t position){
+    if(!m)return;
+    uint64_t total=qm_duration(m);
+    if(!total)return;
+    if(position>total)position=total;
+    m->elapsed_us=position;
+    if(m->kind==QM_VIDEO){
+        uint64_t frame=position*(uint32_t)m->fps/1000000u;
+        m->frame=frame>=(uint64_t)m->frame_count?m->frame_count-1:(int)frame;
+    }
+    if(position==total)m->playing=0;
+}

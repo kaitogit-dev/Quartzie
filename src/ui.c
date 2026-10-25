@@ -492,7 +492,13 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
             q->file_click_elapsed_us=0;
         }else q->file_click_elapsed_us+=elapsed_us;
     }
-    if(qm_advance(&q->media,elapsed_us)&&q->media.kind==QM_VIDEO){q->dirty=1;q->hover_only=0;}
+    if(qm_advance(&q->media,elapsed_us)){
+        if(q->media.kind==QM_VIDEO){q->dirty=1;q->hover_only=0;}
+        else if(q->media.kind==QM_AUDIO){
+            q->audio_display_us+=elapsed_us;
+            if(q->audio_display_us>=250000u){q->audio_display_us%=250000u;q->dirty=1;q->hover_only=0;}
+        }
+    }
     if(!q->animations_enabled)return;
     if(elapsed_us>250000)elapsed_us=250000;
     int frame_advance=0;
@@ -771,6 +777,7 @@ static void files_open(QDesktop *q,int index){
             files_message(q,"Media file exceeds memory or cannot be opened");return;
         }
         if(qm_open(&q->media,q->media_buffer,length)!=0){files_message(q,"Unsupported media encoding");return;}
+        q->photo_zoom=0;q->audio_display_us=0;
         int i=0;for(;entry->name[i]&&i<71;i++)q->media_name[i]=entry->name[i];q->media_name[i]=0;
         q->media_volume=q->file_volume;
         q_open(q,q->media.kind==QM_IMAGE?Q_PHOTOS:Q_MEDIA);
@@ -1114,12 +1121,17 @@ static void draw_media_canvas(QDesktop *q,int x,int y,int w,int h){
     QMedia *m=&q->media;
     if((m->kind!=QM_IMAGE&&m->kind!=QM_VIDEO)||!m->width||!m->height)return;
     int dw=w-28,dh=h-22;
-    if((int64_t)dw*m->height>(int64_t)dh*m->width)dw=(int)((int64_t)dh*m->width/m->height);
+    if(q->render_app==Q_PHOTOS&&q->photo_zoom){
+        dw=m->width*(q->photo_zoom==2?2:1);
+        dh=m->height*(q->photo_zoom==2?2:1);
+    }else if((int64_t)dw*m->height>(int64_t)dh*m->width)dw=(int)((int64_t)dh*m->width/m->height);
     else dh=(int)((int64_t)dw*m->height/m->width);
     if(dw<1||dh<1)return;
     int px=x+(w-dw)/2,py=y+(h-dh)/2;
-    int startx=clamp(px,q->clip_left,q->clip_right),endx=clamp(px+dw,q->clip_left,q->clip_right);
-    int starty=clamp(py,q->clip_top,q->clip_bottom),endy=clamp(py+dh,q->clip_top,q->clip_bottom);
+    int startx=clamp(px>x?px:x,q->clip_left,q->clip_right);
+    int endx=clamp(px+dw<x+w?px+dw:x+w,q->clip_left,q->clip_right);
+    int starty=clamp(py>y?py:y,q->clip_top,q->clip_bottom);
+    int endy=clamp(py+dh<y+h?py+dh:y+h,q->clip_top,q->clip_bottom);
     for(int sy=starty;sy<endy;sy++){
         int iy=(int)((int64_t)(sy-py)*m->height/dh);
         for(int sx=startx;sx<endx;sx++)q->pixels[(size_t)sy*q->width+sx]=qm_pixel(m,(int)((int64_t)(sx-px)*m->width/dw),iy);
@@ -1145,11 +1157,27 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     if(app==Q_MEDIA){
         surface(q,x,y+60+height,101,38,12,colors(q)->selected,q->theme?165:150);
         text(q,x+21,y+86+height,q->media.playing?"Pause":"Play",ink,1);
-        if(q->media.kind==QM_VIDEO){
-            char label[26]="Frame ";
-            int n=q->media.frame+1;
-            label[6]=(char)('0'+n/100%10);label[7]=(char)('0'+n/10%10);label[8]=(char)('0'+n%10);label[9]=0;
-            text(q,x+128,y+87+height,label,muted,0);
+        uint64_t duration=qm_duration(&q->media);
+        int track=cw-300;
+        if(duration&&track>60){
+            int sx=x+117,sy=y+70+height;
+            rectangle(q,sx,sy,track,8,q->theme?0x395269:0xa3bdd0);
+            int fill=(int)((q->media.elapsed_us>duration?duration:q->media.elapsed_us)*(uint64_t)track/duration);
+            if(fill>0)rectangle(q,sx,sy,fill,8,accent(q));
+            circular(q,sx+fill,sy+4,6,accent(q),255);
+            uint64_t seconds=q->media.elapsed_us/1000000u;
+            if(seconds>5999)seconds=5999;
+            char time[8];
+            time[0]=(char)('0'+seconds/600);time[1]=(char)('0'+seconds/60%10);
+            time[2]=':';time[3]=(char)('0'+seconds/10%6);time[4]=(char)('0'+seconds%10);time[5]=0;
+            text(q,sx,sy+31,time,muted,0);
+        }
+    }else{
+        const char *labels[]={"Fit","100%","200%"};
+        for(int i=0;i<3;i++){
+            int bx=x+i*83;
+            surface(q,bx,y+60+height,78,38,11,i==q->photo_zoom?colors(q)->selected:inner_material(q),q->theme?177:148);
+            text(q,bx+14,y+86+height,labels[i],ink,0);
         }
     }
     text(q,x+cw-166,y+86+height,"Browse files",muted,0);
@@ -1269,7 +1297,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.4",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.5",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -1368,7 +1396,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.40.4",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.40.5",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1485,16 +1513,19 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     }else if(app==Q_PHOTOS||app==Q_MEDIA){
         draw_viewer(q,app,w,x,y,cw,ink,muted);
     }else if(app==Q_STORE){
-        text(q,x,y+47,"Library",muted,0);
-        const int entries[4]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL};
+        text(q,x,y+47,"App Library",muted,0);
+        const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
         for(int i=0;i<4;i++){
+            int app_index=entries[q->store_page*4+i];
             int pitch=w->w>650?230:190;
             int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
             surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
-            app_icon(q,bx+39,by+39,entries[i],43,ink);
-            text(q,bx+72,by+40,names[entries[i]],ink,0);
+            app_icon(q,bx+39,by+39,app_index,43,ink);
+            text(q,bx+72,by+40,names[app_index],ink,0);
             text(q,bx+72,by+69,"Open",accent(q),0);
         }
+        text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
+        text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
     }else{
         text(q,x,y+45,"Quartzie 0.40.2",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
@@ -2014,8 +2045,10 @@ void q_click(QDesktop *q,int x,int y){
         }
         int bx=w->x+32,by=w->y+60;
         if(chosen==Q_STORE){
+            const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
+            if(hit(x,y,bx,by+302,140,45)){q->store_page=1-q->store_page;q->dirty=1;return;}
             for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+78+(i/2)*118,174,102)){
-                q_open(q,(int[]){Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL}[i]);return;
+                q_open(q,entries[q->store_page*4+i]);return;
             }
         }else if(chosen==Q_SETTINGS){
             settings_click(q,w,x,y);
@@ -2074,12 +2107,23 @@ void q_click(QDesktop *q,int x,int y){
             int view_h=w->h-178;
             if(view_h<110)view_h=110;
             if(hit(x,y,bx+w->w-64-176,by+60+view_h,176,38)){q_open(q,Q_FILES);return;}
-            if(chosen==Q_MEDIA&&hit(x,y,bx,by+60+view_h,101,38)){
-                if(q->media.elapsed_us&&(!q->media.playing)&&q->media.kind==QM_VIDEO&&q->media.frame==q->media.frame_count-1){
-                    q->media.elapsed_us=0;q->media.frame=0;
+            if(chosen==Q_PHOTOS){
+                for(int i=0;i<3;i++)if(hit(x,y,bx+i*83,by+60+view_h,78,38)){q->photo_zoom=i;q->dirty=1;return;}
+            }
+            if(chosen==Q_MEDIA){
+                int track=w->w-64-300;
+                if(track>60&&hit(x,y,bx+110,by+65+view_h,track+14,20)){
+                    uint64_t duration=qm_duration(&q->media);
+                    if(duration){
+                        int pos=clamp(x-(bx+117),0,track);
+                        qm_seek(&q->media,duration*(uint64_t)pos/(uint64_t)track);
+                        q->dirty=1;return;
+                    }
                 }
-                if(q->media.elapsed_us&&(!q->media.playing)&&q->media.kind==QM_AUDIO&&q->media.elapsed_us*q->media.sample_rate/1000000u>=qm_audio_count(&q->media))q->media.elapsed_us=0;
-                q->media.playing=!q->media.playing;q->dirty=1;return;
+                if(hit(x,y,bx,by+60+view_h,101,38)){
+                    if(!q->media.playing&&q->media.elapsed_us>=qm_duration(&q->media))qm_seek(&q->media,0);
+                    q->media.playing=!q->media.playing;q->dirty=1;return;
+                }
             }
         }else if(chosen==Q_CALCULATOR){
             const char *keys="789/456*123-C0=+";

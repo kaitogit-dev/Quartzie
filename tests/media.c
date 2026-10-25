@@ -61,7 +61,10 @@ int main(void){
     for(int i=0;i<8;i++)wav[44+i]=(uint8_t)(i*32);
     CHECK(qm_open(&m,wav,sizeof(wav))==0&&m.kind==QM_AUDIO);
     CHECK(qm_audio_count(&m)==8&&qm_audio_sample(&m,0)==0&&qm_audio_sample(&m,7)==224);
-    m.playing=1;qm_advance(&m,2000);CHECK(!m.playing);
+    CHECK(qm_duration(&m)==1000);
+    qm_seek(&m,500);CHECK(m.elapsed_us==500);
+    qm_seek(&m,2000);CHECK(m.elapsed_us==1000&&!m.playing);
+    qm_seek(&m,0);m.playing=1;qm_advance(&m,2000);CHECK(!m.playing);
     puts("PASS: path validation, BMP pixels, PCM WAV samples and playback timing");
     return 0;
 }
