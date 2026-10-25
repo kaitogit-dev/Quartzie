@@ -37,5 +37,6 @@ int qfs_write(QStorage *s,int volume,const char *path,const void *data,size_t le
 int qfs_mkdir(QStorage *s,int volume,const char *path);
 int qfs_delete(QStorage *s,int volume,const char *path);
 int qfs_rename(QStorage *s,int volume,const char *source,const char *destination);
+int qfs_copy(QStorage *s,int source_volume,const char *source,int target_volume,const char *target);
 int qfs_join(char *out,size_t capacity,const char *directory,const char *name);
 #endif

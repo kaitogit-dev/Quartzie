@@ -2243,14 +2243,10 @@ static void calc_input(QDesktop *q,char key){
 }
 
 static QFsEntry file_copy_entries[7][QFS_ENTRIES];
-static uint8_t file_copy_small[QFS_MEMORY_BYTES];
 static int files_copy(QDesktop *q,int volume,const char *source,int target_volume,const char *target,int directory,int move,int depth){
     if(depth>=7||!q->storage)return -1;
     if(!directory){
-        uint8_t *buffer=q->media_buffer?q->media_buffer:file_copy_small;
-        size_t capacity=q->media_buffer?q->media_capacity:sizeof(file_copy_small),size=0;
-        if(qfs_read(q->storage,volume,source,buffer,capacity,&size)!=0)return -1;
-        if(qfs_write(q->storage,target_volume,target,buffer,size)!=0)return -1;
+        if(qfs_copy(q->storage,volume,source,target_volume,target)!=0)return -1;
         if(move&&qfs_delete(q->storage,volume,source)!=0)return -1;
         return 0;
     }

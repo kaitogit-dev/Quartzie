@@ -354,3 +354,70 @@ int qfs_rename(QStorage *s,int volume,const char *source,const char *destination
     if(file->Close)file->Close(file);
     return ok?0:-1;
 }
+
+static uint8_t storage_copy_block[8192];
+int qfs_copy(QStorage *s,int source_volume,const char *source,int target_volume,const char *target){
+    if(!s||!source||!target||source_volume<0||target_volume<0||
+       source_volume>=s->count||target_volume>=s->count)return -1;
+    if(source_volume==target_volume&&equal(source,target))return -1;
+    if(target_volume==s->ram_index){
+        if(ram_find(s,target)>=0)return -1;
+    }else{
+        QFile *existing=0;
+        if(open_path(s,target_volume,target,1,0,&existing)==0){
+            if(existing&&existing->Close)existing->Close(existing);
+            return -1;
+        }
+    }
+    if(source_volume==s->ram_index){
+        int index=ram_find(s,source);
+        if(index<0||s->memory[index].directory)return -1;
+        return qfs_write(s,target_volume,target,s->memory[index].data,s->memory[index].length);
+    }
+    QFile *input=0;
+    if(open_path(s,source_volume,source,1,0,&input)!=0||!input||!input->Read){
+        if(input&&input->Close)input->Close(input);
+        return -1;
+    }
+    if(target_volume==s->ram_index){
+        size_t total=0;int ok=1;
+        while(total<sizeof(storage_copy_block)){
+            uint64_t count=sizeof(storage_copy_block)-total;
+            if(input->Read(input,&count,storage_copy_block+total)!=0||count>sizeof(storage_copy_block)-total){ok=0;break;}
+            if(!count)break;
+            total+=(size_t)count;
+        }
+        if(ok&&total==sizeof(storage_copy_block)){
+            uint8_t extra;uint64_t count=1;
+            if(input->Read(input,&count,&extra)!=0||count!=0)ok=0;
+        }
+        if(input->Close)input->Close(input);
+        return ok&&total<=QFS_MEMORY_BYTES?qfs_write(s,target_volume,target,storage_copy_block,total):-1;
+    }
+    QFile *output=0;
+    if(open_path(s,target_volume,target,0x8000000000000003ull,0,&output)!=0||!output||!output->Write){
+        if(output&&output->Close)output->Close(output);
+        if(input->Close)input->Close(input);
+        return -1;
+    }
+    int ok=1;
+    for(;;){
+        uint64_t count=sizeof(storage_copy_block);
+        if(input->Read(input,&count,storage_copy_block)!=0||count>sizeof(storage_copy_block)){ok=0;break;}
+        if(!count)break;
+        uint64_t written=0;
+        while(written<count){
+            uint64_t remaining=count-written;
+            if(output->Write(output,&remaining,storage_copy_block+written)!=0||!remaining||remaining>count-written){
+                ok=0;break;
+            }
+            written+=remaining;
+        }
+        if(!ok)break;
+    }
+    if(input->Close)input->Close(input);
+    if(ok&&output->Flush&&output->Flush(output)!=0)ok=0;
+    if(output->Close&&output->Close(output)!=0)ok=0;
+    if(!ok)qfs_delete(s,target_volume,target);
+    return ok?0:-1;
+}
