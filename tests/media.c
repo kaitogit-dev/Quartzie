@@ -24,7 +24,17 @@ int main(void){
     CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,4,&text_len)!=0);
     CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,5,&text_len)==0&&text_len==5);
     CHECK(qfs_delete(&storage,0,"\\Pictures")!=0);
-    CHECK(qfs_delete(&storage,0,"\\Pictures\\test.txt")==0);
+    CHECK(qfs_rename(&storage,0,"\\Pictures\\test.txt","\\Pictures\\renamed.txt")==0);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,sizeof(text_data),&text_len)!=0);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\renamed.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==5);
+    CHECK(qfs_mkdir(&storage,0,"\\Pictures\\Nested")==0);
+    CHECK(qfs_write(&storage,0,"\\Pictures\\Nested\\inside.txt","ok",2)==0);
+    CHECK(qfs_rename(&storage,0,"\\Pictures\\Nested","\\Pictures\\Moved")==0);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\Moved\\inside.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==2);
+    CHECK(qfs_rename(&storage,0,"\\Pictures\\renamed.txt","\\Pictures\\Moved")==-1);
+    CHECK(qfs_delete(&storage,0,"\\Pictures\\Moved\\inside.txt")==0);
+    CHECK(qfs_delete(&storage,0,"\\Pictures\\Moved")==0);
+    CHECK(qfs_delete(&storage,0,"\\Pictures\\renamed.txt")==0);
     CHECK(qfs_delete(&storage,0,"\\Pictures")==0);
 
     char path[QFS_PATH];

@@ -712,7 +712,7 @@ static void files_message(QDesktop *q,const char *message){
     q->dirty=1;
 }
 static void files_refresh(QDesktop *q){
-    q->file_count=0;q->file_selected=-1;q->file_scroll=0;q->file_confirm=0;
+    q->file_count=0;q->file_selected=-1;q->file_scroll=0;q->file_confirm=0;q->file_operation=0;
     q->file_click_index=-1;q->file_click_elapsed_us=0;
     if(!q->storage||q->storage->count<1){files_message(q,"No mounted volumes");return;}
     int n=qfs_list(q->storage,q->file_volume,q->file_path,q->files,QFS_ENTRIES);
@@ -799,28 +799,50 @@ static void files_parent(QDesktop *q){
     q->file_path[end]=0;
     files_refresh(q);
 }
-static void files_create(QDesktop *q,int directory){
-    if(!q->storage||q->storage->count<1)return;
-    char name[24],path[QFS_PATH];
-    for(int i=1;i<=99;i++){
-        name[0]=directory?'F':'N';name[1]=directory?'o':'o';name[2]=directory?'l':'t';name[3]=directory?'d':'e';
-        int at=4;
-        if(directory){name[at++]='e';name[at++]='r';}
-        if(i>=10)name[at++]=(char)('0'+i/10);
-        name[at++]=(char)('0'+i%10);
-        if(!directory){name[at++]='.';name[at++]='t';name[at++]='x';name[at++]='t';}
-        name[at]=0;
-        int collision=0;
-        for(int j=0;j<q->file_count;j++){
-            if(file_suffix(q->files[j].name,name)&&q->files[j].name[0]==name[0]){collision=1;break;}
-        }
-        if(collision)continue;
-        if(qfs_join(path,sizeof(path),q->file_path,name)!=0)break;
-        int success=directory?qfs_mkdir(q->storage,q->file_volume,path)==0:qfs_write(q->storage,q->file_volume,path,"",0)==0;
-        if(success){files_refresh(q);return;}
-        files_message(q,"This volume is read-only");return;
+static int files_equal(const char *a,const char *b){
+    for(;*a&&*b;a++,b++){
+        char x=*a,y=*b;
+        if(x>='A'&&x<='Z')x=(char)(x+32);
+        if(y>='A'&&y<='Z')y=(char)(y+32);
+        if(x!=y)return 0;
     }
-    files_message(q,"No available file names");
+    return *a==*b;
+}
+static void files_begin(QDesktop *q,int operation){
+    if(operation==3&&(q->file_selected<0||q->file_selected>=q->file_count))return;
+    q->file_operation=operation;
+    q->file_input_length=0;
+    if(operation==3){
+        const char *name=q->files[q->file_selected].name;
+        while(name[q->file_input_length]&&q->file_input_length<70){
+            q->file_input[q->file_input_length]=name[q->file_input_length];
+            q->file_input_length++;
+        }
+    }
+    q->file_input[q->file_input_length]=0;
+    q->file_click_index=-1;
+    q->dirty=1;
+}
+static void files_finish(QDesktop *q){
+    if(!q->storage||!q->file_input_length)return;
+    for(int i=0;i<q->file_count;i++)if(files_equal(q->files[i].name,q->file_input)&&
+        !(q->file_operation==3&&i==q->file_selected)){
+        files_message(q,"A file with this name already exists");
+        return;
+    }
+    char target[QFS_PATH],old[QFS_PATH];
+    if(qfs_join(target,sizeof(target),q->file_path,q->file_input)!=0){
+        files_message(q,"Invalid file name");
+        return;
+    }
+    int ok=0;
+    if(q->file_operation==1)ok=qfs_mkdir(q->storage,q->file_volume,target)==0;
+    else if(q->file_operation==2)ok=qfs_write(q->storage,q->file_volume,target,"",0)==0;
+    else if(q->file_operation==3&&q->file_selected>=0&&
+        qfs_join(old,sizeof(old),q->file_path,q->files[q->file_selected].name)==0)
+        ok=qfs_rename(q->storage,q->file_volume,old,target)==0;
+    if(ok)files_refresh(q);
+    else files_message(q,"Could not create or rename item");
 }
 static void files_save_notes(QDesktop *q){
     if(!q->storage||!q->note_path[0]||q->note_volume<0){files_message(q,"Open a text file from Files to save");return;}
@@ -879,10 +901,21 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             size[j]=0;text(q,x+cw-88,ry+23,size,muted,0);
         }
     }
+    int bottom=y+143+count*40+10;
     if(q->file_count>count){
-        int bottom=y+143+count*40+10;
         text(q,x+14,bottom+18,"Previous",q->file_scroll?ink:muted,0);
         text(q,x+121,bottom+18,"Next",q->file_scroll+count<q->file_count?ink:muted,0);
+    }
+    if(q->file_selected>=0&&q->file_selected<q->file_count)
+        text(q,x+250,bottom+18,"Rename",ink,0);
+    if(q->file_operation){
+        int dx=x+35,dy=y+149,dw=cw-70;
+        pane(q,dx,dy,dw,134,16,material(q),q->theme?242:208);
+        const char *label=q->file_operation==1?"New folder":q->file_operation==2?"New text file":"Rename item";
+        text(q,dx+16,dy+30,label,ink,1);
+        surface(q,dx+14,dy+43,dw-28,42,9,inner_material(q),q->theme?192:181);
+        string_limit(q,dx+25,dy+71,q->file_input_length?q->file_input:"Type a name",q->file_input_length?ink:muted,0,dw-52,1);
+        text(q,dx+17,dy+112,"Enter to save    Esc to cancel",muted,0);
     }
 }
 static void draw_media_canvas(QDesktop *q,int x,int y,int w,int h){
@@ -1045,7 +1078,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.2",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.3",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -1144,7 +1177,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.39.4",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.40.3",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1799,6 +1832,11 @@ void q_click(QDesktop *q,int x,int y){
         }else if(chosen==Q_FILES){
             int rows=files_rows(w);
             if(!files_was_focused)q->file_click_index=-1;
+            if(q->file_operation){
+                int dx=bx+35,dy=by+149,dw=w->w-64-70;
+                if(hit(x,y,dx,dy,dw,134))return;
+                q->file_operation=0;q->dirty=1;return;
+            }
             for(int i=0;i<rows;i++)if(hit(x,y,bx,by+143+i*40,w->w-64,40)&&q->file_scroll+i<q->file_count){
                 files_select(q,q->file_scroll+i);return;
             }
@@ -1812,8 +1850,8 @@ void q_click(QDesktop *q,int x,int y){
             }
             if(hit(x,y,bx,by+79,57,35)){files_parent(q);return;}
             if(hit(x,y,bx+66,by+79,82,35)){files_refresh(q);return;}
-            if(hit(x,y,bx+157,by+79,112,35)){files_create(q,1);return;}
-            if(hit(x,y,bx+278,by+79,98,35)){files_create(q,0);return;}
+            if(hit(x,y,bx+157,by+79,112,35)){files_begin(q,1);return;}
+            if(hit(x,y,bx+278,by+79,98,35)){files_begin(q,2);return;}
             if(hit(x,y,bx+385,by+79,78,35)){
                 if(q->file_selected>=0&&q->file_selected<q->file_count){
                     if(!q->file_confirm){q->file_confirm=1;files_message(q,"");}
@@ -1827,6 +1865,7 @@ void q_click(QDesktop *q,int x,int y){
                 return;
             }
             int bottom=by+143+rows*40+10;
+            if(q->file_selected>=0&&hit(x,y,bx+238,bottom,100,34)){files_begin(q,3);return;}
             if(hit(x,y,bx,bottom,100,34)){
                 q->file_scroll=clamp(q->file_scroll-rows,0,q->file_count);q->dirty=1;return;
             }
@@ -1916,6 +1955,13 @@ void q_move(QDesktop *q,int x,int y){
 }
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     q->hover_only=0;
+    if(q->active==Q_FILES&&q->file_operation){
+        if(ch==27||scan==23){q->file_operation=0;q->dirty=1;return;}
+        if(ch==8){if(q->file_input_length)q->file_input[--q->file_input_length]=0;q->dirty=1;return;}
+        if(ch=='\r'){files_finish(q);q->dirty=1;return;}
+        if(ch>=32&&ch<=126&&ch!='/'&&ch!='\\'&&ch!=':'&&q->file_input_length<70){q->file_input[q->file_input_length++]=(char)ch;q->file_input[q->file_input_length]=0;q->dirty=1;}
+        return;
+    }
     if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
         q->settings_search_length=0;q->settings_search[0]=0;q->dirty=1;return;
     }

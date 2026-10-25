@@ -38,7 +38,8 @@ typedef struct {
     QStorage *storage;
     QFsEntry files[QFS_ENTRIES];
     int file_volume,file_count,file_scroll,file_selected,file_confirm;
-    int file_click_index;
+    int file_click_index,file_operation,file_input_length;
+    char file_input[72];
     uint32_t file_click_elapsed_us;
     char file_path[QFS_PATH],file_status[80],note_path[QFS_PATH],media_name[72];
     int note_volume,media_volume;

@@ -285,3 +285,72 @@ int qfs_delete(QStorage *s,int volume,const char *path){
     if(!file->Delete){if(file->Close)file->Close(file);return -1;}
     return file->Delete(file)==0?0:-1;
 }
+
+int qfs_rename(QStorage *s,int volume,const char *source,const char *destination){
+    if(!s||!source||!destination||volume<0||volume>=s->count)return -1;
+    size_t prefix=0,final=0,target=0;
+    while(source[prefix]){if(source[prefix]=='\\')final=prefix+1;prefix++;}
+    while(destination[target])target++;
+    if(!final||!source[final]||target>=QFS_PATH||!destination[final])return -1;
+    for(size_t i=0;i<final;i++)if(source[i]!=destination[i])return -1;
+    for(size_t i=final;destination[i];i++)if(destination[i]=='\\'||destination[i]=='/'||destination[i]==':'||(unsigned char)destination[i]<32)return -1;
+    if(equal(source,destination))return 0;
+    if(volume==s->ram_index){
+        int index=ram_find(s,source);
+        if(index<0||ram_find(s,destination)>=0)return -1;
+        int directory=s->memory[index].directory;
+        for(int i=0;i<QFS_MEMORY_FILES;i++)if(s->memory[i].active){
+            int match=i==index;
+            if(!match&&directory){
+                size_t n=0;
+                while(source[n]&&s->memory[i].path[n]==source[n])n++;
+                match=n==prefix&&s->memory[i].path[n]=='\\';
+            }
+            if(!match)continue;
+            const char *suffix=s->memory[i].path+(i==index?prefix:prefix);
+            size_t extra=0;
+            while(suffix[extra])extra++;
+            if(target+extra>=QFS_PATH)return -1;
+        }
+        for(int i=0;i<QFS_MEMORY_FILES;i++)if(s->memory[i].active){
+            size_t n=0;
+            while(source[n]&&s->memory[i].path[n]==source[n])n++;
+            if(n!=prefix||(s->memory[i].path[n]&&s->memory[i].path[n]!='\\'))continue;
+            char path[QFS_PATH];
+            size_t k=0;
+            for(;k<target;k++)path[k]=destination[k];
+            for(size_t j=n;s->memory[i].path[j];j++)path[k++]=s->memory[i].path[j];
+            path[k]=0;
+            for(size_t j=0;j<=k;j++)s->memory[i].path[j]=path[j];
+        }
+        return 0;
+    }
+    QFile *existing=0;
+    if(open_path(s,volume,destination,1,0,&existing)==0){
+        if(existing&&existing->Close)existing->Close(existing);
+        return -1;
+    }
+    QFile *file=0;
+    if(open_path(s,volume,source,3,0,&file)!=0||!file||!file->GetInfo||!file->SetInfo){
+        if(file&&file->Close)file->Close(file);
+        return -1;
+    }
+    union {uint64_t alignment;uint8_t bytes[512];} info;
+    uint64_t count=sizeof(info.bytes);
+    int ok=file->GetInfo(file,&info_guid,&count,info.bytes)==0&&count>=82;
+    if(ok){
+        size_t name=0;
+        for(size_t i=final;destination[i];i++)name++;
+        if(80+(name+1)*2>sizeof(info.bytes))ok=0;
+        else{
+            uint16_t *wide_name=(uint16_t *)(void *)(info.bytes+80);
+            for(size_t i=0;i<name;i++)wide_name[i]=(unsigned char)destination[final+i];
+            wide_name[name]=0;
+            uint64_t size=80+(name+1)*2;
+            *(uint64_t *)(void *)info.bytes=size;
+            if(file->SetInfo(file,&info_guid,size,info.bytes)!=0)ok=0;
+        }
+    }
+    if(file->Close)file->Close(file);
+    return ok?0:-1;
+}
