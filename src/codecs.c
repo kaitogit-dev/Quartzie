@@ -52,6 +52,7 @@ static void qc_free(void *p){(void)p;}
 #define MINIMP3_NO_SIMD
 #define MINIMP3_ONLY_MP3
 #include "vendor/minimp3.h"
+#if defined(QUARTZIE_FIRMWARE)
 void *memcpy(void *dst,const void *src,size_t n){
     unsigned char *d=(unsigned char *)dst;
     const unsigned char *s=(const unsigned char *)src;
@@ -75,6 +76,7 @@ int memcmp(const void *a,const void *b,size_t n){
     for(size_t i=0;i<n;i++)if(x[i]!=y[i])return (int)x[i]-(int)y[i];
     return 0;
 }
+#endif
 int qc_image(const uint8_t *data,size_t length,uint32_t **pixels,int *width,int *height){
     if(!data||!pixels||!width||!height||length>0x7fffffff||length<12)return -1;
     qc_reset();
