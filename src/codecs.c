@@ -39,8 +39,15 @@ static void qc_free(void *p){(void)p;}
 #define STBI_REALLOC(p,n) qc_resize(p,0,n)
 #define STBI_REALLOC_SIZED(p,old_size,n) qc_resize(p,old_size,n)
 #define STBI_FREE(p) qc_free(p)
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
 #define STB_IMAGE_IMPLEMENTATION
 #include "vendor/stb_image.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_NO_SIMD
 #define MINIMP3_ONLY_MP3

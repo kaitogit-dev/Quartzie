@@ -214,11 +214,23 @@ int qfs_read(QStorage *s,int volume,const char *path,void *data,size_t capacity,
     }
     QFile *file=0;
     if(open_path(s,volume,path,1,0,&file)!=0||!file||!file->Read)return -1;
-    uint64_t size=capacity;
-    int ok=file->Read(file,&size,data)==0&&size<=capacity;
+    size_t total=0;
+    int ok=1;
+    while(total<capacity){
+        uint64_t size=capacity-total;
+        if(size>65536)size=65536;
+        if(file->Read(file,&size,(uint8_t *)data+total)!=0||size>capacity-total){ok=0;break;}
+        if(size==0)break;
+        total+=(size_t)size;
+    }
+    if(ok&&total==capacity){
+        uint8_t extra=0;
+        uint64_t size=1;
+        if(file->Read(file,&size,&extra)!=0||size!=0)ok=0;
+    }
     if(file->Close)file->Close(file);
     if(!ok)return -1;
-    *length=(size_t)size;return 0;
+    *length=total;return 0;
 }
 int qfs_write(QStorage *s,int volume,const char *path,const void *data,size_t length){
     if(!data||!s||volume<0||volume>=s->count)return -1;

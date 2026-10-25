@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #define QFS_VOLUMES 8
-#define QFS_ENTRIES 48
+#define QFS_ENTRIES 192
 #define QFS_PATH 192
 #define QFS_MEMORY_FILES 24
 #define QFS_MEMORY_BYTES 4096

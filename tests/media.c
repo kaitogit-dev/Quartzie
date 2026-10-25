@@ -21,6 +21,8 @@ int main(void){
     char text_data[32];size_t text_len=0;
     CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==5);
     CHECK(memcmp(text_data,"hello",5)==0);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,4,&text_len)!=0);
+    CHECK(qfs_read(&storage,0,"\\Pictures\\test.txt",text_data,5,&text_len)==0&&text_len==5);
     CHECK(qfs_delete(&storage,0,"\\Pictures")!=0);
     CHECK(qfs_delete(&storage,0,"\\Pictures\\test.txt")==0);
     CHECK(qfs_delete(&storage,0,"\\Pictures")==0);
