@@ -10,6 +10,8 @@ static void key(char c){q_key(&ui,(uint16_t)c,0);}
 static QStorage selection_storage;
 static QDesktop selection_ui;
 static uint32_t selection_pixels[1024*768],selection_wall[1024*768],selection_workspace[1024*768];
+static int full_search_x_for_test(int width){int full=width-30;int search=full/4;if(search<144)search=144;if(search>225)search=225;return full-search+19;}
+static int files_columns_for_test(int width){int cols=(width-46-188)/134;return cols<1?1:cols;}
 static void check_file_selection(void){
     qfs_init(&selection_storage,0,0);
     CHECK(qfs_mkdir(&selection_storage,0,"\\FolderA")==0);
@@ -20,7 +22,9 @@ static void check_file_selection(void){
     q_open(&selection_ui,Q_FILES);
     CHECK(selection_ui.file_count==3&&selection_ui.file_selected==-1);
     QWindow *w=&selection_ui.windows[Q_FILES];
-    int x=w->x+32+110,y=w->y+60+143+20;
+    int cols=files_columns_for_test(w->w);
+    int pitch=(w->w-30-188-16-14)/cols;
+    int x=w->x+15+188+9+6+pitch/2,y=w->y+60+109+65;
     q_click(&selection_ui,x,y);
     CHECK(selection_ui.active==Q_FILES&&selection_ui.file_selected==0);
     CHECK(!strcmp(selection_ui.file_path,"\\"));
@@ -30,22 +34,22 @@ static void check_file_selection(void){
     CHECK(selection_ui.file_selected==-1&&selection_ui.file_click_index==-1);
     q_key(&selection_ui,8,0);
     CHECK(!strcmp(selection_ui.file_path,"\\")&&selection_ui.file_count==3);
-    q_click(&selection_ui,x,y+40);
+    q_click(&selection_ui,x+pitch,y);
     CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
     q_tick_timed(&selection_ui,450000);
-    q_click(&selection_ui,x,y+40);
+    q_click(&selection_ui,x+pitch,y);
     CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
     q_tick_timed(&selection_ui,200000);
-    q_click(&selection_ui,x,y+80);
+    q_click(&selection_ui,x+pitch*2,y);
     CHECK(selection_ui.file_selected==2&&selection_ui.active==Q_FILES);
-    q_click(&selection_ui,x,y+40);
+    q_click(&selection_ui,x+pitch,y);
     CHECK(selection_ui.file_selected==1&&selection_ui.active==Q_FILES);
     q_tick_timed(&selection_ui,100000);
-    q_click(&selection_ui,x,y+40);
+    q_click(&selection_ui,x+pitch,y);
     CHECK(selection_ui.active==Q_NOTES&&selection_ui.note_length==5);
     CHECK(!memcmp(selection_ui.notes,"first",5));
     q_open(&selection_ui,Q_FILES);
-    q_click(&selection_ui,x,y+80);
+    q_click(&selection_ui,x+pitch*2,y);
     CHECK(selection_ui.file_selected==2&&selection_ui.active==Q_FILES);
     q_key(&selection_ui,'\r',0);
     CHECK(selection_ui.active==Q_NOTES&&selection_ui.note_length==6);
@@ -57,6 +61,38 @@ static void check_file_selection(void){
     CHECK(!strcmp(selection_ui.notes,"second"));
     q_key(&selection_ui,19,0);
     CHECK(!selection_ui.note_dirty);
+    q_open(&selection_ui,Q_FILES);
+    QWindow *fw=&selection_ui.windows[Q_FILES];
+    int ox=fw->x+15,oy=fw->y+60;
+    q_click(&selection_ui,ox+500+20,oy+66);
+    CHECK(selection_ui.file_menu==3);
+    q_click(&selection_ui,ox+500+24,oy+94+6+5*35+16);
+    CHECK(selection_ui.file_view==5&&selection_ui.file_menu==0);
+    q_click(&selection_ui,ox+407+18,oy+66);
+    CHECK(selection_ui.file_menu==2);
+    q_click(&selection_ui,ox+407+18,oy+94+6+2*35+16);
+    CHECK(selection_ui.file_sort==2);
+    q_click(&selection_ui,ox+5+18,oy+66);
+    CHECK(selection_ui.file_menu==1);
+    q_click(&selection_ui,ox+5+18,oy+94+6+16);
+    CHECK(selection_ui.file_operation==1);
+    const char *newfolder="New Folder";
+    for(int i=0;newfolder[i];i++)q_key(&selection_ui,newfolder[i],0);
+    q_key(&selection_ui,'\r',0);
+    CHECK(selection_ui.file_operation==0&&selection_ui.file_count==4);
+    int exists=0;
+    for(int i=0;i<selection_ui.file_count;i++)
+        if(!strcmp(selection_ui.files[i].name,"New Folder"))exists=1;
+    CHECK(exists);
+    q_click(&selection_ui,ox+full_search_x_for_test(fw->w),oy+21);
+    CHECK(selection_ui.file_search_active);
+    const char *search="alpha";
+    for(int i=0;search[i];i++)q_key(&selection_ui,search[i],0);
+    CHECK(selection_ui.file_visible_count==1);
+    q_key(&selection_ui,8,0);
+    CHECK(selection_ui.file_visible_count==1);
+    q_key(&selection_ui,27,0);
+    CHECK(!selection_ui.file_search_active);
     q_open(&selection_ui,Q_TERMINAL);
     const char *cmd="mkdir Projects";
     for(int i=0;cmd[i];i++)q_key(&selection_ui,cmd[i],0);

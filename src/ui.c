@@ -1648,7 +1648,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.40.6",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.41.0",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1779,7 +1779,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
         text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
     }else{
-        text(q,x,y+45,"Quartzie 0.40.2",ink,2);
+        text(q,x,y+45,"Quartzie 0.41.0",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -2636,6 +2636,42 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         if(ch>=32&&ch<=126&&ch!='/'&&ch!='\\'&&ch!=':'&&q->file_input_length<70){q->file_input[q->file_input_length++]=(char)ch;q->file_input[q->file_input_length]=0;q->dirty=1;}
         return;
     }
+    if(q->active==Q_FILES){
+        if(q->file_search_active||q->file_address_active){
+            int address=q->file_address_active;
+            char *value=address?q->file_address:q->file_search;
+            int *length=address?&q->file_address_length:&q->file_search_length;
+            int limit=address?QFS_PATH-1:(int)sizeof(q->file_search)-1;
+            if(scan==23||ch==27){
+                q->file_search_active=0;q->file_address_active=0;q->dirty=1;return;
+            }
+            if(ch=='\r'){
+                if(address)files_go(q,q->file_volume,*value?value:"\\",1);
+                else q->file_search_active=0;
+                q->dirty=1;return;
+            }
+            if(ch==8){
+                if(*length>0)value[--*length]=0;
+            }else if(ch>=32&&ch<=126&&*length<limit){
+                value[(*length)++]=(char)ch;value[*length]=0;
+            }
+            if(!address)files_rebuild(q);
+            q->dirty=1;return;
+        }
+        if(q->file_menu&&(scan==23||ch==27)){q->file_menu=0;q->dirty=1;return;}
+        if(ch==1){
+            q->file_checked_count=0;
+            for(int i=0;i<q->file_count;i++)q->file_checked[i]=0;
+            for(int j=0;j<q->file_visible_count;j++){
+                int i=q->file_order[j];q->file_checked[i]=1;q->file_checked_count++;
+            }
+            q->dirty=1;return;
+        }
+        if(ch==3){files_clip(q,0);return;}
+        if(ch==24){files_clip(q,1);return;}
+        if(ch==22){files_paste(q);return;}
+        if(scan==8){files_delete_selected(q);return;}
+    }
     if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
         q->settings_search_length=0;q->settings_search[0]=0;q->dirty=1;return;
     }
@@ -2733,13 +2769,24 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         else if(q->active==Q_CALCULATOR)calc_input(q,'B');
         q->dirty=1;return;
     }
-    if(q->active==Q_FILES&&(scan==1||scan==2)){
-        int next=q->file_selected+(scan==1?-1:1);
-        q->file_selected=clamp(next,0,q->file_count>0?q->file_count-1:0);
-        int rows=files_rows(&q->windows[Q_FILES]);
-        if(q->file_selected<q->file_scroll)q->file_scroll=q->file_selected;
-        if(q->file_selected>=q->file_scroll+rows)q->file_scroll=q->file_selected-rows+1;
-        q->dirty=1;return;
+    if(q->active==Q_FILES&&(scan==1||scan==2||scan==3||scan==4||scan==5||scan==6)){
+        int slot=-1;
+        for(int i=0;i<q->file_visible_count;i++)
+            if(q->file_order[i]==q->file_selected){slot=i;break;}
+        int cols=files_columns(q,&q->windows[Q_FILES]);
+        if(scan==5)slot=0;
+        else if(scan==6)slot=q->file_visible_count-1;
+        else slot+=scan==1?-cols:scan==2?cols:scan==3?1:-1;
+        if(q->file_visible_count>0){
+            slot=clamp(slot,0,q->file_visible_count-1);
+            q->file_selected=q->file_order[slot];q->file_checked_count=1;
+            for(int i=0;i<q->file_count;i++)q->file_checked[i]=i==q->file_selected;
+            int page=files_page(q,&q->windows[Q_FILES]);
+            if(slot<q->file_scroll)q->file_scroll=(slot/cols)*cols;
+            if(slot>=q->file_scroll+page)q->file_scroll=((slot/cols)-(page/cols)+1)*cols;
+            q->file_click_index=-1;q->dirty=1;
+        }
+        return;
     }
     if(ch<32||ch>126)return;
     if(q->menu&&ch>='1'&&ch<'1'+Q_APPS){q_open(q,ch-'1');return;}
