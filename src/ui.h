@@ -44,7 +44,7 @@ typedef struct {
     int file_click_index,file_operation,file_input_length;
     int file_view,file_sort,file_desc,file_menu,file_show_hidden,file_extensions,file_compact,file_details,file_nav;
     int file_search_active,file_address_active,file_search_length,file_address_length,file_visible_count;
-    int file_location,file_history_count,file_history_index,file_clip_volume,file_clip_cut,file_clip_dir,file_checked_count;
+    int file_location,file_history_count,file_history_index,file_clip_volume,file_clip_cut,file_clip_dir,file_checked_count,file_clip_count;
     uint8_t file_checked[QFS_ENTRIES];
     int file_order[QFS_ENTRIES],file_history_volumes[12];
     char file_search[64],file_address[QFS_PATH],file_clip_path[QFS_PATH],file_clip_name[72];

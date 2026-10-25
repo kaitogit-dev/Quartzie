@@ -2242,7 +2242,13 @@ static void calc_input(QDesktop *q,char key){
     }
 }
 
+
+typedef struct {
+    char path[QFS_PATH],name[72];
+    int volume,directory;
+} QFileClipboard;
 static QFsEntry file_copy_entries[7][QFS_ENTRIES];
+static QFileClipboard file_clipboard[QFS_ENTRIES];
 static int files_copy(QDesktop *q,int volume,const char *source,int target_volume,const char *target,int directory,int move,int depth){
     if(depth>=7||!q->storage)return -1;
     if(!directory){
@@ -2266,45 +2272,105 @@ static int files_copy(QDesktop *q,int volume,const char *source,int target_volum
     }
     return !move||qfs_delete(q->storage,volume,source)==0?0:-1;
 }
+static int files_remove_tree(QDesktop *q,int volume,const char *path,int directory,int depth){
+    if(depth>=7)return -1;
+    if(directory){
+        int count=qfs_list(q->storage,volume,path,file_copy_entries[depth],QFS_ENTRIES);
+        if(count<0)return -1;
+        for(int i=0;i<count;i++){
+            char child[QFS_PATH];
+            QFsEntry *entry=&file_copy_entries[depth][i];
+            if(qfs_join(child,sizeof(child),path,entry->name)!=0||
+               files_remove_tree(q,volume,child,entry->directory,depth+1)!=0)return -1;
+        }
+    }
+    return qfs_delete(q->storage,volume,path);
+}
+static int files_destination_exists(QDesktop *q,const char *name){
+    int count=qfs_list(q->storage,q->file_volume,q->file_path,file_copy_entries[0],QFS_ENTRIES);
+    if(count<0)return 1;
+    for(int i=0;i<count;i++)if(files_equal(file_copy_entries[0][i].name,name))return 1;
+    return 0;
+}
 static void files_paste(QDesktop *q){
-    if(q->file_clip_volume<0||!q->file_clip_path[0]){files_message(q,"Clipboard is empty");return;}
+    if(!q->file_clip_count){files_message(q,"Clipboard is empty");return;}
     if(!q->storage||q->file_location){files_message(q,"Choose a folder first");return;}
-    char target[QFS_PATH],name[72];
-    if(qfs_join(target,sizeof(target),q->file_path,q->file_clip_name)!=0){files_message(q,"Path is too long");return;}
-    if(q->file_clip_volume==q->file_volume&&files_equal(q->file_clip_path,target)){
-        const char *source=q->file_clip_name;
-        int at=0;const char *prefix="Copy of ";
-        for(int i=0;prefix[i]&&at<70;i++)name[at++]=prefix[i];
-        for(int i=0;source[i]&&at<70;i++)name[at++]=source[i];
-        name[at]=0;
-        if(qfs_join(target,sizeof(target),q->file_path,name)!=0){files_message(q,"Path is too long");return;}
+    int failures=0,completed=0,remaining=0;
+    for(int item=0;item<q->file_clip_count;item++){
+        QFileClipboard *clip=&file_clipboard[item];
+        char target[QFS_PATH],name[72];
+        int identical=clip->volume==q->file_volume;
+        if(identical){
+            int k=0;
+            for(;clip->path[k]&&clip->path[k]==q->file_path[k];k++);
+            int len=0;while(q->file_path[len])len++;
+            identical=k==len&&(clip->path[k]=='\\'||(len==1&&clip->path[k]));
+        }
+        int count=0;
+        for(;clip->name[count]&&count<71;count++)name[count]=clip->name[count];
+        name[count]=0;
+        if(files_destination_exists(q,name)){
+            if(q->file_clip_cut){
+                if(identical){completed++;continue;}
+                failures++;goto keep;
+            }
+            int attempt=1,found=0;
+            while(attempt<100){
+                char candidate[72];int at=0;
+                const char *prefix="Copy ";
+                for(int i=0;prefix[i];i++)candidate[at++]=prefix[i];
+                int number=attempt;
+                char digits[4];int len=0;
+                do{digits[len++]=(char)('0'+number%10);number/=10;}while(number&&len<3);
+                while(len)candidate[at++]=digits[--len];
+                candidate[at++]=' ';candidate[at++]='-';candidate[at++]=' ';
+                for(int i=0;clip->name[i]&&at<71;i++)candidate[at++]=clip->name[i];
+                candidate[at]=0;
+                if(!files_destination_exists(q,candidate)){
+                    for(int i=0;i<=at;i++)name[i]=candidate[i];found=1;break;
+                }
+                attempt++;
+            }
+            if(!found){failures++;goto keep;}
+        }
+        if(qfs_join(target,sizeof(target),q->file_path,name)!=0||
+           files_copy(q,clip->volume,clip->path,q->file_volume,target,clip->directory,q->file_clip_cut,0)!=0){
+            failures++;goto keep;
+        }
+        completed++;
+        continue;
+keep:
+        if(q->file_clip_cut)file_clipboard[remaining++]=*clip;
     }
-    QFsEntry existing[1];
-    if(qfs_list(q->storage,q->file_volume,target,existing,1)>=0){
-        files_message(q,"Destination already exists");return;
-    }
-    if(files_copy(q,q->file_clip_volume,q->file_clip_path,q->file_volume,target,q->file_clip_dir,q->file_clip_cut,0)!=0){
-        files_message(q,"Copy or move failed");return;
-    }
-    if(q->file_clip_cut){q->file_clip_volume=-1;q->file_clip_path[0]=0;}
+    if(q->file_clip_cut)q->file_clip_count=remaining;
     files_refresh(q);
+    if(failures)files_message(q,"Some items could not be copied or moved");
+    else if(completed)files_message(q,q->file_clip_cut?"Move complete":"Copy complete");
 }
 static void files_clip(QDesktop *q,int cut){
-    if(q->file_location||q->file_selected<0||q->file_selected>=q->file_count)return;
-    QFsEntry *entry=&q->files[q->file_selected];
-    if(qfs_join(q->file_clip_path,sizeof(q->file_clip_path),q->file_path,entry->name)!=0)return;
-    int i=0;for(;entry->name[i]&&i<71;i++)q->file_clip_name[i]=entry->name[i];q->file_clip_name[i]=0;
-    q->file_clip_volume=q->file_volume;q->file_clip_dir=entry->directory;q->file_clip_cut=cut;
+    if(q->file_location||!q->storage)return;
+    int count=0;
+    for(int i=0;i<q->file_count;i++){
+        if(!q->file_checked[i]&&!(q->file_checked_count==0&&i==q->file_selected))continue;
+        QFileClipboard *clip=&file_clipboard[count];
+        if(qfs_join(clip->path,sizeof(clip->path),q->file_path,q->files[i].name)!=0)continue;
+        int j=0;for(;q->files[i].name[j]&&j<71;j++)clip->name[j]=q->files[i].name[j];
+        clip->name[j]=0;clip->volume=q->file_volume;clip->directory=q->files[i].directory;
+        count++;
+    }
+    if(!count){files_message(q,"Select files first");return;}
+    q->file_clip_count=count;q->file_clip_cut=cut;
     files_message(q,cut?"Ready to move":"Copied to clipboard");
 }
 static void files_delete_selected(QDesktop *q){
-    if(q->file_location)return;
+    if(q->file_location||!q->storage)return;
+    if(!q->file_checked_count&&q->file_selected<0){files_message(q,"Select files first");return;}
     if(!q->file_confirm){q->file_confirm=1;files_message(q,"Select Delete again to confirm");return;}
     int failures=0;
     for(int i=0;i<q->file_count;i++)if(q->file_checked[i]||(!q->file_checked_count&&i==q->file_selected)){
         char path[QFS_PATH];
         if(qfs_join(path,sizeof(path),q->file_path,q->files[i].name)!=0||
-           qfs_delete(q->storage,q->file_volume,path)!=0)failures++;
+           files_remove_tree(q,q->file_volume,path,q->files[i].directory,0)!=0)failures++;
     }
     files_refresh(q);
     if(failures)files_message(q,"Some selected items could not be deleted");
@@ -2373,6 +2439,7 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
                         q->file_checked[i]=all==2?!q->file_checked[i]:all;
                         if(q->file_checked[i])q->file_checked_count++;
                     }
+                    if(all==0)q->file_selected=-1;
                 }else if(option==3)q->file_details=1;
                 else if(option==4)files_refresh(q);
                 q->dirty=1;
