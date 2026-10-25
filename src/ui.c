@@ -428,7 +428,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     for(size_t n=0;n<sizeof(*q);n++)data[n]=0;
     q->width=w;q->height=h;q->pixels=pixels;q->wallpaper=wallpaper_pixels;q->blurred=workspace;
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
-    q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;
+    q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
     q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
@@ -722,6 +722,7 @@ static void files_refresh(QDesktop *q){
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity){
     if(!q)return;
     q->storage=storage;q->media_buffer=buffer;q->media_capacity=capacity;
+    q->terminal_volume=storage?storage->ram_index:0;
     q->file_volume=0;q->file_path[0]='\\';q->file_path[1]=0;
     files_refresh(q);
 }
@@ -753,7 +754,7 @@ static void files_open(QDesktop *q,int index){
         if(!q->storage||qfs_read(q->storage,q->file_volume,path,q->notes,sizeof(q->notes)-1,&length)!=0){
             files_message(q,"Cannot open text file");return;
         }
-        q->note_length=(int)length;
+        q->note_length=(int)length;q->note_cursor=q->note_length;q->note_scroll=0;q->note_dirty=0;
         for(int i=0;i<q->note_length;i++)if(q->notes[i]==0)q->notes[i]=' ';
         q->notes[q->note_length]=0;
         int i=0;for(;path[i];i++)q->note_path[i]=path[i];q->note_path[i]=0;
@@ -845,11 +846,201 @@ static void files_finish(QDesktop *q){
     else files_message(q,"Could not create or rename item");
 }
 static void files_save_notes(QDesktop *q){
-    if(!q->storage||!q->note_path[0]||q->note_volume<0){files_message(q,"Open a text file from Files to save");return;}
+    if(!q->storage){files_message(q,"No storage available");return;}
+    if(!q->note_path[0]||q->note_volume<0){
+        int volume=q->storage->ram_index;
+        if(volume<0||volume>=q->storage->count){files_message(q,"No writable storage available");return;}
+        char path[QFS_PATH],filename[32];
+        int found=0;
+        QFsEntry entries[QFS_ENTRIES];
+        int count=qfs_list(q->storage,volume,"\\",entries,QFS_ENTRIES);
+        for(int i=1;i<1000;i++){
+            int k=0;const char *prefix="Note ";
+            for(int j=0;prefix[j];j++)filename[k++]=prefix[j];
+            int number=i,place=k;
+            do{filename[k++]=(char)('0'+number%10);number/=10;}while(number);
+            for(int start=place,end=k-1;start<end;start++,end--){char c=filename[start];filename[start]=filename[end];filename[end]=c;}
+            const char *ext=".txt";for(int j=0;ext[j];j++)filename[k++]=ext[j];filename[k]=0;
+            int used=0;
+            for(int j=0;j<count;j++)if(files_equal(entries[j].name,filename)){used=1;break;}
+            if(used)continue;
+            if(qfs_join(path,sizeof(path),"\\",filename)!=0)break;
+            if(qfs_write(q->storage,volume,path,q->notes,(size_t)q->note_length)==0){
+                int j=0;for(;path[j];j++)q->note_path[j]=path[j];q->note_path[j]=0;
+                q->note_volume=volume;found=1;break;
+            }
+            break;
+        }
+        if(!found){files_message(q,"Could not create note");return;}
+        q->note_dirty=0;files_message(q,"Saved to Home RAM");return;
+    }
     if(qfs_write(q->storage,q->note_volume,q->note_path,q->notes,(size_t)q->note_length)!=0)
-        files_message(q,"Could not save: volume may be read-only");
-    else files_message(q,"Saved");
+        files_message(q,"Could not save note");
+    else{q->note_dirty=0;files_message(q,"Saved");}
 }
+static void notes_insert(QDesktop *q,char value){
+    if(q->note_length>=(int)sizeof(q->notes)-1)return;
+    for(int i=q->note_length;i>=q->note_cursor;i--)q->notes[i+1]=q->notes[i];
+    q->notes[q->note_cursor++]=value;q->note_length++;q->note_dirty=1;q->dirty=1;
+}
+static void notes_delete(QDesktop *q,int forward){
+    if((!forward&&q->note_cursor==0)||(forward&&q->note_cursor==q->note_length))return;
+    if(!forward)q->note_cursor--;
+    for(int i=q->note_cursor;i<q->note_length;i++)q->notes[i]=q->notes[i+1];
+    q->note_length--;q->note_dirty=1;q->dirty=1;
+}
+static void notes_vertical(QDesktop *q,int direction){
+    int start=q->note_cursor;
+    while(start>0&&q->notes[start-1]!='\n')start--;
+    int column=q->note_cursor-start;
+    if(direction<0){
+        if(!start)return;
+        int previous=start-1,beg=previous;
+        while(beg>0&&q->notes[beg-1]!='\n')beg--;
+        q->note_cursor=beg+clamp(column,0,previous-beg);
+    }else{
+        int end=q->note_cursor;
+        while(end<q->note_length&&q->notes[end]!='\n')end++;
+        if(end==q->note_length)return;
+        int next=end+1,stop=next;
+        while(stop<q->note_length&&q->notes[stop]!='\n')stop++;
+        q->note_cursor=next+clamp(column,0,stop-next);
+    }
+    q->dirty=1;
+}
+static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
+    surface(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
+    int row=0,advance=0,used=0,cursor_row=0,cursor_x=0;
+    int max_width=cw-47;
+    for(int i=0;i<=q->note_length;i++){
+        if(i==q->note_cursor){cursor_row=row;cursor_x=advance;}
+        char c=i<q->note_length?q->notes[i]:0;
+        int width=c&&c!='\n'?q_font_glyph(1,(unsigned char)c)->advance:0;
+        if(c=='\n'||!c||advance+width>max_width){
+            if(c=='\n'||advance+width>max_width){row++;advance=0;}
+            if(!c)break;
+            if(c=='\n')continue;
+        }
+        advance+=width;used++;
+    }
+    int visible=clamp((w->h-205)/26,3,22);
+    if(cursor_row<q->note_scroll)q->note_scroll=cursor_row;
+    if(cursor_row>=q->note_scroll+visible)q->note_scroll=cursor_row-visible+1;
+    int line=0,at=0,px=0;
+    char display[256];
+    if(!q->note_length)text(q,x+23,y+73,"Write something...",muted,1);
+    for(int i=0;i<=q->note_length;i++){
+        char c=i<q->note_length?q->notes[i]:0;
+        int width=c&&c!='\n'?q_font_glyph(1,(unsigned char)c)->advance:0;
+        if(c=='\n'||!c||px+width>max_width||at==255){
+            if(line>=q->note_scroll&&line<q->note_scroll+visible&&at){
+                display[at]=0;
+                string_limit(q,x+23,y+73+(line-q->note_scroll)*26,display,ink,1,max_width,1);
+            }
+            at=0;px=0;
+            if(!c)break;
+            line++;
+            if(c=='\n')continue;
+        }
+        display[at++]=c;px+=width;
+    }
+    if(cursor_row>=q->note_scroll&&cursor_row<q->note_scroll+visible){
+        int cx=x+23+cursor_x,cy=y+54+(cursor_row-q->note_scroll)*26;
+        rectangle(q,cx,cy,2,23,accent(q));
+    }
+    surface(q,x+cw-200,y+2,94,28,9,inner_material(q),q->theme?172:157);
+    text(q,x+cw-178,y+22,"New",ink,0);
+    surface(q,x+cw-98,y+2,96,28,9,inner_material(q),q->theme?172:157);
+    text(q,x+cw-74,y+22,"Save",ink,0);
+    if(q->file_status[0])string_limit(q,x+8,y+w->h-112,q->file_status,muted,0,cw-16,1);
+    else text(q,x+8,y+w->h-112,q->note_dirty?"Unsaved changes":"",muted,0);
+}
+static void terminal_log(QDesktop *q,const char *message){
+    for(int i=0;i<6;i++)for(int j=0;j<96;j++)q->terminal_lines[i][j]=q->terminal_lines[i+1][j];
+    int n=0;for(;message&&message[n]&&n<95;n++)q->terminal_lines[6][n]=message[n];
+    q->terminal_lines[6][n]=0;
+    if(q->terminal_count<7)q->terminal_count++;
+    q->dirty=1;
+}
+static void terminal_run(QDesktop *q){
+    char *command=q->command;
+    while(*command==' ')command++;
+    char *argument=command;
+    while(*argument&&*argument!=' ')argument++;
+    if(*argument){*argument++=0;while(*argument==' ')argument++;}
+    if(!*command)return;
+    if(files_equal(command,"clear")){q->terminal_count=0;for(int i=0;i<7;i++)q->terminal_lines[i][0]=0;return;}
+    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open clear help echo");return;}
+    if(files_equal(command,"pwd")){terminal_log(q,q->terminal_path);return;}
+    if(files_equal(command,"echo")){terminal_log(q,argument);return;}
+    if(files_equal(command,"open")){
+        const char *apps[Q_APPS]={"files","notes","terminal","calculator","settings","about","store","photos","media"};
+        for(int i=0;i<Q_APPS;i++)if(files_equal(apps[i],argument)){q_open(q,i);return;}
+        terminal_log(q,"Unknown application");return;
+    }
+    if(!q->storage){terminal_log(q,"No storage available");return;}
+    if(files_equal(command,"drives")){
+        for(int i=0;i<q->storage->count;i++)terminal_log(q,q->storage->volumes[i].label);
+        return;
+    }
+    if(files_equal(command,"drive")){
+        if(argument[0]>='0'&&argument[0]<='9'&&!argument[1]){
+            int target=argument[0]-'0';
+            if(target<q->storage->count){
+                q->terminal_volume=target;q->terminal_path[0]='\\';q->terminal_path[1]=0;
+                terminal_log(q,q->storage->volumes[target].label);return;
+            }
+        }
+        terminal_log(q,"Invalid drive index");return;
+    }
+    if(files_equal(command,"dir")||files_equal(command,"ls")){
+        QFsEntry listing[QFS_ENTRIES];
+        int n=qfs_list(q->storage,q->terminal_volume,q->terminal_path,listing,QFS_ENTRIES);
+        if(n<0){terminal_log(q,"Cannot read folder");return;}
+        if(!n){terminal_log(q,"Folder is empty");return;}
+        for(int i=0;i<n;i++){char label[96];int at=0;
+            if(listing[i].directory){const char *prefix="<DIR> ";for(int j=0;prefix[j];j++)label[at++]=prefix[j];}
+            for(int j=0;listing[i].name[j]&&at<95;j++)label[at++]=listing[i].name[j];
+            label[at]=0;terminal_log(q,label);
+        }
+        return;
+    }
+    if(files_equal(command,"cd")){
+        if(files_equal(argument,"..")){
+            int end=0;while(q->terminal_path[end])end++;
+            while(end>1&&q->terminal_path[end-1]!='\\')end--;
+            if(end>1)end--;
+            q->terminal_path[end]=0;terminal_log(q,q->terminal_path);return;
+        }
+        if(!argument[0]){terminal_log(q,q->terminal_path);return;}
+        char next[QFS_PATH];QFsEntry entries[1];
+        if(qfs_join(next,sizeof(next),q->terminal_path,argument)!=0||
+            qfs_list(q->storage,q->terminal_volume,next,entries,1)<0){terminal_log(q,"Directory not found");return;}
+        int i=0;for(;next[i];i++)q->terminal_path[i]=next[i];q->terminal_path[i]=0;
+        terminal_log(q,q->terminal_path);return;
+    }
+    char path[QFS_PATH];
+    if(!argument[0]||qfs_join(path,sizeof(path),q->terminal_path,argument)!=0){
+        terminal_log(q,"Invalid path or missing name");return;
+    }
+    if(files_equal(command,"mkdir")){terminal_log(q,qfs_mkdir(q->storage,q->terminal_volume,path)==0?"Folder created":"Cannot create folder");return;}
+    if(files_equal(command,"touch")){terminal_log(q,qfs_write(q->storage,q->terminal_volume,path,"",0)==0?"File created":"Cannot create file");return;}
+    if(files_equal(command,"del")||files_equal(command,"rm")){terminal_log(q,qfs_delete(q->storage,q->terminal_volume,path)==0?"Deleted":"Cannot delete item");return;}
+    if(files_equal(command,"type")||files_equal(command,"cat")){
+        char data[2048];size_t length=0;
+        if(qfs_read(q->storage,q->terminal_volume,path,data,sizeof(data)-1,&length)!=0){terminal_log(q,"Cannot read file");return;}
+        int index=0;
+        while(index<(int)length){
+            char line[96];int n=0;
+            while(index<(int)length&&data[index]!='\n'&&n<95){if(data[index]>=32&&data[index]<127)line[n++]=data[index];index++;}
+            if(index<(int)length&&data[index]=='\n')index++;
+            line[n]=0;terminal_log(q,line);
+        }
+        return;
+    }
+    terminal_log(q,"Unknown command");
+}
+
 static int files_rows(QWindow *w){return clamp((w->h-235)/40,3,10);}
 static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
     surface(q,x,y+25,112,43,12,inner_material(q),q->theme?169:166);
@@ -1078,7 +1269,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.3",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.4",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -1177,7 +1368,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.40.3",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.40.4",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1260,16 +1451,15 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     if(app==Q_FILES){
         draw_files(q,w,x,y,cw,ink,muted);
     }else if(app==Q_NOTES){
-        surface(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
-        string_limit(q,x+22,y+73,q->note_length?q->notes:"Write something...",q->note_length?ink:muted,1,cw-44,clamp((w->h-195)/26,1,20));
-        surface(q,x+cw-98,y+2,96,28,9,inner_material(q),q->theme?172:157);
-        text(q,x+cw-74,y+22,"Save",ink,0);
+        draw_notes(q,w,x,y,cw,ink,muted);
     }else if(app==Q_TERMINAL){
         surface(q,x,y+30,cw,w->h-157,17,0x0d2237,221);
-        text(q,x+22,y+72,"quartzie >",0x8edee8,1);
-        text(q,x+22,y+117,q->status[0]?q->status:"Type help for commands",0xe0f5fb,0);
-        text(q,x+22,y+162,">",0x88d8e5,1);
-        text(q,x+48,y+162,q->command,0xf8feff,1);
+        string_limit(q,x+18,y+62,q->terminal_path,0x8edee8,0,cw-40,1);
+        int spacing=clamp((w->h-345)/7,16,26);
+        for(int i=0;i<q->terminal_count;i++)
+            string_limit(q,x+22,y+91+i*spacing,q->terminal_lines[7-q->terminal_count+i],0xe0f5fb,0,cw-42,1);
+        text(q,x+22,y+w->h-179,">",0x88d8e5,1);
+        string_limit(q,x+48,y+w->h-179,q->command,0xf8feff,1,cw-66,1);
     }else if(app==Q_CALCULATOR){
         surface(q,x,y+27,322,81,16,inner_material(q),q->theme?111:144);
         const char *output=q->calc_length?q->calc:q->answer;
@@ -1873,7 +2063,13 @@ void q_click(QDesktop *q,int x,int y){
                 q->file_scroll=clamp(q->file_scroll+rows,0,q->file_count>rows?q->file_count-rows:0);q->dirty=1;return;
             }
         }else if(chosen==Q_NOTES){
-            if(hit(x,y,bx+w->w-64-98,by+2,96,28)){files_save_notes(q);return;}
+            int cw=w->w-64;
+            if(hit(x,y,bx+cw-98,by+2,96,28)){files_save_notes(q);return;}
+            if(hit(x,y,bx+cw-200,by+2,94,28)){
+                if(q->note_dirty){files_message(q,"Save changes before New");return;}
+                q->note_length=0;q->notes[0]=0;q->note_cursor=0;q->note_scroll=0;
+                q->note_path[0]=0;q->note_volume=-1;q->file_status[0]=0;q->dirty=1;return;
+            }
         }else if(chosen==Q_PHOTOS||chosen==Q_MEDIA){
             int view_h=w->h-178;
             if(view_h<110)view_h=110;
@@ -2031,6 +2227,15 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
             q->dirty=1;return;
         }
     }
+    if(q->active==Q_NOTES){
+        if(ch==19){files_save_notes(q);return;}
+        if(scan==3&&q->note_cursor<q->note_length){q->note_cursor++;q->dirty=1;return;}
+        if(scan==4&&q->note_cursor>0){q->note_cursor--;q->dirty=1;return;}
+        if(scan==1||scan==2){notes_vertical(q,scan==1?-1:1);return;}
+        if(scan==5){while(q->note_cursor>0&&q->notes[q->note_cursor-1]!='\n')q->note_cursor--;q->dirty=1;return;}
+        if(scan==6){while(q->note_cursor<q->note_length&&q->notes[q->note_cursor]!='\n')q->note_cursor++;q->dirty=1;return;}
+        if(scan==8){notes_delete(q,1);return;}
+    }
     if(ch=='\r'){
         if(q->active==Q_FILES){
             q->file_click_index=-1;
@@ -2038,21 +2243,14 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         }
         if(q->active==Q_CALCULATOR){calc_input(q,'=');q->dirty=1;return;}
         if(q->active==Q_TERMINAL){
-            if(q->command_length){
-                const char *msg="Unknown command";
-                if(q->command[0]=='h')msg="help   clear   files   notes";
-                else if(q->command[0]=='c')msg="";
-                else if(q->command[0]=='f'){q_open(q,Q_FILES);}
-                else if(q->command[0]=='n'){q_open(q,Q_NOTES);}
-                for(int i=0;i<95;i++){q->status[i]=msg[i];if(!msg[i])break;}
-            }
+            if(q->command_length)terminal_run(q);
             q->command_length=0;q->command[0]=0;
-        }else if(q->active==Q_NOTES&&q->note_length<2047){q->notes[q->note_length++]='\n';q->notes[q->note_length]=0;}
+        }else if(q->active==Q_NOTES)notes_insert(q,'\n');
         q->dirty=1;return;
     }
     if(ch==8){
         if(q->active==Q_FILES){files_parent(q);return;}
-        if(q->active==Q_NOTES&&q->note_length)q->notes[--q->note_length]=0;
+        if(q->active==Q_NOTES)notes_delete(q,0);
         else if(q->active==Q_TERMINAL&&q->command_length)q->command[--q->command_length]=0;
         else if(q->active==Q_CALCULATOR)calc_input(q,'B');
         q->dirty=1;return;
@@ -2067,7 +2265,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     }
     if(ch<32||ch>126)return;
     if(q->menu&&ch>='1'&&ch<'1'+Q_APPS){q_open(q,ch-'1');return;}
-    if(q->active==Q_NOTES&&q->note_length<2047){q->notes[q->note_length++]=(char)ch;q->notes[q->note_length]=0;q->dirty=1;}
+    if(q->active==Q_NOTES){notes_insert(q,(char)ch);}
     else if(q->active==Q_TERMINAL&&q->command_length<120){q->command[q->command_length++]=(char)ch;q->command[q->command_length]=0;q->dirty=1;}
     else if(q->active==Q_CALCULATOR){calc_input(q,(char)ch);q->dirty=1;}
 }

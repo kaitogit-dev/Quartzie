@@ -28,7 +28,9 @@ typedef struct {
     int menu,notifications,quick,active,drag,drag_x,drag_y;
     int pressed,last_button,frame_count,hover;
     int drag_start_x,drag_start_y,drag_moved;
-    int note_length,command_length,calc_length;
+    int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
+    int terminal_volume,terminal_count;
+    char terminal_path[QFS_PATH],terminal_lines[7][96];
     int menu_search_length,calc_history_count;
     int settings_page,settings_search_length;
     char settings_search[32];
