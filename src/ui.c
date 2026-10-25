@@ -1248,23 +1248,24 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         files_button(q,left+tx[i],top+57,tw[i],tools[i],q->file_menu==((i==0)?1:(i==6)?2:(i==7)?3:(i==8)?4:0));
     thin_rule(q,left,top+97,full,31);
     int canvas_y=top+109,canvas_h=footer-canvas_y;
+    rectangle(q,left,canvas_y,full,canvas_h,q->theme?0x191b20:0xf9fcff);
     if(q->file_nav){
         surface(q,left,sidebar_y,side-6,footer-sidebar_y,8,inner_material(q),q->theme?117:143);
-        const char *shortcuts[]={"Home","Desktop","Documents","Pictures","Music","Videos","This PC","Network"};
-        const int icons[]={QI_FILE_EXPLORER,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_WIFI};
-        for(int i=0;i<8;i++){
-            int py=sidebar_y+12+i*36+(i>=6?18:0);
+        const char *shortcuts[]={"Home","Gallery","Desktop","Documents","Pictures","Music","Videos","This PC","Network"};
+        const int icons[]={QI_FILE_EXPLORER,QI_IMAGE,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_WIFI};
+        for(int i=0;i<9;i++){
+            int py=sidebar_y+12+i*36+(i>=2?12:0)+(i>=7?18:0);
             int chosen=(i==0&&q->storage&&q->file_volume==q->storage->ram_index&&files_equal(q->file_path,"\\"))||
-                (i==6&&q->file_location)||
-                (i>=1&&i<=5&&q->storage&&q->file_volume==q->storage->ram_index&&files_contains(q->file_path,shortcuts[i]));
+                (i==7&&q->file_location)||
+                (i>=2&&i<=6&&q->storage&&q->file_volume==q->storage->ram_index&&files_contains(q->file_path,shortcuts[i]));
             if(chosen)surface(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
             sprite(q,left+22,py+13,icons[i],25);
             string_limit(q,left+41,py+20,shortcuts[i],ink,0,side-49,1);
         }
-        thin_rule(q,left+13,sidebar_y+328,side-31,44);
+        thin_rule(q,left+13,sidebar_y+358,side-31,44);
         int count=q->storage?q->storage->count:0;
         for(int i=0;i<count&&i<5;i++){
-            int py=sidebar_y+344+i*35;
+            int py=sidebar_y+371+i*35;
             if(py+30>=footer)break;
             if(!q->file_location&&q->file_volume==i)surface(q,left+5,py-1,side-17,33,6,colors(q)->selected,131);
             sprite(q,left+22,py+14,QI_FILE_EXPLORER,25);
@@ -1325,7 +1326,8 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
                     string_limit(q,ix+42,iy+item_h/2+25,files_type(entry),muted,0,iw-50,1);
             }else{
                 sprite(q,ix+iw/2,iy+size/2+6,files_icon(entry),size);
-                string_limit(q,ix+6,iy+size+26,name,ink,0,iw-12,2);
+                int nx=text_width(name,0)<=iw-12?ix+(iw-text_width(name,0))/2:ix+6;
+                string_limit(q,nx,iy+size+26,name,ink,0,iw-12,2);
             }
         }
         if(!q->file_visible_count)
@@ -2378,11 +2380,12 @@ static void files_delete_selected(QDesktop *q){
 }
 static void files_shortcut(QDesktop *q,int index){
     if(!q->storage)return;
-    if(index==6){q->file_location=1;q->file_menu=0;q->file_search[0]=0;q->file_search_length=0;q->file_selected=-1;q->dirty=1;return;}
-    if(index==7){files_message(q,"Network locations are not connected");return;}
+    if(index==7){q->file_location=1;q->file_menu=0;q->file_search[0]=0;q->file_search_length=0;q->file_selected=-1;q->dirty=1;return;}
+    if(index==8){files_message(q,"Network locations are not connected");return;}
+    if(index==1){q_open(q,Q_PHOTOS);return;}
     int volume=q->storage->ram_index;
     if(index==0){files_go(q,volume,"\\",1);return;}
-    const char *folders[]={"","Desktop","Documents","Pictures","Music","Videos"};
+    const char *folders[]={"","","Desktop","Documents","Pictures","Music","Videos"};
     char target[QFS_PATH];
     if(qfs_join(target,sizeof(target),"\\",folders[index])!=0)return;
     QFsEntry item[1];
@@ -2481,12 +2484,12 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
     }
     if(q->file_nav&&hit(x,y,left,top+103,182,footer-(top+103))){
         int sy=top+103;
-        for(int i=0;i<8;i++){
-            int py=sy+12+i*36+(i>=6?18:0);
+        for(int i=0;i<9;i++){
+            int py=sy+12+i*36+(i>=2?12:0)+(i>=7?18:0);
             if(hit(x,y,left+4,py-2,176,34)){files_shortcut(q,i);return 1;}
         }
         if(q->storage)for(int i=0;i<q->storage->count&&i<5;i++){
-            int py=sy+344+i*35;
+            int py=sy+371+i*35;
             if(py+30<footer&&hit(x,y,left+4,py,176,33)){files_go(q,i,"\\",1);return 1;}
         }
         return 1;
