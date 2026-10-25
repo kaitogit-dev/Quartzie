@@ -110,6 +110,86 @@ static void check_file_selection(void){
     CHECK(qfs_read(&selection_storage,0,"\\Projects\\draft.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==0);
 }
 
+
+static QStorage move_storage;
+static QDesktop move_ui;
+static void select_named(const char *name){
+    move_ui.file_selected=-1;
+    move_ui.file_checked_count=0;
+    for(int i=0;i<move_ui.file_count;i++){
+        int found=!strcmp(move_ui.files[i].name,name);
+        move_ui.file_checked[i]=(uint8_t)found;
+        if(found){move_ui.file_selected=i;move_ui.file_checked_count=1;}
+    }
+    CHECK(move_ui.file_selected>=0);
+}
+static void select_file_path(const char *path){
+    move_ui.file_address_active=1;
+    move_ui.file_address_length=(int)strlen(path);
+    strcpy(move_ui.file_address,path);
+    q_key(&move_ui,'\r',0);
+    CHECK(!strcmp(move_ui.file_path,path));
+}
+static void check_file_moves(void){
+    qfs_init(&move_storage,0,0);
+    CHECK(qfs_mkdir(&move_storage,0,"\\Source")==0);
+    CHECK(qfs_write(&move_storage,0,"\\Source\\a.txt","one",3)==0);
+    CHECK(qfs_write(&move_storage,0,"\\Source\\b.txt","two",3)==0);
+    CHECK(qfs_mkdir(&move_storage,0,"\\Destination")==0);
+    q_init(&move_ui,1024,768,selection_pixels,selection_wall,selection_workspace);
+    q_attach_storage(&move_ui,&move_storage,0,0);
+    q_open(&move_ui,Q_FILES);
+    select_named("Source");
+    q_key(&move_ui,24,0);
+    CHECK(move_ui.file_clip_count==1&&move_ui.file_clip_cut);
+    q_key(&move_ui,22,0);
+    CHECK(!strcmp(move_ui.file_status,"Move complete"));
+    CHECK(move_ui.file_clip_count==0);
+    QFsEntry items[QFS_ENTRIES];
+    CHECK(qfs_list(&move_storage,0,"\\Source",items,QFS_ENTRIES)==2);
+    select_file_path("\\Destination");
+    q_key(&move_ui,22,0);
+    CHECK(!strcmp(move_ui.file_status,"Clipboard is empty"));
+    select_file_path("\\");
+    select_named("Source");
+    q_key(&move_ui,24,0);
+    select_file_path("\\Destination");
+    q_key(&move_ui,22,0);
+    CHECK(!strcmp(move_ui.file_status,"Move complete"));
+    char buffer[32];size_t length=0;
+    CHECK(qfs_read(&move_storage,0,"\\Destination\\Source\\a.txt",buffer,sizeof(buffer),&length)==0);
+    CHECK(length==3&&!memcmp(buffer,"one",3));
+    CHECK(qfs_read(&move_storage,0,"\\Destination\\Source\\b.txt",buffer,sizeof(buffer),&length)==0);
+    CHECK(length==3&&!memcmp(buffer,"two",3));
+    CHECK(qfs_list(&move_storage,0,"\\Source",items,QFS_ENTRIES)<0);
+    select_named("Source");
+    q_key(&move_ui,3,0);
+    q_key(&move_ui,22,0);
+    CHECK(qfs_list(&move_storage,0,"\\Destination\\Copy 1 - Source",items,QFS_ENTRIES)==2);
+    qfs_init(&move_storage,0,0);
+    CHECK(qfs_mkdir(&move_storage,0,"\\Batch")==0);
+    CHECK(qfs_write(&move_storage,0,"\\Batch\\a.txt","alpha",5)==0);
+    CHECK(qfs_write(&move_storage,0,"\\Batch\\b.txt","beta",4)==0);
+    CHECK(qfs_mkdir(&move_storage,0,"\\Target")==0);
+    for(int i=0;i<19;i++){
+        char name[16];
+        snprintf(name,sizeof(name),"\\filler%02d",i);
+        CHECK(qfs_write(&move_storage,0,name,"x",1)==0);
+    }
+    q_init(&move_ui,1024,768,selection_pixels,selection_wall,selection_workspace);
+    q_attach_storage(&move_ui,&move_storage,0,0);
+    q_open(&move_ui,Q_FILES);
+    select_named("Batch");
+    q_key(&move_ui,24,0);
+    select_file_path("\\Target");
+    q_key(&move_ui,22,0);
+    CHECK(!strcmp(move_ui.file_status,"Some items could not be copied or moved"));
+    CHECK(move_ui.file_clip_count==1);
+    CHECK(qfs_list(&move_storage,0,"\\Target",items,QFS_ENTRIES)==0);
+    CHECK(qfs_read(&move_storage,0,"\\Batch\\a.txt",buffer,sizeof(buffer),&length)==0&&length==5);
+    CHECK(qfs_read(&move_storage,0,"\\Batch\\b.txt",buffer,sizeof(buffer),&length)==0&&length==4);
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -172,6 +252,7 @@ int main(void){
     q_click(&ui,store->x+32+230+87,store->y+60+78+51);
     CHECK(ui.active==Q_CALCULATOR&&ui.windows[Q_CALCULATOR].open);
     check_file_selection();
+    check_file_moves();
     puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }

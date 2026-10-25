@@ -810,6 +810,7 @@ static void files_select(QDesktop *q,int index){
     q->dirty=1;
 }
 static void files_parent(QDesktop *q){
+    if(q->file_location)return;
     int end=0;while(q->file_path[end])end++;
     if(end<=1)return;
     while(end>1&&q->file_path[end-1]!='\\')end--;
@@ -1135,18 +1136,20 @@ static void files_rebuild(QDesktop *q){
 static void files_history(QDesktop *q){
     if(q->file_history_index>=0&&q->file_history_index<q->file_history_count){
         int k=q->file_history_index;
-        if(q->file_history_volumes[k]==q->file_volume&&files_equal(q->file_history_paths[k],q->file_path))return;
+        if(q->file_history_locations[k]==q->file_location&&q->file_history_volumes[k]==q->file_volume&&files_equal(q->file_history_paths[k],q->file_path))return;
     }
     q->file_history_count=q->file_history_index+1;
     if(q->file_history_count>=12){
         for(int i=1;i<12;i++){
             q->file_history_volumes[i-1]=q->file_history_volumes[i];
+            q->file_history_locations[i-1]=q->file_history_locations[i];
             for(int j=0;j<QFS_PATH;j++)q->file_history_paths[i-1][j]=q->file_history_paths[i][j];
         }
         q->file_history_count=11;
     }
     int k=q->file_history_count++;
     q->file_history_index=k;q->file_history_volumes[k]=q->file_volume;
+    q->file_history_locations[k]=q->file_location;
     for(int j=0;j<QFS_PATH;j++)q->file_history_paths[k][j]=q->file_path[j];
 }
 static void files_go(QDesktop *q,int volume,const char *path,int remember){
@@ -1163,11 +1166,21 @@ static void files_go(QDesktop *q,int volume,const char *path,int remember){
     q->file_address_active=0;q->file_menu=0;
     files_refresh(q);if(remember)files_history(q);
 }
+static void files_this_pc(QDesktop *q,int remember){
+    q->file_location=1;q->file_menu=0;q->file_submenu=0;
+    q->file_search[0]=0;q->file_search_length=0;
+    q->file_search_active=0;q->file_address_active=0;
+    q->file_selected=-1;q->file_checked_count=0;q->file_click_index=-1;
+    for(int i=0;i<QFS_ENTRIES;i++)q->file_checked[i]=0;
+    if(remember)files_history(q);
+    q->dirty=1;
+}
 static void files_back(QDesktop *q,int forward){
     int index=q->file_history_index+(forward?1:-1);
     if(index<0||index>=q->file_history_count)return;
     q->file_history_index=index;
-    files_go(q,q->file_history_volumes[index],q->file_history_paths[index],0);
+    if(q->file_history_locations[index])files_this_pc(q,0);
+    else files_go(q,q->file_history_volumes[index],q->file_history_paths[index],0);
 }
 static const char *files_type(const QFsEntry *entry){
     if(entry->directory)return "File folder";
@@ -2261,12 +2274,10 @@ typedef struct {
 } QFileClipboard;
 static QFsEntry file_copy_entries[7][QFS_ENTRIES];
 static QFileClipboard file_clipboard[QFS_ENTRIES];
-static int files_copy(QDesktop *q,int volume,const char *source,int target_volume,const char *target,int directory,int move,int depth){
+static int files_copy(QDesktop *q,int volume,const char *source,int target_volume,const char *target,int directory,int depth){
     if(depth>=7||!q->storage)return -1;
     if(!directory){
-        if(qfs_copy(q->storage,volume,source,target_volume,target)!=0)return -1;
-        if(move&&qfs_delete(q->storage,volume,source)!=0)return -1;
-        return 0;
+        return qfs_copy(q->storage,volume,source,target_volume,target);
     }
     if(volume==target_volume){
         int n=0;while(source[n]&&source[n]==target[n])n++;
@@ -2280,9 +2291,9 @@ static int files_copy(QDesktop *q,int volume,const char *source,int target_volum
         QFsEntry *entry=&file_copy_entries[depth][i];
         if(qfs_join(child,sizeof(child),source,entry->name)!=0||
            qfs_join(dest,sizeof(dest),target,entry->name)!=0)return -1;
-        if(files_copy(q,volume,child,target_volume,dest,entry->directory,move,depth+1)!=0)return -1;
+        if(files_copy(q,volume,child,target_volume,dest,entry->directory,depth+1)!=0)return -1;
     }
-    return !move||qfs_delete(q->storage,volume,source)==0?0:-1;
+    return 0;
 }
 static int files_remove_tree(QDesktop *q,int volume,const char *path,int directory,int depth){
     if(depth>=7)return -1;
@@ -2313,10 +2324,15 @@ static void files_paste(QDesktop *q){
         char target[QFS_PATH],name[72];
         int identical=clip->volume==q->file_volume;
         if(identical){
-            int k=0;
-            for(;clip->path[k]&&clip->path[k]==q->file_path[k];k++);
-            int len=0;while(q->file_path[len])len++;
-            identical=k==len&&(clip->path[k]=='\\'||(len==1&&clip->path[k]));
+            int slash=0,length=0;
+            for(int i=0;clip->path[i];i++)if(clip->path[i]=='\\')slash=i;
+            while(q->file_path[length])length++;
+            if(slash==0)identical=length==1&&q->file_path[0]=='\\';
+            else{
+                identical=length==slash;
+                for(int i=0;identical&&i<slash;i++)
+                    if(q->file_path[i]!=clip->path[i])identical=0;
+            }
         }
         int count=0;
         for(;clip->name[count]&&count<71;count++)name[count]=clip->name[count];
@@ -2346,8 +2362,14 @@ static void files_paste(QDesktop *q){
             }
             if(!found){failures++;goto keep;}
         }
-        if(qfs_join(target,sizeof(target),q->file_path,name)!=0||
-           files_copy(q,clip->volume,clip->path,q->file_volume,target,clip->directory,q->file_clip_cut,0)!=0){
+        if(qfs_join(target,sizeof(target),q->file_path,name)!=0){
+            failures++;goto keep;
+        }
+        if(files_copy(q,clip->volume,clip->path,q->file_volume,target,clip->directory,0)!=0){
+            files_remove_tree(q,q->file_volume,target,clip->directory,0);
+            failures++;goto keep;
+        }
+        if(q->file_clip_cut&&files_remove_tree(q,clip->volume,clip->path,clip->directory,0)!=0){
             failures++;goto keep;
         }
         completed++;
@@ -2390,7 +2412,7 @@ static void files_delete_selected(QDesktop *q){
 }
 static void files_shortcut(QDesktop *q,int index){
     if(!q->storage)return;
-    if(index==7){q->file_location=1;q->file_menu=0;q->file_search[0]=0;q->file_search_length=0;q->file_selected=-1;q->dirty=1;return;}
+    if(index==7){files_this_pc(q,1);return;}
     if(index==8){files_message(q,"Network locations are not connected");return;}
     if(index==1){q_open(q,Q_PHOTOS);return;}
     int volume=q->storage->ram_index;

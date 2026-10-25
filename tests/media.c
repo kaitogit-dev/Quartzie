@@ -52,6 +52,8 @@ int main(void){
     CHECK(qfs_join(path,sizeof(path),"\\Folder","clip.avi")==0);
     CHECK(strcmp(path,"\\Folder\\clip.avi")==0);
     CHECK(qfs_join(path,sizeof(path),"\\","../wrong")==-1);
+    CHECK(qfs_join(path,sizeof(path),"\\",".")==-1);
+    CHECK(qfs_join(path,sizeof(path),"\\","..")==-1);
     QMedia m;
     uint8_t bmp[70]={0};
     bmp[0]='B';bmp[1]='M';

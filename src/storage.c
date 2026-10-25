@@ -46,6 +46,7 @@ static int wide(uint16_t *dst,size_t capacity,const char *source){
 }
 int qfs_join(char *dst,size_t capacity,const char *dir,const char *name){
     if(!dst||!capacity||!dir||!name||!*name)return -1;
+    if(name[0]=='.'&&(!name[1]||(name[1]=='.'&&!name[2])))return -1;
     size_t n=0;
     while(dir[n]){if(n+1>=capacity)return -1;dst[n]=dir[n];n++;}
     if(n==0){dst[n++]='\\';}
