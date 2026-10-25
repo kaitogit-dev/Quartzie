@@ -42,6 +42,13 @@ typedef struct {
     QFsEntry files[QFS_ENTRIES];
     int file_volume,file_count,file_scroll,file_selected,file_confirm;
     int file_click_index,file_operation,file_input_length;
+    int file_view,file_sort,file_desc,file_menu,file_show_hidden,file_extensions,file_compact,file_details,file_nav;
+    int file_search_active,file_address_active,file_search_length,file_address_length,file_visible_count;
+    int file_location,file_history_count,file_history_index,file_clip_volume,file_clip_cut,file_clip_dir,file_checked_count;
+    uint8_t file_checked[QFS_ENTRIES];
+    int file_order[QFS_ENTRIES],file_history_volumes[12];
+    char file_search[64],file_address[QFS_PATH],file_clip_path[QFS_PATH],file_clip_name[72];
+    char file_history_paths[12][QFS_PATH];
     char file_input[72];
     uint32_t file_click_elapsed_us;
     char file_path[QFS_PATH],file_status[80],note_path[QFS_PATH],media_name[72];
