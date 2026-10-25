@@ -70,6 +70,7 @@ static void check_file_selection(void){
     for(int i=0;cmd[i];i++)q_key(&selection_ui,cmd[i],0);
     q_key(&selection_ui,'\r',0);
     CHECK(!strcmp(selection_ui.terminal_lines[6],"File created"));
+    char text_data[32];size_t text_len=0;
     CHECK(qfs_read(&selection_storage,0,"\\Projects\\draft.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==0);
 }
 
