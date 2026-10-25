@@ -2241,6 +2241,219 @@ static void calc_input(QDesktop *q,char key){
         }
     }
 }
+
+static QFsEntry file_copy_entries[7][QFS_ENTRIES];
+static uint8_t file_copy_small[QFS_MEMORY_BYTES];
+static int files_copy(QDesktop *q,int volume,const char *source,int target_volume,const char *target,int directory,int move,int depth){
+    if(depth>=7||!q->storage)return -1;
+    if(!directory){
+        uint8_t *buffer=q->media_buffer?q->media_buffer:file_copy_small;
+        size_t capacity=q->media_buffer?q->media_capacity:sizeof(file_copy_small),size=0;
+        if(qfs_read(q->storage,volume,source,buffer,capacity,&size)!=0)return -1;
+        if(qfs_write(q->storage,target_volume,target,buffer,size)!=0)return -1;
+        if(move&&qfs_delete(q->storage,volume,source)!=0)return -1;
+        return 0;
+    }
+    if(volume==target_volume){
+        int n=0;while(source[n]&&source[n]==target[n])n++;
+        if(!source[n]&&(target[n]==0||target[n]=='\\'))return -1;
+    }
+    if(qfs_mkdir(q->storage,target_volume,target)!=0)return -1;
+    int count=qfs_list(q->storage,volume,source,file_copy_entries[depth],QFS_ENTRIES);
+    if(count<0)return -1;
+    for(int i=0;i<count;i++){
+        char child[QFS_PATH],dest[QFS_PATH];
+        QFsEntry *entry=&file_copy_entries[depth][i];
+        if(qfs_join(child,sizeof(child),source,entry->name)!=0||
+           qfs_join(dest,sizeof(dest),target,entry->name)!=0)return -1;
+        if(files_copy(q,volume,child,target_volume,dest,entry->directory,move,depth+1)!=0)return -1;
+    }
+    return !move||qfs_delete(q->storage,volume,source)==0?0:-1;
+}
+static void files_paste(QDesktop *q){
+    if(q->file_clip_volume<0||!q->file_clip_path[0]){files_message(q,"Clipboard is empty");return;}
+    if(!q->storage||q->file_location){files_message(q,"Choose a folder first");return;}
+    char target[QFS_PATH],name[72];
+    if(qfs_join(target,sizeof(target),q->file_path,q->file_clip_name)!=0){files_message(q,"Path is too long");return;}
+    if(q->file_clip_volume==q->file_volume&&files_equal(q->file_clip_path,target)){
+        const char *source=q->file_clip_name;
+        int at=0;const char *prefix="Copy of ";
+        for(int i=0;prefix[i]&&at<70;i++)name[at++]=prefix[i];
+        for(int i=0;source[i]&&at<70;i++)name[at++]=source[i];
+        name[at]=0;
+        if(qfs_join(target,sizeof(target),q->file_path,name)!=0){files_message(q,"Path is too long");return;}
+    }
+    QFsEntry existing[1];
+    if(qfs_list(q->storage,q->file_volume,target,existing,1)>=0){
+        files_message(q,"Destination already exists");return;
+    }
+    if(files_copy(q,q->file_clip_volume,q->file_clip_path,q->file_volume,target,q->file_clip_dir,q->file_clip_cut,0)!=0){
+        files_message(q,"Copy or move failed");return;
+    }
+    if(q->file_clip_cut){q->file_clip_volume=-1;q->file_clip_path[0]=0;}
+    files_refresh(q);
+}
+static void files_clip(QDesktop *q,int cut){
+    if(q->file_location||q->file_selected<0||q->file_selected>=q->file_count)return;
+    QFsEntry *entry=&q->files[q->file_selected];
+    if(qfs_join(q->file_clip_path,sizeof(q->file_clip_path),q->file_path,entry->name)!=0)return;
+    int i=0;for(;entry->name[i]&&i<71;i++)q->file_clip_name[i]=entry->name[i];q->file_clip_name[i]=0;
+    q->file_clip_volume=q->file_volume;q->file_clip_dir=entry->directory;q->file_clip_cut=cut;
+    files_message(q,cut?"Ready to move":"Copied to clipboard");
+}
+static void files_delete_selected(QDesktop *q){
+    if(q->file_location)return;
+    if(!q->file_confirm){q->file_confirm=1;files_message(q,"Select Delete again to confirm");return;}
+    int failures=0;
+    for(int i=0;i<q->file_count;i++)if(q->file_checked[i]||(!q->file_checked_count&&i==q->file_selected)){
+        char path[QFS_PATH];
+        if(qfs_join(path,sizeof(path),q->file_path,q->files[i].name)!=0||
+           qfs_delete(q->storage,q->file_volume,path)!=0)failures++;
+    }
+    files_refresh(q);
+    if(failures)files_message(q,"Some selected items could not be deleted");
+}
+static void files_shortcut(QDesktop *q,int index){
+    if(!q->storage)return;
+    if(index==6){q->file_location=1;q->file_menu=0;q->file_search[0]=0;q->file_search_length=0;q->file_selected=-1;q->dirty=1;return;}
+    if(index==7){files_message(q,"Network locations are not connected");return;}
+    int volume=q->storage->ram_index;
+    if(index==0){files_go(q,volume,"\\",1);return;}
+    const char *folders[]={"","Desktop","Documents","Pictures","Music","Videos"};
+    char target[QFS_PATH];
+    if(qfs_join(target,sizeof(target),"\\",folders[index])!=0)return;
+    QFsEntry item[1];
+    if(qfs_list(q->storage,volume,target,item,1)<0)
+        if(qfs_mkdir(q->storage,volume,target)!=0){files_message(q,"Cannot open this folder");return;}
+    files_go(q,volume,target,1);
+}
+static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
+    int left=w->x+15,top=w->y+60,full=w->w-30;
+    int side=q->file_nav?188:0;
+    int main_x=left+side+9,main_w=full-side-16-(q->file_details?188:0);
+    int canvas_y=top+109,footer=w->y+w->h-31;
+    if(!focused)q->file_click_index=-1;
+    if(q->file_operation){
+        int dw=clamp(full-96,310,530),dx=left+(full-dw)/2,dy=top+135;
+        if(hit(x,y,dx,dy,dw,154))return 1;
+        q->file_operation=0;q->dirty=1;return 1;
+    }
+    if(q->file_menu){
+        int mx=left+(q->file_menu==1?5:q->file_menu==2?407:q->file_menu==3?500:595);
+        int my=top+94,group=q->file_menu;
+        if(group==3)mx=clamp(mx,left,left+full-424);
+        if(group==4)mx=clamp(mx,left,left+full-193);
+        int width=group==1?190:group==2?178:group==3?418:188;
+        int height=group==1?82:group==2?187:group==3?292:187;
+        if(hit(x,y,mx,my,width,height)){
+            int option=(y-my-6)/35;
+            q->file_menu=0;
+            if(group==1){
+                if(option>=0&&option<2)files_begin(q,option+1);
+            }else if(group==2){
+                if(option>=0&&option<3)q->file_sort=option;
+                if(option==3)q->file_desc=0;
+                if(option==4)q->file_desc=1;
+                files_rebuild(q);
+            }else if(group==3){
+                if(x<mx+222){
+                    if(option>=0&&option<8)q->file_view=option;
+                }else if(option>=0&&option<5){
+                    if(option==0)q->file_nav=!q->file_nav;
+                    if(option==1)q->file_details=!q->file_details;
+                    if(option==2)q->file_compact=!q->file_compact;
+                    if(option==3)q->file_extensions=!q->file_extensions;
+                    if(option==4)q->file_show_hidden=!q->file_show_hidden;
+                }
+                files_rebuild(q);
+            }else{
+                if(option==0||option==1||option==2){
+                    int all=option==0?1:option==1?0:2;
+                    q->file_checked_count=0;
+                    for(int i=0;i<q->file_count;i++){
+                        int visible=0;
+                        for(int k=0;k<q->file_visible_count;k++)if(q->file_order[k]==i){visible=1;break;}
+                        if(!visible){q->file_checked[i]=0;continue;}
+                        q->file_checked[i]=all==2?!q->file_checked[i]:all;
+                        if(q->file_checked[i])q->file_checked_count++;
+                    }
+                }else if(option==3)q->file_details=1;
+                else if(option==4)files_refresh(q);
+                q->dirty=1;
+            }
+            return 1;
+        }
+        q->file_menu=0;q->dirty=1;
+        return 1;
+    }
+    if(hit(x,y,left,top,full,46)){
+        if(hit(x,y,left,top+4,35,37)){files_back(q,0);return 1;}
+        if(hit(x,y,left+40,top+4,35,37)){files_back(q,1);return 1;}
+        if(hit(x,y,left+80,top+4,35,37)){files_parent(q);return 1;}
+        if(hit(x,y,left+120,top+4,70,37)){files_refresh(q);return 1;}
+        int search_w=clamp(full/4,144,225),address_x=left+195,address_w=full-203-search_w-8;
+        if(hit(x,y,address_x,top+6,address_w,34)){
+            q->file_address_active=1;q->file_search_active=0;q->file_address_length=0;
+            for(int i=0;q->file_path[i]&&i<QFS_PATH-1;i++)q->file_address[q->file_address_length++]=q->file_path[i];
+            q->file_address[q->file_address_length]=0;q->dirty=1;return 1;
+        }
+        if(hit(x,y,left+full-search_w,top+6,search_w,34)){
+            q->file_search_active=1;q->file_address_active=0;q->dirty=1;return 1;
+        }
+        q->file_address_active=0;q->file_search_active=0;return 1;
+    }
+    if(hit(x,y,left,top+51,full,47)){
+        const int tx[]={5,83,131,186,249,326,407,500,595},tw[]={74,45,52,55,75,76,85,88,45};
+        for(int i=0;i<9;i++)if(tx[i]+tw[i]<=full&&hit(x,y,left+tx[i],top+57,tw[i],33)){
+            if(i==0||i==6||i==7||i==8){q->file_menu=i==0?1:i==6?2:i==7?3:4;q->dirty=1;}
+            else if(i==1)files_clip(q,1);
+            else if(i==2)files_clip(q,0);
+            else if(i==3)files_paste(q);
+            else if(i==4)files_begin(q,3);
+            else if(i==5)files_delete_selected(q);
+            return 1;
+        }
+        return 1;
+    }
+    if(q->file_nav&&hit(x,y,left,top+103,182,footer-(top+103))){
+        int sy=top+103;
+        for(int i=0;i<8;i++){
+            int py=sy+12+i*36+(i>=6?18:0);
+            if(hit(x,y,left+4,py-2,176,34)){files_shortcut(q,i);return 1;}
+        }
+        if(q->storage)for(int i=0;i<q->storage->count&&i<5;i++){
+            int py=sy+344+i*35;
+            if(py+30<footer&&hit(x,y,left+4,py,176,33)){files_go(q,i,"\\",1);return 1;}
+        }
+        return 1;
+    }
+    if(q->file_location){
+        if(q->storage)for(int i=0;i<q->storage->count;i++){
+            int dx=main_x+8+(i%2)*225,dy=canvas_y+53+(i/2)*90;
+            if(dx+210>main_x+main_w)break;
+            if(hit(x,y,dx,dy,210,76)){files_go(q,i,"\\",1);return 1;}
+        }
+        return 1;
+    }
+    if(q->file_view==5)canvas_y+=37;
+    int cols=files_columns(q,w),item_h=files_item_height(q);
+    int pitch=cols==1?main_w-10:(main_w-14)/cols,page=files_page(q,w);
+    for(int slot=0;slot<page;slot++){
+        int shown=q->file_scroll+slot;
+        if(shown>=q->file_visible_count)break;
+        int ix=main_x+6+(slot%cols)*pitch,iy=canvas_y+(slot/cols)*item_h;
+        if(iy+item_h>footer-5)break;
+        if(hit(x,y,ix,iy,pitch-5,item_h-4)){
+            files_select(q,q->file_order[shown]);return 1;
+        }
+    }
+    if(hit(x,y,main_x,canvas_y,main_w,footer-canvas_y)){
+        q->file_selected=-1;q->file_click_index=-1;q->file_checked_count=0;
+        for(int i=0;i<QFS_ENTRIES;i++)q->file_checked[i]=0;
+        q->dirty=1;return 1;
+    }
+    return 0;
+}
 void q_click(QDesktop *q,int x,int y){
     q->hover_only=0;
     int dock=q_dock_hit(q,x,y);
@@ -2315,48 +2528,7 @@ void q_click(QDesktop *q,int x,int y){
         }else if(chosen==Q_SETTINGS){
             settings_click(q,w,x,y);
         }else if(chosen==Q_FILES){
-            int rows=files_rows(w);
-            if(!files_was_focused)q->file_click_index=-1;
-            if(q->file_operation){
-                int dx=bx+35,dy=by+149,dw=w->w-64-70;
-                if(hit(x,y,dx,dy,dw,134))return;
-                q->file_operation=0;q->dirty=1;return;
-            }
-            for(int i=0;i<rows;i++)if(hit(x,y,bx,by+143+i*40,w->w-64,40)&&q->file_scroll+i<q->file_count){
-                files_select(q,q->file_scroll+i);return;
-            }
-            q->file_click_index=-1;
-            if(hit(x,y,bx,by+139,w->w-64,rows*40+8)){
-                q->file_selected=-1;q->file_confirm=0;q->dirty=1;return;
-            }
-            if(hit(x,y,bx,by+25,112,43)){
-                if(q->storage&&q->storage->count){q->file_volume=(q->file_volume+1)%q->storage->count;q->file_path[0]='\\';q->file_path[1]=0;files_refresh(q);}
-                return;
-            }
-            if(hit(x,y,bx,by+79,57,35)){files_parent(q);return;}
-            if(hit(x,y,bx+66,by+79,82,35)){files_refresh(q);return;}
-            if(hit(x,y,bx+157,by+79,112,35)){files_begin(q,1);return;}
-            if(hit(x,y,bx+278,by+79,98,35)){files_begin(q,2);return;}
-            if(hit(x,y,bx+385,by+79,78,35)){
-                if(q->file_selected>=0&&q->file_selected<q->file_count){
-                    if(!q->file_confirm){q->file_confirm=1;files_message(q,"");}
-                    else{
-                        char path[QFS_PATH];
-                        if(qfs_join(path,sizeof(path),q->file_path,q->files[q->file_selected].name)==0&&qfs_delete(q->storage,q->file_volume,path)==0)files_refresh(q);
-                        else files_message(q,"Cannot delete this item");
-                        q->file_confirm=0;
-                    }
-                }
-                return;
-            }
-            int bottom=by+143+rows*40+10;
-            if(q->file_selected>=0&&hit(x,y,bx+238,bottom,100,34)){files_begin(q,3);return;}
-            if(hit(x,y,bx,bottom,100,34)){
-                q->file_scroll=clamp(q->file_scroll-rows,0,q->file_count);q->dirty=1;return;
-            }
-            if(hit(x,y,bx+105,bottom,100,34)){
-                q->file_scroll=clamp(q->file_scroll+rows,0,q->file_count>rows?q->file_count-rows:0);q->dirty=1;return;
-            }
+            files_click(q,w,x,y,files_was_focused);
         }else if(chosen==Q_NOTES){
             int cw=w->w-64;
             if(hit(x,y,bx+cw-98,by+2,96,28)){files_save_notes(q);return;}
