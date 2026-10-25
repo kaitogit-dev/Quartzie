@@ -852,6 +852,7 @@ static void files_finish(QDesktop *q){
     if(ok)files_refresh(q);
     else files_message(q,"Could not create or rename item");
 }
+static QFsEntry operation_entries[QFS_ENTRIES];
 static void files_save_notes(QDesktop *q){
     if(!q->storage){files_message(q,"No storage available");return;}
     if(!q->note_path[0]||q->note_volume<0){
@@ -859,8 +860,7 @@ static void files_save_notes(QDesktop *q){
         if(volume<0||volume>=q->storage->count){files_message(q,"No writable storage available");return;}
         char path[QFS_PATH],filename[32];
         int found=0;
-        QFsEntry entries[QFS_ENTRIES];
-        int count=qfs_list(q->storage,volume,"\\",entries,QFS_ENTRIES);
+        int count=qfs_list(q->storage,volume,"\\",operation_entries,QFS_ENTRIES);
         for(int i=1;i<1000;i++){
             int k=0;const char *prefix="Note ";
             for(int j=0;prefix[j];j++)filename[k++]=prefix[j];
@@ -869,7 +869,7 @@ static void files_save_notes(QDesktop *q){
             for(int start=place,end=k-1;start<end;start++,end--){char c=filename[start];filename[start]=filename[end];filename[end]=c;}
             const char *ext=".txt";for(int j=0;ext[j];j++)filename[k++]=ext[j];filename[k]=0;
             int used=0;
-            for(int j=0;j<count;j++)if(files_equal(entries[j].name,filename)){used=1;break;}
+            for(int j=0;j<count;j++)if(files_equal(operation_entries[j].name,filename)){used=1;break;}
             if(used)continue;
             if(qfs_join(path,sizeof(path),"\\",filename)!=0)break;
             if(qfs_write(q->storage,volume,path,q->notes,(size_t)q->note_length)==0){
@@ -1001,13 +1001,12 @@ static void terminal_run(QDesktop *q){
         terminal_log(q,"Invalid drive index");return;
     }
     if(files_equal(command,"dir")||files_equal(command,"ls")){
-        QFsEntry listing[QFS_ENTRIES];
-        int n=qfs_list(q->storage,q->terminal_volume,q->terminal_path,listing,QFS_ENTRIES);
+        int n=qfs_list(q->storage,q->terminal_volume,q->terminal_path,operation_entries,QFS_ENTRIES);
         if(n<0){terminal_log(q,"Cannot read folder");return;}
         if(!n){terminal_log(q,"Folder is empty");return;}
         for(int i=0;i<n;i++){char label[96];int at=0;
-            if(listing[i].directory){const char *prefix="<DIR> ";for(int j=0;prefix[j];j++)label[at++]=prefix[j];}
-            for(int j=0;listing[i].name[j]&&at<95;j++)label[at++]=listing[i].name[j];
+            if(operation_entries[i].directory){const char *prefix="<DIR> ";for(int j=0;prefix[j];j++)label[at++]=prefix[j];}
+            for(int j=0;operation_entries[i].name[j]&&at<95;j++)label[at++]=listing[i].name[j];
             label[at]=0;terminal_log(q,label);
         }
         return;
@@ -1297,7 +1296,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.5",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.6",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -1396,7 +1395,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.40.5",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.40.6",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1892,6 +1891,34 @@ static int calc_number(const char *expr,int *index,int64_t *out){
     *out=value*sign;
     return 1;
 }
+static int calc_term(const char *expression,int *position,int64_t *result){
+    if(!calc_number(expression,position,result))return 0;
+    while(expression[*position]=='*'||expression[*position]=='/'){
+        char operation=expression[(*position)++];
+        int64_t right=0;
+        if(!calc_number(expression,position,&right))return 0;
+        if(operation=='/'&&right==0)return 0;
+        int64_t value=operation=='*'?*result*right:*result/right;
+        if(value>1000000000||value< -1000000000)return -1;
+        *result=value;
+    }
+    return 1;
+}
+static int calc_expression(const char *expression,int64_t *result){
+    int position=0;
+    int status=calc_term(expression,&position,result);
+    if(status!=1)return status;
+    while(expression[position]=='+'||expression[position]=='-'){
+        char operation=expression[position++];
+        int64_t right=0;
+        status=calc_term(expression,&position,&right);
+        if(status!=1)return status;
+        int64_t value=operation=='+'?*result+right:*result-right;
+        if(value>1000000000||value< -1000000000)return -1;
+        *result=value;
+    }
+    return expression[position]?0:1;
+}
 static void calc_format(char *output,int64_t value){
     char digits[24];
     int negative=value<0,at=0,index=0;
@@ -1912,28 +1939,10 @@ static void calc_input(QDesktop *q,char key){
     }
     if(key=='='){
         if(!q->calc_length)return;
-        int index=0;
-        int64_t left=0,right=0,result=0;
-        int valid=calc_number(q->calc,&index,&left);
-        char op=q->calc[index];
-        if(valid&&op){
-            if(op!='+'&&op!='-'&&op!='*'&&op!='/')valid=0;
-            else{
-                index++;
-                valid=calc_number(q->calc,&index,&right)&&q->calc[index]==0;
-            }
-        }
-        if(valid&&!op)valid=q->calc[index]==0;
-        if(valid){
-            if(!op)result=left;
-            else if(op=='+')result=left+right;
-            else if(op=='-')result=left-right;
-            else if(op=='*')result=left*right;
-            else if(op=='/'&&right)result=left/right;
-            else valid=0;
-        }
-        if(!valid||result>1000000000||result< -1000000000){
-            const char *err=valid?"OVERFLOW":"ERR";
+        int64_t result=0;
+        int status=calc_expression(q->calc,&result);
+        if(status!=1){
+            const char *err=status<0?"OVERFLOW":"ERR";
             int n=0;
             while(err[n]){q->answer[n]=err[n];n++;}
             q->answer[n]=0;

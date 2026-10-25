@@ -50,6 +50,27 @@ static void check_file_selection(void){
     q_key(&selection_ui,'\r',0);
     CHECK(selection_ui.active==Q_NOTES&&selection_ui.note_length==6);
     CHECK(!memcmp(selection_ui.notes,"second",6));
+    q_key(&selection_ui,0,4);
+    q_key(&selection_ui,'X',0);
+    CHECK(!strcmp(selection_ui.notes,"seconXd")&&selection_ui.note_dirty);
+    q_key(&selection_ui,8,0);
+    CHECK(!strcmp(selection_ui.notes,"second"));
+    q_key(&selection_ui,19,0);
+    CHECK(!selection_ui.note_dirty);
+    q_open(&selection_ui,Q_TERMINAL);
+    const char *cmd="mkdir Projects";
+    for(int i=0;cmd[i];i++)q_key(&selection_ui,cmd[i],0);
+    q_key(&selection_ui,'\r',0);
+    CHECK(!strcmp(selection_ui.terminal_lines[6],"Folder created"));
+    cmd="cd Projects";
+    for(int i=0;cmd[i];i++)q_key(&selection_ui,cmd[i],0);
+    q_key(&selection_ui,'\r',0);
+    CHECK(!strcmp(selection_ui.terminal_path,"\\Projects"));
+    cmd="touch draft.txt";
+    for(int i=0;cmd[i];i++)q_key(&selection_ui,cmd[i],0);
+    q_key(&selection_ui,'\r',0);
+    CHECK(!strcmp(selection_ui.terminal_lines[6],"File created"));
+    CHECK(qfs_read(&selection_storage,0,"\\Projects\\draft.txt",text_data,sizeof(text_data),&text_len)==0&&text_len==0);
 }
 
 int main(void){
@@ -77,6 +98,13 @@ int main(void){
     CHECK(!strcmp(ui.answer,"ERR")&&ui.calc_history_count==2);
     key('C');
     CHECK(!strcmp(ui.answer,"0")&&ui.calc_length==0);
+    key('2');key('+');key('3');key('*');key('4');key('\r');
+    CHECK(!strcmp(ui.answer,"14"));
+    key('2');key('0');key('/');key('2');key('+');key('4');key('*');key('2');key('\r');
+    CHECK(!strcmp(ui.answer,"18"));
+    key('1');key('0');key('0');key('0');key('0');key('0');key('0');key('0');key('0');key('0');key('*');key('2');key('\r');
+    CHECK(!strcmp(ui.answer,"OVERFLOW"));
+    key('C');
     q_key(&ui,0,21);
     CHECK(ui.windows[Q_CALCULATOR].maximized);
     q_key(&ui,0,21);
