@@ -14,6 +14,7 @@ static uint32_t *dock_base_buffer;
 static QDesktop desktop;
 static QNtKernel *native_kernel;
 static QStorage *native_storage;
+static QNetwork native_network;
 static uint8_t *media_memory;
 static uint8_t *photo_output_memory;
 static uint8_t *codec_memory;
@@ -285,6 +286,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     qc_memory(codec_memory,48u*1024u*1024u);
     qfs_init(native_storage,image,bs);
+    qnet_refresh(bs,&native_network);
+    q_attach_network(&desktop,&native_network);
     serial_text(native_storage->home_index==native_storage->ram_index?"QUARTZIE-HOME-RAM\n":"QUARTZIE-HOME-PERSISTENT\n");
     q_attach_storage(&desktop,native_storage,media_memory,8u*1024u*1024u);
     q_attach_photo_output(&desktop,photo_output_memory,16u*1024u*1024u);
@@ -331,6 +334,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     serial_text("QUARTZIE-DESKTOP-READY\n");
     serial_text("QUARTZIE-INPUT-READY\n");
     for(;;){
+        if((native_kernel->clock_ticks%300u)==0u)qnet_refresh(bs,&native_network);
         pointer_sample(0);
         if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
             q_move(&desktop,pointer_x,pointer_y);

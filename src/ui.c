@@ -1392,6 +1392,9 @@ static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     if(q->file_status[0])string_limit(q,x+8,y+w->h-112,q->file_status,muted,0,cw-16,1);
     else text(q,x+8,y+w->h-112,q->note_dirty?"Unsaved changes":"",muted,0);
 }
+void q_attach_network(QDesktop *q,QNetwork *network){
+    if(q){q->network=network;q->dirty=1;}
+}
 static void terminal_log(QDesktop *q,const char *message){
     for(int i=0;i<6;i++)for(int j=0;j<96;j++)q->terminal_lines[i][j]=q->terminal_lines[i+1][j];
     int n=0;for(;message&&message[n]&&n<95;n++)q->terminal_lines[6][n]=message[n];
@@ -1407,7 +1410,16 @@ static void terminal_run(QDesktop *q){
     if(*argument){*argument++=0;while(*argument==' ')argument++;}
     if(!*command)return;
     if(files_equal(command,"clear")){q->terminal_count=0;for(int i=0;i<7;i++)q->terminal_lines[i][0]=0;return;}
-    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open tasks clear help echo");return;}
+    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open tasks netinfo clear help echo");return;}
+    if(files_equal(command,"netinfo")){
+        if(!q->network||!q->network->count){terminal_log(q,"No network adapter detected");return;}
+        for(int i=0;i<q->network->count;i++){
+            QNetAdapter *net=&q->network->adapters[i];
+            terminal_log(q,net->mac);
+            terminal_log(q,net->link_known?(net->link_present?"Link connected":"Link disconnected"):"Link state unknown");
+        }
+        return;
+    }
     if(files_equal(command,"pwd")){terminal_log(q,q->terminal_path);return;}
     if(files_equal(command,"echo")){terminal_log(q,argument);return;}
     if(files_equal(command,"open")){
@@ -1909,7 +1921,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     if(q->media_status[0])string_limit(q,x+5,y+w->h-70,q->media_status,muted,0,cw-10,1);
 }
 
-static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About"};
+static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About","Network"};
 static int settings_sidebar_width(int width){return clamp(width/4,175,220);}
 static int settings_find(const char *haystack,const char *needle){
     if(!needle[0])return 1;
@@ -2119,6 +2131,17 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
             }
         }
         text(q,left+5,y+w->h-109,"Select a drive to browse it in Files.",secondary(q),0);
+    }else if(page==6){
+        text(q,left+5,y+112,"Detected network interfaces",foreground(q),1);
+        if(!q->network||!q->network->count)
+            settings_card(q,left,y+139,width,80,"No network adapter","No UEFI SNP device is available",0);
+        else for(int i=0;i<q->network->count&&i<4;i++){
+            QNetAdapter *adapter=&q->network->adapters[i];
+            int top=y+139+i*97;
+            settings_card(q,left,top,width,87,adapter->mac,
+                adapter->link_known?(adapter->link_present?"Cable connected":"Cable disconnected"):"Link status unavailable",0);
+        }
+        text(q,left+5,y+w->h-104,"Hardware link and MAC information",secondary(q),0);
     }else if(page==5){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));

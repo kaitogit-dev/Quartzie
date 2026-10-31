@@ -6,6 +6,7 @@
 #include "media.h"
 #include "ntcore.h"
 #include "package.h"
+#include "network.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
@@ -21,7 +22,7 @@
 #define Q_PHOTOS 7
 #define Q_MEDIA 8
 #define Q_TASKS 9
-#define Q_SETTINGS_PAGES 6
+#define Q_SETTINGS_PAGES 7
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
@@ -57,6 +58,7 @@ typedef struct {
     char menu_search[24],calc_history[3][64];
     QWindow windows[Q_APPS];
     QStorage *storage;
+    QNetwork *network;
     QNtKernel *kernel;
     int (*terminate_process)(QNtKernel *,uint32_t);
     QFsEntry files[QFS_ENTRIES];
@@ -95,6 +97,7 @@ void q_ui_set_scratch(uint32_t *storage);
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
+void q_attach_network(QDesktop *q,QNetwork *network);
 void q_attach_kernel(QDesktop *q,QNtKernel *kernel,int (*terminate_process)(QNtKernel *,uint32_t));
 void q_attach_photo_output(QDesktop *q,uint8_t *output,size_t capacity);
 int q_photo_save_bmp(QDesktop *q);
