@@ -2185,6 +2185,9 @@ static void profile_refresh(QDesktop *q){
         if(files_equal(q->profiles[i].name,q->storage->profile))q->profile_target=i;
 }
 static void profile_activate(QDesktop *q,const char *name,const char *pin){
+    if(q->note_dirty&&!files_equal(q->storage->profile,name)){
+        profile_message(q,"Save your Notes changes before changing accounts");return;
+    }
     if(!q->storage||qprofiles_switch(q->storage,name,pin)!=0){
         profile_message(q,"Incorrect PIN or account unavailable");return;
     }
