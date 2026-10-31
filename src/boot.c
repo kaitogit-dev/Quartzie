@@ -289,6 +289,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     if(w==1920&&h==1080)serial_text("QUARTZIE-MODE-1920x1080\n");
     else serial_text("QUARTZIE-MODE-FALLBACK\n");
     qnt_init(native_kernel);
+    q_attach_kernel(&desktop,native_kernel,qnt_process_destroy);
     size_t executable_size=0;
     int has_disk_app=qefi_read_app(image,bs,executable_buffer,Q_EXECUTABLE_CAPACITY,&executable_size)==0;
     if(has_disk_app)serial_text("QUARTZIE-WIN32-FILE\n");

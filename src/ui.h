@@ -4,10 +4,11 @@
 #include <stddef.h>
 #include "storage.h"
 #include "media.h"
+#include "ntcore.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
-#define Q_APPS 9
+#define Q_APPS 10
 #define Q_DOCK_APPS 7
 #define Q_FILES 0
 #define Q_NOTES 1
@@ -18,6 +19,7 @@
 #define Q_STORE 6
 #define Q_PHOTOS 7
 #define Q_MEDIA 8
+#define Q_TASKS 9
 #define Q_SETTINGS_PAGES 6
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
@@ -30,6 +32,9 @@ typedef struct {
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
     int terminal_volume,terminal_count,photo_zoom,store_page;
+    int task_tab,task_selected,task_scroll;
+    uint32_t task_refresh_us;
+    uint64_t uptime_us;
     uint32_t audio_display_us;
     char terminal_path[QFS_PATH],terminal_lines[7][96];
     int menu_search_length,calc_history_count;
@@ -39,6 +44,8 @@ typedef struct {
     char menu_search[24],calc_history[3][64];
     QWindow windows[Q_APPS];
     QStorage *storage;
+    QNtKernel *kernel;
+    int (*terminate_process)(QNtKernel *,uint32_t);
     QFsEntry files[QFS_ENTRIES];
     int file_volume,file_count,file_scroll,file_selected,file_confirm;
     int file_click_index,file_operation,file_input_length;
@@ -75,6 +82,8 @@ void q_ui_set_scratch(uint32_t *storage);
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_draw(QDesktop *q);
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
+void q_attach_kernel(QDesktop *q,QNtKernel *kernel,int (*terminate_process)(QNtKernel *,uint32_t));
+int q_task_end_selected(QDesktop *q);
 void q_enable_animations(QDesktop *q);
 void q_tick(QDesktop *q);
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us);

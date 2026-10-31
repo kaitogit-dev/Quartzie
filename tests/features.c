@@ -190,6 +190,44 @@ static void check_file_moves(void){
     CHECK(qfs_read(&move_storage,0,"\\Batch\\b.txt",buffer,sizeof(buffer),&length)==0&&length==4);
 }
 
+
+static QNtKernel tasks_kernel;
+static QDesktop tasks_ui;
+static uint32_t tasks_pixels[1024*768],tasks_wall[1024*768],tasks_scratch[1024*768];
+static int tasks_terminated;
+static int terminate_test_process(QNtKernel *kernel,uint32_t pid){
+    tasks_terminated++;
+    for(int i=0;i<QNT_PROCESSES;i++)if(kernel->processes[i].alive&&kernel->processes[i].pid==pid){
+        kernel->processes[i].alive=0;
+        return QNT_OK;
+    }
+    return QNT_NOT_FOUND;
+}
+static void check_task_manager(void){
+    memset(&tasks_kernel,0,sizeof(tasks_kernel));
+    tasks_kernel.processes[0].alive=1;tasks_kernel.processes[0].pid=42;
+    tasks_kernel.processes[0].region_count=1;tasks_kernel.processes[0].regions[0].length=1048576;
+    q_init(&tasks_ui,1024,768,tasks_pixels,tasks_wall,tasks_scratch);
+    q_attach_kernel(&tasks_ui,&tasks_kernel,terminate_test_process);
+    q_open(&tasks_ui,Q_NOTES);q_open(&tasks_ui,Q_FILES);q_open(&tasks_ui,Q_TASKS);
+    CHECK(tasks_ui.windows[Q_TASKS].open);
+    tasks_ui.task_tab=0;tasks_ui.task_selected=Q_NOTES;
+    CHECK(q_task_end_selected(&tasks_ui)==1&&!tasks_ui.windows[Q_NOTES].open);
+    CHECK(q_task_end_selected(&tasks_ui)==0);
+    tasks_ui.task_tab=1;tasks_ui.task_selected=0;
+    CHECK(q_task_end_selected(&tasks_ui)==1&&tasks_terminated==1&&!tasks_kernel.processes[0].alive);
+    CHECK(q_task_end_selected(&tasks_ui)==0);
+    q_tick_timed(&tasks_ui,1000000);
+    CHECK(tasks_ui.uptime_us==1000000u);
+    q_open(&tasks_ui,Q_TASKS);
+    QWindow *window=&tasks_ui.windows[Q_TASKS];
+    int x=window->x+32,y=window->y+60;
+    q_click(&tasks_ui,x+145*2+25,y+35);
+    CHECK(tasks_ui.task_tab==2);
+    q_click(&tasks_ui,x+25,y+35);
+    CHECK(tasks_ui.task_tab==0);
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -253,6 +291,7 @@ int main(void){
     CHECK(ui.active==Q_CALCULATOR&&ui.windows[Q_CALCULATOR].open);
     check_file_selection();
     check_file_moves();
+    check_task_manager();
     puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }

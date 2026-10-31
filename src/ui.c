@@ -384,14 +384,21 @@ static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
     else if(app==Q_STORE)icon_id=QI_STORE;
     else if(app==Q_PHOTOS)icon_id=QI_IMAGE;
     else if(app==Q_MEDIA)icon_id=QI_MEDIA_PLAYER;
-    if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
+    if(app==Q_TASKS){
+        int side=size*3/4;
+        surface(q,cx-side/2,cy-side/2,side,side,side/5,0x316a9e,238);
+        for(int i=0;i<4;i++){
+            int bar=side*(i+2)/8;
+            rectangle(q,cx-side/2+side/8+i*side/5,cy+side/2-side/8-bar,side/9,bar,0xe2f8ff);
+        }
+    }else if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
     else icon(q,cx,cy,app,color);
 }
 static int dock_x(QDesktop *q){return (q->width-632)/2;}
 static int dock_y(QDesktop *q){return q->height-89;}
 static int menu_x(QDesktop *q){return (q->width-510)/2;}
 static int menu_y(QDesktop *q){return clamp(q->height-607,54,q->height-100);}
-static const char *names[Q_APPS]={"Files","Notes","Terminal","Calculator","Settings","About","Store","Photos","Media Player"};
+static const char *names[Q_APPS]={"Files","Notes","Terminal","Calculator","Settings","About","Store","Photos","Media Player","Task Manager"};
 static int menu_match(QDesktop *q,int app){
     if(!q->menu_search_length)return 1;
     const char *name=names[app];
@@ -430,7 +437,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
     q->file_view=1;q->file_nav=1;q->file_extensions=1;q->file_clip_volume=-1;q->file_history_index=-1;
     q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
-    q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
+    q->task_selected=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
@@ -490,6 +497,11 @@ void q_enable_animations(QDesktop *q){
     q->animations_enabled=1;
 }
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
+    q->uptime_us+=elapsed_us;
+    if(q->windows[Q_TASKS].open&&!q->windows[Q_TASKS].minimized){
+        q->task_refresh_us+=elapsed_us;
+        if(q->task_refresh_us>=1000000u){q->task_refresh_us%=1000000u;q->dirty=1;q->hover_only=0;}
+    }
     if(q->file_click_index>=0){
         if(elapsed_us>=420000u-q->file_click_elapsed_us){
             q->file_click_index=-1;
@@ -717,6 +729,142 @@ static void maximize_window(QDesktop *q,int app){
     begin_scene_tween(q,2);
     q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
+
+void q_attach_kernel(QDesktop *q,QNtKernel *kernel,int (*terminate_process)(QNtKernel *,uint32_t)){
+    if(!q)return;
+    q->kernel=kernel;
+    q->terminate_process=terminate_process;
+}
+static int task_index(QDesktop *q,int row){
+    if(row<0)return -1;
+    if(q->task_tab==0){
+        for(int i=0;i<Q_APPS;i++)if(q->windows[i].open){
+            if(row--==0)return i;
+        }
+    }else if(q->task_tab==1&&q->kernel){
+        for(int i=0;i<QNT_PROCESSES;i++)if(q->kernel->processes[i].alive){
+            if(row--==0)return i;
+        }
+    }
+    return -1;
+}
+static int task_count(QDesktop *q,int tab){
+    int count=0;
+    if(tab==0){for(int i=0;i<Q_APPS;i++)if(q->windows[i].open)count++;}
+    else if(tab==1&&q->kernel){for(int i=0;i<QNT_PROCESSES;i++)if(q->kernel->processes[i].alive)count++;}
+    return count;
+}
+int q_task_end_selected(QDesktop *q){
+    if(!q||q->task_selected<0||q->task_tab>1)return 0;
+    int index=q->task_selected;
+    if(q->task_tab==0){
+        if(index>=Q_APPS||!q->windows[index].open)return 0;
+        close_window(q,index);
+    }else{
+        if(!q->kernel||!q->terminate_process||index>=QNT_PROCESSES||!q->kernel->processes[index].alive)return 0;
+        uint32_t pid=q->kernel->processes[index].pid;
+        if(q->terminate_process(q->kernel,pid)!=QNT_OK)return 0;
+    }
+    q->task_selected=-1;q->dirty=1;
+    return 1;
+}
+static void task_number(char *out,uint64_t n){
+    char reversed[24];int length=0,index=0;
+    do{reversed[length++]=(char)('0'+n%10u);n/=10u;}while(n&&length<24);
+    while(length)out[index++]=reversed[--length];
+    out[index]=0;
+}
+static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
+    int count=task_count(q,q->task_tab);
+    const char *tabs[]={"Applications","Processes","Performance"};
+    for(int i=0;i<3;i++){
+        int left=x+i*145;
+        if(left+136>x+cw)break;
+        surface(q,left,y+17,136,39,10,q->task_tab==i?colors(q)->selected:inner_material(q),q->theme?191:145);
+        string_limit(q,left+12,y+43,tabs[i],ink,0,123,1);
+    }
+    if(q->task_tab==2){
+        int apps=task_count(q,0),processes=task_count(q,1),threads=0;
+        uint64_t mapped=0;
+        if(q->kernel){
+            for(int i=0;i<QNT_THREADS;i++)if(q->kernel->threads[i].state)threads++;
+            for(int i=0;i<QNT_PROCESSES;i++)if(q->kernel->processes[i].alive)
+                for(uint32_t j=0;j<q->kernel->processes[i].region_count;j++)
+                    mapped+=q->kernel->processes[i].regions[j].length;
+        }
+        char value[32];
+        surface(q,x,y+79,cw,w->h-188,15,inner_material(q),q->theme?128:154);
+        const char *labels[]={"Open apps","Processes","Threads","Mapped virtual MiB","Uptime seconds","Scheduler ticks","Context switches","System calls"};
+        uint64_t numbers[]={ (uint64_t)apps,(uint64_t)processes,(uint64_t)threads,mapped/(1024u*1024u),
+            q->uptime_us/1000000u,q->kernel?q->kernel->clock_ticks:0,
+            q->kernel?q->kernel->switches:0,q->kernel?q->kernel->syscalls:0 };
+        for(int i=0;i<8;i++){
+            int yy=y+115+i*39;
+            if(yy>y+w->h-120)break;
+            text(q,x+20,yy,labels[i],ink,0);
+            task_number(value,numbers[i]);
+            text(q,x+cw-140,yy,value,accent(q),1);
+        }
+        return;
+    }
+    int max_rows=clamp((w->h-245)/42,3,10);
+    if(q->task_scroll>=count)q->task_scroll=count>0?(count-1)/max_rows*max_rows:0;
+    surface(q,x,y+75,cw,w->h-190,14,inner_material(q),q->theme?112:155);
+    text(q,x+19,y+99,q->task_tab==0?"Application":"Native process",muted,0);
+    text(q,x+cw-145,y+99,q->task_tab==0?"State":"PID / Memory",muted,0);
+    for(int row=0;row<max_rows;row++){
+        int index=task_index(q,q->task_scroll+row);
+        if(index<0)break;
+        int top=y+109+row*42;
+        if(top+40>y+w->h-119)break;
+        surface(q,x+9,top,cw-18,39,8,index==q->task_selected?colors(q)->selected:inner_material(q),q->theme?165:118);
+        if(q->task_tab==0){
+            app_icon(q,x+35,top+20,index,27,ink);
+            string_limit(q,x+60,top+26,names[index],ink,0,cw-225,1);
+            text(q,x+cw-144,top+26,q->windows[index].minimized?"Minimized":index==q->active?"Active":"Running",muted,0);
+        }else{
+            QNtProcess *p=&q->kernel->processes[index];
+            char number[32],info[60];int len=0;
+            const char *title="Native process";
+            string_limit(q,x+25,top+26,title,ink,0,cw-230,1);
+            task_number(number,p->pid);
+            for(int i=0;number[i];i++)info[len++]=number[i];
+            info[len++]=' ';info[len++]='/';info[len++]=' ';
+            uint64_t vm=0;for(uint32_t i=0;i<p->region_count;i++)vm+=p->regions[i].length;
+            task_number(number,vm/1024u);
+            for(int i=0;number[i];i++)info[len++]=number[i];
+            info[len++]='K';info[len]=0;
+            text(q,x+cw-145,top+26,info,muted,0);
+        }
+    }
+    int bottom=y+w->h-103;
+    surface(q,x,bottom,124,39,11,inner_material(q),q->theme?151:143);
+    text(q,x+26,bottom+26,"Previous",ink,0);
+    surface(q,x+132,bottom,98,39,11,inner_material(q),q->theme?151:143);
+    text(q,x+151,bottom+26,"Next",ink,0);
+    surface(q,x+cw-151,bottom,151,39,11,q->task_selected>=0?colors(q)->selected:inner_material(q),q->theme?185:129);
+    text(q,x+cw-127,bottom+26,"End task",ink,1);
+}
+static void tasks_click(QDesktop *q,QWindow *w,int x,int y){
+    int left=w->x+32,top=w->y+60,cw=w->w-64;
+    for(int i=0;i<3;i++)if(hit(x,y,left+i*145,top+17,136,39)){
+        q->task_tab=i;q->task_selected=-1;q->task_scroll=0;q->dirty=1;return;
+    }
+    if(q->task_tab==2)return;
+    int max_rows=clamp((w->h-245)/42,3,10);
+    for(int row=0;row<max_rows;row++)if(hit(x,y,left+9,top+109+row*42,cw-18,39)){
+        q->task_selected=task_index(q,q->task_scroll+row);q->dirty=1;return;
+    }
+    int bottom=top+w->h-103,count=task_count(q,q->task_tab);
+    if(hit(x,y,left,bottom,124,39)&&q->task_scroll>0){
+        q->task_scroll-=max_rows;if(q->task_scroll<0)q->task_scroll=0;q->task_selected=-1;q->dirty=1;return;
+    }
+    if(hit(x,y,left+132,bottom,98,39)&&q->task_scroll+max_rows<count){
+        q->task_scroll+=max_rows;q->task_selected=-1;q->dirty=1;return;
+    }
+    if(hit(x,y,left+cw-151,bottom,151,39))q_task_end_selected(q);
+}
+
 static void files_rebuild(QDesktop *q);
 static void files_history(QDesktop *q);
 static void files_go(QDesktop *q,int volume,const char *path,int remember);
@@ -995,11 +1143,11 @@ static void terminal_run(QDesktop *q){
     if(*argument){*argument++=0;while(*argument==' ')argument++;}
     if(!*command)return;
     if(files_equal(command,"clear")){q->terminal_count=0;for(int i=0;i<7;i++)q->terminal_lines[i][0]=0;return;}
-    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open clear help echo");return;}
+    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open tasks clear help echo");return;}
     if(files_equal(command,"pwd")){terminal_log(q,q->terminal_path);return;}
     if(files_equal(command,"echo")){terminal_log(q,argument);return;}
     if(files_equal(command,"open")){
-        const char *apps[Q_APPS]={"files","notes","terminal","calculator","settings","about","store","photos","media"};
+        const char *apps[Q_APPS]={"files","notes","terminal","calculator","settings","about","store","photos","media","tasks"};
         for(int i=0;i<Q_APPS;i++)if(files_equal(apps[i],argument)){q_open(q,i);return;}
         terminal_log(q,"Unknown application");return;
     }
@@ -1680,7 +1828,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.41.0",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.42.0",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1796,6 +1944,8 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         draw_settings(q,w,x,y,cw);
     }else if(app==Q_PHOTOS||app==Q_MEDIA){
         draw_viewer(q,app,w,x,y,cw,ink,muted);
+    }else if(app==Q_TASKS){
+        draw_tasks(q,w,x,y,cw,ink,muted);
     }else if(app==Q_STORE){
         text(q,x,y+47,"App Library",muted,0);
         const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
@@ -1811,7 +1961,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
         text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
     }else{
-        text(q,x,y+45,"Quartzie 0.41.0",ink,2);
+        text(q,x,y+45,"Quartzie 0.42.0",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -2648,6 +2798,8 @@ void q_click(QDesktop *q,int x,int y){
             }
         }else if(chosen==Q_SETTINGS){
             settings_click(q,w,x,y);
+        }else if(chosen==Q_TASKS){
+            tasks_click(q,w,x,y);
         }else if(chosen==Q_FILES){
             files_click(q,w,x,y,files_was_focused);
         }else if(chosen==Q_NOTES){
