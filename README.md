@@ -79,3 +79,5 @@ Quartzie Store now accepts native `.qapp` packages from Files. Open a verified `
 Photos now supports non-destructive 90-degree rotation, horizontal mirroring, browse previous/next images and Save BMP, which writes a new 24-bit bitmap to the writable Home Pictures folder. Media Player now supports previous/next tracks in the current directory, repeat mode, volume adjustment and muting; auto-next advances when playback finishes. Audio still uses the PC speaker on the current firmware backend.
 
 Network diagnostics now use UEFI Simple Network Protocol to enumerate actual adapters and read their MAC addresses, link state and MTUs. See Settings > Network or run `netinfo` in Terminal. This release provides hardware discovery and link diagnostics; TCP/IP, DNS, Internet downloads, and browsing require additional networking stack work.
+
+The Windows QEMU launcher now attaches an emulated E1000 network device by default so Quartzie can discover a NIC through firmware. This does not yet provide web access: the network controls report only adapter and physical link diagnostics.

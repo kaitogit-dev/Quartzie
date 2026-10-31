@@ -1089,7 +1089,9 @@ static int media_load(QDesktop *q,int volume,const char *path,const char *name){
     if(!q->media_buffer||!q->storage)return -1;
     size_t bytes=0;QMedia opened;
     if(qfs_read(q->storage,volume,path,q->media_buffer,q->media_capacity,&bytes)!=0||
-       qm_open(&opened,q->media_buffer,bytes)!=0)return -1;
+       qm_open(&opened,q->media_buffer,bytes)!=0){
+        q->media.playing=0;q->media.kind=QM_NONE;return -1;
+    }
     q->media=opened;q->photo_zoom=0;q->photo_rotation=0;q->photo_flipped=0;
     q->audio_display_us=0;q->media_volume=volume;
     int i=0;for(;path[i]&&i<QFS_PATH-1;i++)q->media_path[i]=path[i];
@@ -1946,7 +1948,8 @@ static int settings_result(QDesktop *q,int page){
         "theme light dark accent color appearance",
         "installed applications open launch store photos media",
         "drives volumes home files disk",
-        "device version hardware system information"
+        "device version hardware system information",
+        "network ethernet adapter mac address link cable"
     };
     return settings_find(keywords[page],q->settings_search);
 }
@@ -2013,7 +2016,7 @@ static void settings_card(QDesktop *q,int x,int y,int w,int h,const char *headin
 static void settings_icon(QDesktop *q,int x,int y,int page){
     uint32_t ink=page==q->settings_page?accent(q):secondary(q);
     circular(q,x,y,13,ink,48);
-    const char *letters[Q_SETTINGS_PAGES]={"H","S","P","A","D","i"};
+    const char *letters[Q_SETTINGS_PAGES]={"H","S","P","A","D","i","N"};
     text(q,x-5,y+5,letters[page],ink,0);
 }
 static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
@@ -2043,7 +2046,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){
             int yy=y+76+row*75;
             if(yy+67>y+w->h-76)break;
-            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and theme","Installed applications","Volumes and drives","Device information"};
+            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and theme","Installed applications","Volumes and drives","Device information","Network interfaces"};
             settings_card(q,left,yy,width,66,settings_pages[i],subtitles[i],1);
             row++;
         }
@@ -2058,7 +2061,8 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         "Make Quartzie yours",
         "Open your applications",
         "Manage local storage",
-        "Device information"
+        "Device information",
+        "Network adapters and link status"
     };
     text(q,left,y+69,subtitles[page],secondary(q),0);
     if(page==0){

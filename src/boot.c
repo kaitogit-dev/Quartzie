@@ -334,7 +334,16 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     serial_text("QUARTZIE-DESKTOP-READY\n");
     serial_text("QUARTZIE-INPUT-READY\n");
     for(;;){
-        if((native_kernel->clock_ticks%300u)==0u)qnet_refresh(bs,&native_network);
+        if((native_kernel->clock_ticks%300u)==0u){
+            QNetwork previous=native_network;
+            qnet_refresh(bs,&native_network);
+            if(previous.count!=native_network.count)desktop.dirty=1;
+            else for(int i=0;i<native_network.count;i++){
+                if(previous.adapters[i].link_known!=native_network.adapters[i].link_known||
+                   previous.adapters[i].link_present!=native_network.adapters[i].link_present||
+                   previous.adapters[i].state!=native_network.adapters[i].state){desktop.dirty=1;break;}
+            }
+        }
         pointer_sample(0);
         if(pointer_x!=desktop.mouse_x||pointer_y!=desktop.mouse_y){
             q_move(&desktop,pointer_x,pointer_y);

@@ -271,6 +271,103 @@ static void check_store_import(void){
     CHECK(!strcmp(store_ui.file_status,"Invalid, corrupt or oversized QApp package"));
 }
 
+
+static QDesktop media_ui;
+static QStorage media_storage;
+static uint32_t media_pixels[1024*768],media_wall[1024*768],media_blur[1024*768];
+static uint8_t media_payload[4096],media_export[4096];
+static void test_write32(uint8_t *b,int n,uint32_t v){
+    for(int i=0;i<4;i++)b[n+i]=(uint8_t)(v>>(8*i));
+}
+static void check_media_actions(void){
+    qfs_init(&media_storage,0,0);
+    CHECK(qfs_mkdir(&media_storage,0,"\\Pictures")==0);
+    uint8_t bmp[70]={0};
+    bmp[0]='B';bmp[1]='M';
+    test_write32(bmp,10,54);test_write32(bmp,14,40);test_write32(bmp,18,2);test_write32(bmp,22,2);
+    bmp[26]=1;bmp[28]=24;
+    bmp[54]=0;bmp[55]=0;bmp[56]=255;
+    bmp[62]=255;bmp[63]=0;bmp[64]=0;
+    CHECK(qfs_write(&media_storage,0,"\\Pictures\\First.bmp",bmp,sizeof(bmp))==0);
+    CHECK(qfs_write(&media_storage,0,"\\Pictures\\Second.bmp",bmp,sizeof(bmp))==0);
+    q_init(&media_ui,1024,768,media_pixels,media_wall,media_blur);
+    q_attach_storage(&media_ui,&media_storage,media_payload,sizeof(media_payload));
+    q_attach_photo_output(&media_ui,media_export,sizeof(media_export));
+    q_open(&media_ui,Q_FILES);
+    media_ui.file_selected=0;
+    q_key(&media_ui,'\r',0);
+    CHECK(!strcmp(media_ui.file_path,"\\Pictures"));
+    media_ui.file_selected=0;
+    q_key(&media_ui,'\r',0);
+    CHECK(media_ui.active==Q_PHOTOS&&media_ui.media_track_count==2);
+    CHECK(media_ui.media_track_index==0);
+    QWindow *w=&media_ui.windows[Q_PHOTOS];
+    int left=w->x+32,top=w->y+60,view=w->h-223;
+    q_click(&media_ui,left+15,top+104+view+18);
+    CHECK(media_ui.photo_rotation==1);
+    q_click(&media_ui,left+101,top+104+view+18);
+    CHECK(media_ui.photo_flipped==1);
+    q_click(&media_ui,left+184,top+104+view+18);
+    char data[128];size_t length=0;
+    CHECK(qfs_read(&media_storage,0,"\\Pictures\\Edited-001.bmp",data,sizeof(data),&length)==0&&length==70);
+    QMedia sample;
+    CHECK(qm_open(&sample,data,length)==0);
+    CHECK(qm_pixel(&sample,0,0)==qm_image_pixel(&media_ui.media,1,1,0,0));
+    q_click(&media_ui,left+395,top+104+view+18);
+    CHECK(media_ui.media_track_index==1);
+    q_click(&media_ui,left+306,top+104+view+18);
+    CHECK(media_ui.media_track_index==0);
+    uint8_t wav[52]={0};
+    memcpy(wav,"RIFF",4);memcpy(wav+8,"WAVEfmt ",8);
+    test_write32(wav,16,16);wav[20]=1;wav[22]=1;
+    test_write32(wav,24,8000);test_write32(wav,28,8000);
+    wav[32]=1;wav[34]=8;
+    memcpy(wav+36,"data",4);test_write32(wav,40,8);
+    for(int i=0;i<8;i++)wav[44+i]=(uint8_t)(i*32);
+    CHECK(qfs_write(&media_storage,0,"\\Pictures\\Song1.wav",wav,sizeof(wav))==0);
+    CHECK(qfs_write(&media_storage,0,"\\Pictures\\Song2.wav",wav,sizeof(wav))==0);
+    q_open(&media_ui,Q_FILES);
+    int selected=-1;
+    for(int i=0;i<media_ui.file_count;i++)if(!strcmp(media_ui.files[i].name,"Song1.wav"))selected=i;
+    CHECK(selected>=0);
+    media_ui.file_selected=selected;q_key(&media_ui,'\r',0);
+    CHECK(media_ui.active==Q_MEDIA&&media_ui.media.kind==QM_AUDIO);
+    CHECK(media_ui.media_track_count==2);
+    w=&media_ui.windows[Q_MEDIA];
+    left=w->x+32;top=w->y+60;view=w->h-223;
+    q_click(&media_ui,left+99,top+104+view+18);
+    CHECK(media_ui.media_track_index==1&&media_ui.media.playing);
+    q_click(&media_ui,left+190,top+104+view+18);
+    CHECK(media_ui.media_repeat);
+    q_click(&media_ui,left+255,top+104+view+18);
+    CHECK(media_ui.media_volume_level==70);
+    q_click(&media_ui,left+390,top+104+view+18);
+    CHECK(media_ui.media_muted);
+    q_tick_timed(&media_ui,3000);
+    CHECK(media_ui.media.playing&&media_ui.media_track_index==0);
+}
+static void check_network_ui(void){
+    static QNetwork network;
+    static QDesktop desktop;
+    static uint32_t pixels[1024*768],wall[1024*768],blur[1024*768];
+    q_init(&desktop,1024,768,pixels,wall,blur);
+    network.count=1;
+    strcpy(network.adapters[0].mac,"52:54:00:12:AB:FE");
+    network.adapters[0].link_known=1;
+    network.adapters[0].link_present=1;
+    q_attach_network(&desktop,&network);
+    q_open(&desktop,Q_SETTINGS);
+    QWindow *w=&desktop.windows[Q_SETTINGS];
+    q_click(&desktop,w->x+42,w->y+60+128+6*43+15);
+    CHECK(desktop.settings_page==6);
+    q_open(&desktop,Q_TERMINAL);
+    const char *command="netinfo";
+    for(int i=0;command[i];i++)q_key(&desktop,command[i],0);
+    q_key(&desktop,'\r',0);
+    CHECK(!strcmp(desktop.terminal_lines[5],"52:54:00:12:AB:FE"));
+    CHECK(!strcmp(desktop.terminal_lines[6],"Link connected"));
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -336,6 +433,8 @@ int main(void){
     check_file_moves();
     check_task_manager();
     check_store_import();
+    check_media_actions();
+    check_network_ui();
     puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }
