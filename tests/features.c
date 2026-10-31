@@ -327,6 +327,10 @@ static void check_media_actions(void){
     CHECK(qfs_write(&media_storage,0,"\\Pictures\\Song1.wav",wav,sizeof(wav))==0);
     CHECK(qfs_write(&media_storage,0,"\\Pictures\\Song2.wav",wav,sizeof(wav))==0);
     q_open(&media_ui,Q_FILES);
+    q_key(&media_ui,8,0);
+    media_ui.file_selected=0;
+    q_key(&media_ui,'\r',0);
+    CHECK(!strcmp(media_ui.file_path,"\\Pictures"));
     int selected=-1;
     for(int i=0;i<media_ui.file_count;i++)if(!strcmp(media_ui.files[i].name,"Song1.wav"))selected=i;
     CHECK(selected>=0);
