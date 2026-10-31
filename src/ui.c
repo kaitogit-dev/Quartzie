@@ -1510,6 +1510,29 @@ static void terminal_log(QDesktop *q,const char *message){
     if(q->terminal_count<7)q->terminal_count++;
     q->dirty=1;
 }
+static void boot_diagnose(QDesktop *q){
+    if(!q||!q->storage){terminal_log(q,"Storage unavailable");return;}
+    QStorage *s=q->storage;
+    terminal_log(q,"Quartzie boot diagnostics");
+    int target=-1;QFsEntry probe[1];
+    for(int i=0;i<s->ram_index;i++)if(qfs_list(s,i,"\\EFI\\BOOT",probe,1)>=0){target=i;break;}
+    if(target<0)terminal_log(q,"EFI system files: not found");
+    else{
+        uint8_t *buffer=q->photo_output?q->photo_output:q->media_buffer;
+        size_t capacity=q->photo_output?q->photo_output_capacity:q->media_capacity;
+        if(buffer&&qupd_health(s,target,buffer,capacity)==0)terminal_log(q,"EFI image: valid structure and available digest");
+        else terminal_log(q,"EFI image: FAILED integrity check");
+    }
+    terminal_log(q,qupd_target(s,1)>=0?"Previous firmware: recoverable":"Previous firmware: no usable backup");
+    terminal_log(q,s->home_index==s->ram_index?"Home: temporary memory":"Home: persistent disk");
+    char home[QFS_PATH];
+    if(qfs_profile_path(s,"",home,sizeof(home))==0&&
+       qfs_list(s,s->home_index,home,probe,1)>=0)terminal_log(q,"Active profile folder: accessible");
+    else terminal_log(q,"Active profile folder: missing");
+    terminal_log(q,q->network&&q->network->count?"Network hardware: detected":"Network hardware: not detected");
+    terminal_log(q,"Desktop renderer: running");
+    q_open(q,Q_TERMINAL);
+}
 static void terminal_run(QDesktop *q){
     char *command=q->command;
     while(*command==' ')command++;
@@ -1518,7 +1541,8 @@ static void terminal_run(QDesktop *q){
     if(*argument){*argument++=0;while(*argument==' ')argument++;}
     if(!*command)return;
     if(files_equal(command,"clear")){q->terminal_count=0;for(int i=0;i<7;i++)q->terminal_lines[i][0]=0;return;}
-    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open tasks netinfo clear help echo");return;}
+    if(files_equal(command,"help")){terminal_log(q,"dir cd pwd drives drive mkdir touch del type");terminal_log(q,"open tasks netinfo diagnose clear help echo");return;}
+    if(files_equal(command,"diagnose")){boot_diagnose(q);return;}
     if(files_equal(command,"netinfo")){
         if(!q->network||!q->network->count){terminal_log(q,"No network adapter detected");return;}
         for(int i=0;i<q->network->count;i++){
@@ -2229,13 +2253,10 @@ static void update_install(QDesktop *q){
         q->update_found=0;update_message(q,"Installed and verified. Reboot to start the new version");
     }else update_message(q,"Install failed. Check backup and writable EFI disk");
 }
+static void boot_diagnose(QDesktop *q);
 static void update_integrity(QDesktop *q){
-    if(!q->storage||!q->media_buffer)return;
-    int target=qupd_target(q->storage,0);
-    if(target<0){update_message(q,"No writable EFI system disk detected");return;}
-    q->update_target=target;
-    int result=qupd_health(q->storage,target,q->media_buffer,q->media_capacity);
-    update_message(q,result==0?"EFI image and recorded hash verified":"EFI image damaged or integrity check failed");
+    boot_diagnose(q);
+    update_message(q,"Boot diagnostics opened in Terminal");
 }
 static void update_rollback(QDesktop *q){
     if(!q->storage||!q->media_buffer)return;
@@ -2469,8 +2490,8 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         }
         if(q->profile_status[0])string_limit(q,left+7,y+(compact?440:560),q->profile_status,secondary(q),0,width-12,1);
     }else if(page==8){
-        const char *actions[]={"Check for updates","Install verified update","Verify EFI integrity","Roll back firmware","Restore appearance settings","Discard rollback backup"};
-        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Check boot image and stored SHA-256","Restore the saved previous EFI","Recover the last saved configuration","Allow installation of a further update"};
+        const char *actions[]={"Check for updates","Install verified update","Run boot diagnostics","Roll back firmware","Restore appearance settings","Discard rollback backup"};
+        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Inspect boot EFI, storage, accounts and fallback","Restore the saved previous EFI","Recover the last saved configuration","Allow installation of a further update"};
         int row=clamp((w->h-175)/6,49,76);
         for(int i=0;i<6;i++)settings_card(q,left,y+92+i*row,width,row-8,actions[i],descs[i],1);
         if(q->update_status[0])string_limit(q,left+5,y+w->h-57,q->update_status,secondary(q),0,width-10,1);

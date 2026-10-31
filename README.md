@@ -39,6 +39,6 @@ python3 tools/update.py pack build/BOOTX64.EFI -o QUARTZIE.UPD --version 0.44.0
 
 Installation validates the UEFI payload and its SHA-256 digest, stages the new EFI binary, backs up the existing firmware, and verifies the result. The target system partition must be writable; ISO media is not. Keep the previous `QUARTZIE.BAK` binary until you're satisfied the update boots. Restore the backup by booting a working Quartzie recovery ISO with the affected disk attached and selecting Roll Back. A backup must be rolled back or explicitly cleared before installing a further firmware update.
 
-The Update & Recovery page also checks EFI integrity against the stored digest and restores the preceding saved appearance configuration. These operations use local media; the networking stack currently provides adapter diagnostics rather than Internet update downloads.
+The Update & Recovery page runs boot diagnostics covering the EFI image, saved backup, Home storage, profile folder and network hardware. The same report is available using `diagnose` in Terminal. It also restores the preceding saved appearance configuration. These operations use local media; the networking stack currently provides adapter diagnostics rather than Internet update downloads.
 
 Quartzie Store converts EXE/APK packages to `.qapp` for distribution and installs verified archives, while execution still depends on the corresponding runtime.
