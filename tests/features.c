@@ -372,6 +372,64 @@ static void check_network_ui(void){
     CHECK(!strcmp(desktop.terminal_lines[6],"Link connected"));
 }
 
+
+static QDesktop trash_ui;
+static QStorage trash_storage;
+static uint32_t trash_pixels[1024*768],trash_wall[1024*768],trash_blur[1024*768];
+static QTrashEntry trash_entries[QTRASH_LIMIT];
+static void check_recycle_bin_ui(void){
+    qfs_init(&trash_storage,0,0);
+    CHECK(qfs_mkdir(&trash_storage,0,"\\Documents")==0);
+    CHECK(qfs_write(&trash_storage,0,"\\Documents\\draft.txt","draft",5)==0);
+    q_init(&trash_ui,1024,768,trash_pixels,trash_wall,trash_blur);
+    q_attach_storage(&trash_ui,&trash_storage,0,0);
+    q_open(&trash_ui,Q_FILES);
+    int docs=-1;
+    for(int i=0;i<trash_ui.file_count;i++)if(!strcmp(trash_ui.files[i].name,"Documents"))docs=i;
+    CHECK(docs>=0);
+    trash_ui.file_selected=docs;
+    q_key(&trash_ui,'\r',0);
+    CHECK(!strcmp(trash_ui.file_path,"\\Documents"));
+    CHECK(trash_ui.file_count==1);
+    trash_ui.file_selected=0;
+    q_key(&trash_ui,0,8);
+    CHECK(trash_ui.file_confirm==1);
+    q_key(&trash_ui,0,8);
+    CHECK(qtrash_list(&trash_storage,trash_entries,QTRASH_LIMIT)==1);
+    QWindow *w=&trash_ui.windows[Q_FILES];
+    int sidebar_x=w->x+15,sidebar_y=w->y+60+103;
+    q_click(&trash_ui,sidebar_x+55,sidebar_y+12+8*36+12+18+12);
+    CHECK(trash_ui.file_location==2&&trash_ui.file_count==1);
+    CHECK(!strcmp(trash_ui.files[0].name,"draft.txt"));
+    trash_ui.file_selected=0;
+    q_key(&trash_ui,'\r',0);
+    CHECK(trash_ui.file_count==0);
+    char data[24];size_t length=0;
+    CHECK(qfs_read(&trash_storage,0,"\\Documents\\draft.txt",data,sizeof(data),&length)==0&&length==5);
+    CHECK(!memcmp(data,"draft",5));
+    CHECK(qtrash_put(&trash_storage,0,"\\Documents\\draft.txt",0)==0);
+    q_click(&trash_ui,sidebar_x+55,sidebar_y+12+8*36+12+18+12);
+    CHECK(trash_ui.file_count==1);
+    trash_ui.file_selected=0;
+    q_key(&trash_ui,0,8);
+    CHECK(trash_ui.file_confirm==1);
+    q_key(&trash_ui,0,8);
+    CHECK(trash_ui.file_count==0);
+    CHECK(qtrash_list(&trash_storage,trash_entries,QTRASH_LIMIT)==0);
+    CHECK(qfs_write(&trash_storage,0,"\\Documents\\one.txt","1",1)==0);
+    CHECK(qfs_write(&trash_storage,0,"\\Documents\\two.txt","2",1)==0);
+    CHECK(qtrash_put(&trash_storage,0,"\\Documents\\one.txt",0)==0);
+    CHECK(qtrash_put(&trash_storage,0,"\\Documents\\two.txt",0)==0);
+    q_click(&trash_ui,sidebar_x+55,sidebar_y+12+8*36+12+18+12);
+    CHECK(trash_ui.file_count==2);
+    int left=w->x+15,top=w->y+60;
+    q_click(&trash_ui,left+274,top+70);
+    CHECK(trash_ui.file_confirm);
+    q_click(&trash_ui,left+274,top+70);
+    CHECK(trash_ui.file_count==0);
+    CHECK(qtrash_list(&trash_storage,trash_entries,QTRASH_LIMIT)==0);
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -439,6 +497,7 @@ int main(void){
     check_store_import();
     check_media_actions();
     check_network_ui();
+    check_recycle_bin_ui();
     puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }
