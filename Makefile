@@ -57,9 +57,9 @@ build/ui-test: tests/ui.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c 
 build/ps2-test: tests/ps2.c src/ps2.c src/ps2.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ps2.c src/ps2.c -o $@
 build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 test: build/package-test build/native-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/package-test build/native-test.qapp
 	./build/settings-test
@@ -91,17 +91,17 @@ clean:
 build/theme-test: tests/theme.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/theme.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
 build/features-test: tests/features.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/features.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/features.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/start-test: tests/start.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/start.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/start.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/transitions-test: tests/transitions.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/transitions.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/transitions.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/tween.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h src/cursor.h build/cursor.c build/font.c build/icons.c build/embed_app.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/storage.c src/media.c src/codecs.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/storage.c src/media.c src/codecs.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c src/package.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
@@ -115,9 +115,9 @@ build/pe-test: tests/pe64.c src/pe64.c src/pe64.h | build
 build/icons-test: tests/icons.c build/icons.c src/icons.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/icons.c build/icons.c -o $@
 build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/media-test: tests/media.c src/media.c src/media.h src/storage.c src/storage.h src/codecs.c src/codecs.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/media.c src/media.c src/storage.c src/codecs.c -o $@
 build/settings-test: tests/settings.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/settings.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/settings.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 .PHONY: all release test verify clean

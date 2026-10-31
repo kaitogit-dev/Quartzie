@@ -138,7 +138,7 @@ int qpkg_verify(const uint8_t *bytes,size_t length,QPackage *info){
         else return -1;
     }
     if(!manifest||!payload||(icon?count!=3:count!=2)||manifest->length>16384)return -1;
-    char schema[40],platform[16],path[40],sha[65],name[81],app_id[80],version[65];
+    char schema[40],platform[16],path[40],sha[65]={0},name[81],app_id[80],version[65];
     uint64_t schema_version=0,payload_length=0;
     if(field(manifest->bytes,manifest->length,"schema",schema,sizeof(schema))!=0||
        field(manifest->bytes,manifest->length,"platform",platform,sizeof(platform))!=0||
@@ -152,7 +152,7 @@ int qpkg_verify(const uint8_t *bytes,size_t length,QPackage *info){
     if(!same(schema,"quartzie.app.package")||schema_version!=1||payload_length!=payload->length||
        !same(path,payload->name)||(!same(platform,"windows")&&!same(platform,"android"))||
        (same(platform,"windows")!=same(payload->name,"payload/application.exe")))return -1;
-    if(!app_id[0]||!name[0]||!version[0]||!same(app_id,app_id)||!same(path,payload->name))return -1;
+    if(!app_id[0]||!name[0]||!version[0]||!same(path,payload->name))return -1;
     for(int i=0;app_id[i];i++){
         char c=app_id[i];
         if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='.'))return -1;

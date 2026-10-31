@@ -1989,7 +1989,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.42.1",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.42.2",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -2151,7 +2151,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.42.1",ink,2);
+        text(q,x,y+45,"Quartzie 0.42.2",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
