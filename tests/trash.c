@@ -31,7 +31,8 @@ int main(void){
     CHECK(qfs_mkdir(&storage,0,"\\Documents\\Album\\Nested")==0);
     CHECK(qfs_write(&storage,0,"\\Documents\\Album\\Nested\\b.txt","beta",4)==0);
     CHECK(qtrash_put(&storage,0,"\\Documents\\Album",1)==0);
-    CHECK(qfs_list(&storage,0,"\\Documents\\Album",items? (QFsEntry *)data:0,1)<0);
+    QFsEntry probe[1];
+    CHECK(qfs_list(&storage,0,"\\Documents\\Album",probe,1)<0);
     CHECK(qtrash_list(&storage,items,QTRASH_LIMIT)==1&&items[0].directory);
     strcpy(id,items[0].id);
     CHECK(qtrash_restore(&storage,id)==0);

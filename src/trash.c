@@ -50,20 +50,19 @@ static int read_info(QStorage *s,const char *id,QTrashEntry *out){
     size_t length=0;
     if(info_path(s,id,info)!=0||make_path(payload,directory(s),id)!=0||
        qfs_read(s,s->home_index,info,bytes,sizeof(bytes),&length)!=0||
-       length<8||bytes[0]!='Q'||bytes[1]!='T'||bytes[2]!='R'||bytes[3]=='0'||
-       bytes[3]!='2'||(bytes[4]!='F'&&bytes[4]!='D'))return -1;
+       length<8||bytes[0]!='Q'||bytes[1]!='T'||bytes[2]!='R'||bytes[3]!='2'||(bytes[4]!='F'&&bytes[4]!='D'))return -1;
     size_t path_length=(unsigned char)bytes[5];
     path_length|=(size_t)(unsigned char)bytes[6]<<8;
     if(path_length<2||path_length>=QFS_PATH||length!=path_length+7||bytes[7]!='\\')return -1;
     for(size_t i=0;i<path_length;i++)if(bytes[7+i]==0)return -1;
     QFsEntry entries[1];
-    char parent[QFS_PATH];
     int last=0;
     for(size_t i=0;i<path_length;i++)if(bytes[7+i]=='\\')last=(int)i;
     if(!last||path_length==(size_t)last+1)return -1;
-    for(int i=0;i<last;i++)parent[i]=bytes[7+i];
-    parent[last]=0;
-    if(prefix(bytes+7,directory(s)))return -1;
+    char restored[QFS_PATH];
+    for(size_t i=0;i<path_length;i++)restored[i]=bytes[7+i];
+    restored[path_length]=0;
+    if(prefix(restored,directory(s)))return -1;
     if(qfs_list(s,s->home_index,directory(s),entries,1)<0)return -1;
     int count=qfs_list(s,s->home_index,directory(s),trash_list_buffer,QFS_ENTRIES);
     if(count<0)return -1;
@@ -74,7 +73,8 @@ static int read_info(QStorage *s,const char *id,QTrashEntry *out){
         matched=1;break;
     }
     if(!matched)return -1;
-    for(int i=0;i<8;i++)out->id[i]=id[i];out->id[8]=0;
+    for(int i=0;i<8;i++)out->id[i]=id[i];
+    out->id[8]=0;
     for(size_t i=0;i<path_length;i++)out->path[i]=bytes[7+i];
     out->path[path_length]=0;
     int n=0;
