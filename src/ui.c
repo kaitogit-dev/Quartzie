@@ -2312,7 +2312,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     surface(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
     string_limit(q,x+27,y+105,q->settings_search_length?q->settings_search:"Find a setting",q->settings_search_length?foreground(q):secondary(q),0,side-51,1);
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
-        int yy=y+128+i*43;
+        int yy=y+128+i*(w->h<600?35:43);
         if(q->settings_page==i){
             surface(q,x+10,yy,side-20,38,10,colors(q)->selected,q->theme?182:167);
             rectangle(q,x+11,yy+8,3,22,accent(q));
@@ -2442,35 +2442,38 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         }
         text(q,left+5,y+w->h-109,"Select a drive to browse it in Files.",secondary(q),0);
     }else if(page==7){
-        settings_card(q,left,y+92,width,76,"Signed in",q->storage?q->storage->profile:"Default",0);
-        text(q,left+5,y+196,"Accounts",foreground(q),1);
-        for(int i=0;i<q->profile_count&&i<5;i++){
-            int yy=y+211+i*43;
+        int compact=w->h<600,create_y=compact?322:446,lock_y=compact?375:499;
+        int list_y=compact?177:211,list_count=compact?3:5;
+        settings_card(q,left,y+92,width,compact?66:76,"Signed in",q->storage?q->storage->profile:"Default",0);
+        text(q,left+5,y+(compact?169:196),"Accounts",foreground(q),1);
+        for(int i=0;i<q->profile_count&&i<list_count;i++){
+            int yy=y+list_y+i*(compact?44:43);
             surface(q,left+2,yy,width-4,38,11,q->profile_target==i?colors(q)->selected:inner_material(q),165);
             string_limit(q,left+19,yy+26,q->profiles[i].name,foreground(q),0,width-120,1);
             text(q,left+width-90,yy+25,q->profiles[i].has_pin?"PIN":"No PIN",secondary(q),0);
         }
-        surface(q,left+2,y+446,175,41,11,inner_material(q),175);
-        text(q,left+15,y+472,"Create account",foreground(q),0);
-        surface(q,left+185,y+446,175,41,11,inner_material(q),175);
-        text(q,left+202,y+472,"Set account PIN",foreground(q),0);
-        surface(q,left+2,y+499,176,41,11,colors(q)->selected,185);
-        text(q,left+27,y+525,"Lock screen",foreground(q),0);
+        surface(q,left+2,y+create_y,165,41,11,inner_material(q),175);
+        text(q,left+15,y+create_y+26,"Create account",foreground(q),0);
+        surface(q,left+174,y+create_y,165,41,11,inner_material(q),175);
+        text(q,left+188,y+create_y+26,"Set account PIN",foreground(q),0);
+        surface(q,left+2,y+lock_y,176,41,11,colors(q)->selected,185);
+        text(q,left+27,y+lock_y+26,"Lock screen",foreground(q),0);
         if(q->profile_edit){
-            surface(q,left+189,y+499,width-191,41,11,inner_material(q),185);
+            surface(q,left+187,y+lock_y,width-189,41,11,inner_material(q),185);
             char obscured[25];int k=0;
             if(q->profile_edit==2&&q->profile_input_len){
                 for(;k<q->profile_input_len;k++)obscured[k]='*';
                 obscured[k]=0;
             }
-            string_limit(q,left+202,y+525,q->profile_input_len?(q->profile_edit==2?obscured:q->profile_input):"Type and press Enter",foreground(q),0,width-211,1);
+            string_limit(q,left+198,y+lock_y+26,q->profile_input_len?(q->profile_edit==2?obscured:q->profile_input):"Type and press Enter",foreground(q),0,width-208,1);
         }
-        if(q->profile_status[0])string_limit(q,left+7,y+560,q->profile_status,secondary(q),0,width-12,1);
+        if(q->profile_status[0])string_limit(q,left+7,y+(compact?440:560),q->profile_status,secondary(q),0,width-12,1);
     }else if(page==8){
         const char *actions[]={"Check for updates","Install verified update","Verify EFI integrity","Roll back firmware","Restore appearance settings","Discard rollback backup"};
         const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Check boot image and stored SHA-256","Restore the saved previous EFI","Recover the last saved configuration","Allow installation of a further update"};
-        for(int i=0;i<6;i++)settings_card(q,left,y+92+i*76,width,68,actions[i],descs[i],1);
-        if(q->update_status[0])string_limit(q,left+5,y+563,q->update_status,secondary(q),0,width-10,1);
+        int row=clamp((w->h-175)/6,49,76);
+        for(int i=0;i<6;i++)settings_card(q,left,y+92+i*row,width,row-8,actions[i],descs[i],1);
+        if(q->update_status[0])string_limit(q,left+5,y+w->h-57,q->update_status,secondary(q),0,width-10,1);
     }else if(page==6){
         text(q,left+5,y+112,"Detected network interfaces",foreground(q),1);
         if(!q->network||!q->network->count)
@@ -2498,7 +2501,7 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
     int side=settings_sidebar_width(cw);
     int left=bx+side+25,width=cw-side-25;
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
-        if(hit(x,y,bx+10,by+128+i*43,side-20,38)){settings_navigate(q,i);return;}
+        if(hit(x,y,bx+10,by+128+i*(w->h<600?35:43),side-20,38)){settings_navigate(q,i);return;}
     }
     if(hit(x,y,bx+14,by+82,side-28,36)){q->dirty=1;return;}
     if(q->settings_search_length){
@@ -2549,20 +2552,23 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
             break;
         }
         case 7:{
-            if(hit(x,y,left+2,by+446,175,41)){
+            int compact=w->h<600,create_y=compact?322:446,lock_y=compact?375:499;
+            if(hit(x,y,left+2,by+create_y,165,41)){
                 q->profile_edit=1;q->profile_input_len=0;q->profile_input[0]=0;q->dirty=1;return;
             }
-            if(hit(x,y,left+185,by+446,175,41)){
+            if(hit(x,y,left+174,by+create_y,165,41)){
                 q->profile_edit=2;q->profile_input_len=0;q->profile_input[0]=0;q->dirty=1;return;
             }
-            if(hit(x,y,left+2,by+499,176,41)){q_lock(q);return;}
-            for(int i=0;i<q->profile_count&&i<5;i++)if(hit(x,y,left+2,by+211+i*43,width-4,38)){
+            if(hit(x,y,left+2,by+lock_y,176,41)){q_lock(q);return;}
+            for(int i=0;i<q->profile_count&&i<(compact?3:5);i++)
+                if(hit(x,y,left+2,by+(compact?177:211)+i*(compact?44:43),width-4,38)){
                 q_lock(q);q->profile_target=i;return;
             }
             break;
         }
         case 8:{
-            for(int i=0;i<6;i++)if(hit(x,y,left,by+92+i*76,width,68)){
+            int row=clamp((w->h-175)/6,49,76);
+            for(int i=0;i<6;i++)if(hit(x,y,left,by+92+i*row,width,row-8)){
                 if(i==0)update_check(q);
                 if(i==1)update_install(q);
                 if(i==2)update_integrity(q);
