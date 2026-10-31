@@ -2242,6 +2242,15 @@ static void update_rollback(QDesktop *q){
     int ok=qupd_rollback(q->storage,target,q->media_buffer,q->media_capacity)==0;
     update_message(q,ok?"Previous firmware restored. Reboot to use it":"Rollback failed. Use recovery media");
 }
+static void update_clear_backup(QDesktop *q){
+    if(!q->storage)return;
+    int target=qupd_target(q->storage,1);
+    if(target<0){update_message(q,"No saved firmware backup");return;}
+    if(q->update_confirm!=3){q->update_confirm=3;update_message(q,"Select Discard Backup again to confirm");return;}
+    q->update_confirm=0;
+    update_message(q,qupd_clear_backup(q->storage,target)==0?
+        "Previous firmware backup discarded":"Could not discard backup");
+}
 static void update_restore_settings(QDesktop *q){
     if(!q->storage)return;
     char original[QFS_PATH],backup[QFS_PATH];
@@ -2454,10 +2463,10 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         }
         if(q->profile_status[0])string_limit(q,left+7,y+560,q->profile_status,secondary(q),0,width-12,1);
     }else if(page==8){
-        const char *actions[]={"Check for updates","Install verified update","Verify EFI integrity","Roll back firmware","Restore appearance settings"};
-        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Check the boot binary and its saved hash","Restore the saved previous version","Recover the last saved configuration"};
-        for(int i=0;i<5;i++)settings_card(q,left,y+92+i*88,width,78,actions[i],descs[i],1);
-        if(q->update_status[0])string_limit(q,left+5,y+549,q->update_status,secondary(q),0,width-10,1);
+        const char *actions[]={"Check for updates","Install verified update","Verify EFI integrity","Roll back firmware","Restore appearance settings","Discard rollback backup"};
+        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Check boot image and stored SHA-256","Restore the saved previous EFI","Recover the last saved configuration","Allow installation of a further update"};
+        for(int i=0;i<6;i++)settings_card(q,left,y+92+i*76,width,68,actions[i],descs[i],1);
+        if(q->update_status[0])string_limit(q,left+5,y+563,q->update_status,secondary(q),0,width-10,1);
     }else if(page==6){
         text(q,left+5,y+112,"Detected network interfaces",foreground(q),1);
         if(!q->network||!q->network->count)
@@ -2544,17 +2553,18 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
             }
             if(hit(x,y,left+2,by+499,176,41)){q_lock(q);return;}
             for(int i=0;i<q->profile_count&&i<5;i++)if(hit(x,y,left+2,by+211+i*43,width-4,38)){
-                q->profile_target=i;q_lock(q);return;
+                q_lock(q);q->profile_target=i;return;
             }
             break;
         }
         case 8:{
-            for(int i=0;i<5;i++)if(hit(x,y,left,by+92+i*88,width,78)){
+            for(int i=0;i<6;i++)if(hit(x,y,left,by+92+i*76,width,68)){
                 if(i==0)update_check(q);
                 if(i==1)update_install(q);
                 if(i==2)update_integrity(q);
                 if(i==3)update_rollback(q);
                 if(i==4)update_restore_settings(q);
+                if(i==5)update_clear_backup(q);
                 return;
             }
             break;
