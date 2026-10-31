@@ -75,7 +75,10 @@ static void check_profile_wallpaper_ui(void){
     static uint32_t pixels2[800*600],wall2[800*600],blur2[800*600];
     q_init(&reboot,800,600,pixels2,wall2,blur2);
     q_attach_storage(&reboot,&profile_storage,profile_buffer,sizeof(profile_buffer));
-    CHECK(reboot.wallpaper_mode==1&&reboot.settings_loaded==1);
+    CHECK(reboot.wallpaper_mode==1&&reboot.settings_loaded==1&&reboot.locked);
+    q_key(&reboot,'2',0);q_key(&reboot,'4',0);q_key(&reboot,'6',0);q_key(&reboot,'8',0);
+    q_key(&reboot,'\r',0);
+    CHECK(!reboot.locked);
     uint8_t bmp[70]={0};
     bmp[0]='B';bmp[1]='M';bmp[10]=54;bmp[14]=40;bmp[18]=2;bmp[22]=2;bmp[26]=1;bmp[28]=24;
     bmp[54]=255;bmp[55]=0;bmp[56]=0;

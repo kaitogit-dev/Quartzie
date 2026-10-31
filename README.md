@@ -15,7 +15,7 @@ GitHub Actions builds Quartzie-0.44.0-x64.iso, Quartzie-0.44.0-x64.img, and Quar
 
 ## Boot
 
-Run `tools/run-windows.ps1` from PowerShell with the ISO and persistent data disk alongside it or in Downloads. It uses silent QEMU audio by default to avoid DirectSoundCapture failures. On a working audio device, use `-AudioBackend dsound` to enable PC speaker playback.
+Run `tools/run-windows.ps1` from PowerShell with the ISO and persistent data disk alongside it or in Downloads. It uses silent QEMU audio by default to avoid DirectSoundCapture failures. On a working audio device, use `-AudioBackend dsound` to enable PC speaker playback. Use `-BootMode disk` to start from the writable UEFI disk image when testing firmware updates and recovery instead of the read-only ISO.
 
 For QEMU/OVMF on Linux, boot the ISO and attach Quartzie-userdata.img as a writable FAT disk. Keep the same user disk across OS updates.
 
