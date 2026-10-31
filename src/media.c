@@ -169,3 +169,56 @@ void qm_seek(QMedia *m,uint64_t position){
     }
     if(position==total)m->playing=0;
 }
+
+void qm_image_dimensions(const QMedia *m,int rotation,int *width,int *height){
+    if(!width||!height)return;
+    *width=0;*height=0;
+    if(!m||m->kind!=QM_IMAGE||m->width<1||m->height<1)return;
+    *width=(rotation&1)?m->height:m->width;
+    *height=(rotation&1)?m->width:m->height;
+}
+uint32_t qm_image_pixel(const QMedia *m,int rotation,int flipped,int x,int y){
+    int width=0,height=0;
+    qm_image_dimensions(m,rotation,&width,&height);
+    if(x<0||y<0||x>=width||y>=height)return 0;
+    if(flipped)x=width-1-x;
+    rotation&=3;
+    int source_x=x,source_y=y;
+    if(rotation==1){source_x=y;source_y=m->height-1-x;}
+    else if(rotation==2){source_x=m->width-1-x;source_y=m->height-1-y;}
+    else if(rotation==3){source_x=m->width-1-y;source_y=x;}
+    return qm_pixel(m,source_x,source_y);
+}
+int qm_export_bmp(const QMedia *m,int rotation,int flipped,uint8_t *output,size_t capacity,size_t *written){
+    if(!written)return -1;
+    *written=0;
+    int width,height;
+    qm_image_dimensions(m,rotation,&width,&height);
+    if(!width||!height||!output)return -1;
+    size_t stride=((size_t)width*3u+3u)&~(size_t)3;
+    size_t total=54u+stride*(size_t)height;
+    if(total>capacity||total>0xffffffffu)return -1;
+    for(size_t i=0;i<54;i++)output[i]=0;
+    output[0]='B';output[1]='M';
+    const uint32_t fields[7]={(uint32_t)total,54,40,(uint32_t)width,(uint32_t)height,0,(uint32_t)(stride*(size_t)height)};
+    const int offsets[7]={2,10,14,18,22,28,34};
+    for(int i=0;i<7;i++){
+        uint32_t v=fields[i];
+        int n=i==5?2:4;
+        if(i==5)v=24;
+        for(int j=0;j<n;j++)output[offsets[i]+j]=(uint8_t)(v>>(j*8));
+    }
+    output[26]=1;
+    for(int row=0;row<height;row++){
+        uint8_t *dest=output+54u+(size_t)row*stride;
+        for(int x=0;x<width;x++){
+            uint32_t pixel=qm_image_pixel(m,rotation,flipped,x,height-1-row);
+            dest[x*3]=(uint8_t)pixel;
+            dest[x*3+1]=(uint8_t)(pixel>>8);
+            dest[x*3+2]=(uint8_t)(pixel>>16);
+        }
+        for(size_t j=(size_t)width*3u;j<stride;j++)dest[j]=0;
+    }
+    *written=total;
+    return 0;
+}

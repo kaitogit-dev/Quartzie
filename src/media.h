@@ -24,6 +24,9 @@ uint32_t qm_pixel(const QMedia *media,int x,int y);
 int qm_advance(QMedia *media,uint32_t microseconds);
 uint64_t qm_duration(const QMedia *media);
 void qm_seek(QMedia *media,uint64_t microseconds);
+void qm_image_dimensions(const QMedia *media,int rotation,int *width,int *height);
+uint32_t qm_image_pixel(const QMedia *media,int rotation,int flipped,int x,int y);
+int qm_export_bmp(const QMedia *media,int rotation,int flipped,uint8_t *output,size_t capacity,size_t *written);
 uint8_t qm_audio_sample(const QMedia *media,uint64_t index);
 uint64_t qm_audio_count(const QMedia *media);
 #endif
