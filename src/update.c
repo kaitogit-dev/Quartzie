@@ -56,7 +56,9 @@ int qupd_verify(const uint8_t *archive,size_t length,QUpdate *out){
 }
 int qupd_find(QStorage *s,int *volume,char *path,size_t capacity){
     if(!s||!volume||!path)return -1;
-    const char *paths[]={"\\QUARTZIE.UPD","\\Users\\Default\\Downloads\\QUARTZIE.UPD"};
+    char downloads[QFS_PATH];
+    if(qfs_profile_path(s,"Downloads\\QUARTZIE.UPD",downloads,sizeof(downloads))!=0)return -1;
+    const char *paths[]={"\\QUARTZIE.UPD",downloads};
     for(int v=0;v<s->count;v++)for(int k=0;k<2;k++){
         if(k&&v!=s->home_index)continue;
         if(!has_file(s,v,paths[k]))continue;

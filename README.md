@@ -1,41 +1,44 @@
 # Quartzie
 
-An x86-64 UEFI desktop with a glass compositor, native applications, FAT storage, virtual desktops, a native services core, and an experimental PE32+ compatibility layer.
+An x86-64 UEFI desktop with glass windows, native applications, persistent profiles, personal wallpapers, FAT storage, a native services core, and PE32+ executable support.
 
 ## Build
 
-Ubuntu dependencies: `clang`, `lld`, `xorriso`, `ovmf`, `qemu-system-x86`, `python3-pil`, `fonts-inter`, `make`, and `gcc`.
+On Ubuntu, install clang, lld, xorriso, ovmf, qemu-system-x86, python3-pil, fonts-inter, make, and gcc.
 
 ```sh
 make verify
 make release
 ```
 
-GitHub Actions verifies the firmware and application tests, boots both ISO and GPT images under OVMF, and publishes the ISO, UEFI disk, and writable Home disk.
+GitHub Actions builds Quartzie-0.44.0-x64.iso, Quartzie-0.44.0-x64.img, and Quartzie-0.44.0-userdata.img and runs firmware boot and application tests.
 
-## Boot and storage
+## Boot
 
-The boot ISO is `Quartzie-0.43.1-x64.iso`. Attach `Quartzie-0.43.1-userdata.img` as a writable USB mass-storage disk to retain user files and preferences between sessions. The Windows QEMU launcher `tools/run-windows.ps1` attaches the disk automatically. Keep the same data image when upgrading.
+Run `tools/run-windows.ps1` from PowerShell with the ISO and persistent data disk alongside it or in Downloads. It uses silent QEMU audio by default to avoid DirectSoundCapture failures. On a working audio device, use `-AudioBackend dsound` to enable PC speaker playback.
 
-Quartzie uses `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, Videos, and Applications. If the user disk is missing, Home falls back to temporary RAM storage.
-
-Files offers folder browsing, multiple views, searching, sorting, multi-selection, copying, moving, and renaming. Home deletions move to **Recycle Bin**, with restore, permanent removal, and empty-bin operations. Deletions from other volumes require explicit confirmation and are permanent. Settings > Storage shows capacity and free space for volumes that report it.
+For QEMU/OVMF on Linux, boot the ISO and attach Quartzie-userdata.img as a writable FAT disk. Keep the same user disk across OS updates.
 
 ## Desktop and applications
 
-Drag window title bars to screen edges or corners for snapping; hover over Maximize for snap layouts. The dock switcher offers three desktops and lets you move the active window between them. Tab cycles through windows on the active desktop. Task Manager lists running apps and native processes, and can terminate selected tasks.
+Files supports multiple views, search, sorting, clipboard operations and a Recycle Bin for Home deletions. Restore, Delete Forever and Empty Bin are available from Files. Task Manager lists native processes and desktop applications.
 
-Notes supports editable text and saving to Documents. Calculator supports arithmetic precedence and keeps recent results. Photos opens BMP, PNG, JPG, GIF (first frame), and TGA; it can rotate, mirror, browse pictures, and export BMP. Media Player supports MP3, PCM WAV, and uncompressed AVI, with track navigation, repeat and volume controls. Audio uses the PC speaker backend.
+Window snapping supports sides, corners and maximize-hover layouts. Three virtual desktops are accessible from the dock; Tab cycles through open windows.
 
-Quartzie Store installs verified `.qapp` archives from Files to the user disk and supports removal. Convert EXE/APK payloads using `tools/qapp.py`; installing a package does not imply runtime support. The PE32+ loader can run supported test executables through a limited Win32 bridge; Android application execution remains under development.
+Notes edits and saves text files. Photos supports BMP, PNG, JPEG, GIF first-frame and TGA, rotates and mirrors images, exports BMP, and sets the current photo as a wallpaper. Media Player offers WAV, MP3 and uncompressed AVI playback with track navigation, repeat and volume controls.
 
-UEFI Simple Network Protocol is used for real adapter, MAC, link, and MTU diagnostics in Settings > Network and Terminal `netinfo`. TCP/IP, DNS and web browsing are not yet integrated.
+Settings includes light and dark modes, eight accent colors, wallpaper presets, account profiles and screen locking with an optional account PIN. User folders and appearance preferences persist on the writable Home disk. The firmware image does not provide encrypted isolation of profile files.
 
-## Test executable
+## Quartzie Update and Recovery
 
-The boot volume includes `QSTART.EXE`. To substitute a supported AMD64 PE32+ program:
+Settings > Update & Recovery can locate a local `QUARTZIE.UPD` package in a FAT volume root or in the active user's Downloads folder. Generate an update from an x86-64 UEFI application using:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.43.1-x64.iso program.exe Quartzie-custom.iso
+python3 tools/update.py pack build/BOOTX64.EFI -o QUARTZIE.UPD --version 0.44.0
 ```
 
+Installation validates the UEFI payload and its SHA-256 digest, stages the new EFI binary, backs up the existing firmware, and verifies the result. The target system partition must be writable; ISO media is not. Keep the previous `QUARTZIE.BAK` binary until you're satisfied the update boots. Restore the backup by booting a working Quartzie recovery ISO with the affected disk attached and selecting Roll Back. A backup must be rolled back or explicitly cleared before installing a further firmware update.
+
+The Update & Recovery page also checks EFI integrity against the stored digest and restores the preceding saved appearance configuration. These operations use local media; the networking stack currently provides adapter diagnostics rather than Internet update downloads.
+
+Quartzie Store converts EXE/APK packages to `.qapp` for distribution and installs verified archives, while execution still depends on the corresponding runtime.

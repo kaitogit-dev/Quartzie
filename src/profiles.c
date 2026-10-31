@@ -55,7 +55,9 @@ int qprofiles_has_pin(QStorage *s,const char *name){
        length==36&&record[0]=='Q'&&record[1]=='P'&&record[2]=='I'&&record[3]=='N';
 }
 int qprofiles_check_pin(QStorage *s,const char *name,const char *pin){
-    if(!s||!valid(name)||!has_user(s,name)||!pin)return -1;
+    if(!s||!valid(name)||!pin)return -1;
+    if(s->home_index==s->ram_index&&equal(name,"Default")&&!pin[0])return 0;
+    if(!has_user(s,name))return -1;
     if(!qprofiles_has_pin(s,name))return pin[0]?-1:0;
     char location[QFS_PATH];uint8_t record[36];size_t length=0;
     if(path(s,name,"PASS.DAT",location)!=0||

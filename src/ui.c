@@ -2000,10 +2000,10 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
         }
     }
     if(app==Q_PHOTOS){
-        const char *actions[]={"Rotate","Flip","Save BMP","Previous","Next"};
-        const int offsets[]={0,88,161,277,365};
-        for(int i=0;i<5;i++){
-            int bx=x+offsets[i],width=i==2?107:i==1?69:84;
+        const char *actions[]={"Rotate","Flip","Save BMP","Previous","Next","Set wallpaper"};
+        const int offsets[]={0,88,161,277,365,458};
+        for(int i=0;i<6;i++){
+            int bx=x+offsets[i],width=i==5?143:i==2?107:i==1?69:84;
             if(bx+width>x+cw-2)break;
             surface(q,bx,y+104+height,width-2,36,10,inner_material(q),q->theme?158:148);
             text(q,bx+9,y+128+height,actions[i],ink,0);
@@ -2429,7 +2429,12 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         text(q,left+27,y+525,"Lock screen",foreground(q),0);
         if(q->profile_edit){
             surface(q,left+189,y+499,width-191,41,11,inner_material(q),185);
-            string_limit(q,left+202,y+525,q->profile_input_len?q->profile_input:"Type and press Enter",foreground(q),0,width-211,1);
+            char obscured[25];int k=0;
+            if(q->profile_edit==2&&q->profile_input_len){
+                for(;k<q->profile_input_len;k++)obscured[k]='*';
+                obscured[k]=0;
+            }
+            string_limit(q,left+202,y+525,q->profile_input_len?(q->profile_edit==2?obscured:q->profile_input):"Type and press Enter",foreground(q),0,width-211,1);
         }
         if(q->profile_status[0])string_limit(q,left+7,y+560,q->profile_status,secondary(q),0,width-12,1);
     }else if(page==8){
@@ -2452,7 +2457,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.43.1",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.44.0",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -2500,7 +2505,8 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
                 if(hit(x,y,cx-22,cy-22,44,44)){q_set_accent(q,i);return;}
             }
             for(int i=0;i<4;i++)if(hit(x,y,left+i*118,by+416,112,47)){
-                if(q_wallpaper_mode(q,i)!=0)profile_message(q,"No saved photo wallpaper");return;
+                if(q_wallpaper_mode(q,i)!=0)profile_message(q,"No saved photo wallpaper");
+                return;
             }
             if(w->h>=570&&hit(x,y,left,by+473,width,58)){q_open(q,Q_PHOTOS);return;}
             break;
@@ -2638,7 +2644,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.43.1",ink,2);
+        text(q,x,y+45,"Quartzie 0.44.0",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -3606,13 +3612,14 @@ void q_click(QDesktop *q,int x,int y){
             if(hit(x,y,bx+w->w-64-176,by+60+view_h,176,38)){q_open(q,Q_FILES);return;}
             if(chosen==Q_PHOTOS){
                 for(int i=0;i<3;i++)if(hit(x,y,bx+i*83,by+60+view_h,78,38)){q->photo_zoom=i;q->dirty=1;return;}
-                const int offsets[]={0,88,161,277,365};
-                for(int i=0;i<5;i++)if(hit(x,y,bx+offsets[i],by+104+view_h,i==2?107:i==1?69:84,36)){
+                const int offsets[]={0,88,161,277,365,458};
+                for(int i=0;i<6;i++)if(hit(x,y,bx+offsets[i],by+104+view_h,i==5?143:i==2?107:i==1?69:84,36)){
                     if(i==0)q->photo_rotation=(q->photo_rotation+1)&3;
                     if(i==1)q->photo_flipped=!q->photo_flipped;
                     if(i==2)q_photo_save_bmp(q);
                     if(i==3)q_media_next(q,-1);
                     if(i==4)q_media_next(q,1);
+                    if(i==5)media_message(q,q_wallpaper_photo(q)==0?"Wallpaper saved to this account":"Could not save wallpaper");
                     q->dirty=1;return;
                 }
             }
