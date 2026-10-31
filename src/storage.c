@@ -171,6 +171,41 @@ void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot){
     QFsVolume *home=&s->volumes[s->count++];
     const char *label="Home RAM";
     for(int i=0;label[i];i++)home->label[i]=label[i];
+    s->home_index=s->ram_index;
+    static const char marker[]="QUARTZIE USER V1";
+    for(int i=0;i<s->ram_index;i++){
+        char probe[sizeof(marker)];
+        size_t length=0;
+        if(qfs_read(s,i,"\\QUSER.DAT",probe,sizeof(probe),&length)!=0||
+           length!=sizeof(marker)-1)continue;
+        int match=1;
+        for(size_t j=0;j<length;j++)if(probe[j]!=marker[j])match=0;
+        if(match){s->home_index=i;break;}
+    }
+    if(s->home_index!=s->ram_index){
+        if(qfs_home_setup(s)==0){
+            QFsVolume *v=&s->volumes[s->home_index];
+            for(int i=0;i<20;i++)v->label[i]=0;
+            const char *name="Home";
+            for(int i=0;name[i];i++)v->label[i]=name[i];
+        }else s->home_index=s->ram_index;
+    }
+}
+int qfs_home_setup(QStorage *s){
+    if(!s||s->home_index<0||s->home_index>=s->ram_index)return -1;
+    const char *folders[]={
+        "\\Users","\\Users\\Default","\\Users\\Default\\Desktop",
+        "\\Users\\Default\\Documents","\\Users\\Default\\Downloads",
+        "\\Users\\Default\\Pictures","\\Users\\Default\\Music",
+        "\\Users\\Default\\Videos"
+    };
+    QFsEntry item;
+    for(size_t i=0;i<sizeof(folders)/sizeof(folders[0]);i++){
+        if(qfs_list(s,s->home_index,folders[i],&item,1)>=0)continue;
+        if(qfs_mkdir(s,s->home_index,folders[i])!=0)return -1;
+        if(qfs_list(s,s->home_index,folders[i],&item,1)<0)return -1;
+    }
+    return 0;
 }
 int qfs_list(QStorage *s,int volume,const char *path,QFsEntry *entries,int limit){
     if(!entries||limit<1)return -1;

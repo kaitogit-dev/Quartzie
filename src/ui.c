@@ -737,8 +737,14 @@ static void files_refresh(QDesktop *q){
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity){
     if(!q)return;
     q->storage=storage;q->media_buffer=buffer;q->media_capacity=capacity;
-    q->terminal_volume=storage?storage->ram_index:0;
-    q->file_volume=0;q->file_path[0]='\\';q->file_path[1]=0;
+    q->terminal_volume=storage?storage->home_index:0;
+    q->file_volume=storage?storage->home_index:0;
+    q->file_path[0]='\\';q->file_path[1]=0;
+    if(storage&&storage->home_index!=storage->ram_index){
+        const char *home="\\Users\\Default";int i=0;
+        for(;home[i];i++)q->file_path[i]=home[i];q->file_path[i]=0;
+        for(i=0;home[i];i++)q->terminal_path[i]=home[i];q->terminal_path[i]=0;
+    }
     files_refresh(q);files_history(q);
 }
 static int file_suffix(const char *name,const char *suffix){
@@ -867,11 +873,12 @@ static QFsEntry operation_entries[QFS_ENTRIES];
 static void files_save_notes(QDesktop *q){
     if(!q->storage){files_message(q,"No storage available");return;}
     if(!q->note_path[0]||q->note_volume<0){
-        int volume=q->storage->ram_index;
+        int volume=q->storage->home_index;
         if(volume<0||volume>=q->storage->count){files_message(q,"No writable storage available");return;}
         char path[QFS_PATH],filename[32];
         int found=0;
-        int count=qfs_list(q->storage,volume,"\\",operation_entries,QFS_ENTRIES);
+        const char *directory=volume==q->storage->ram_index?"\\":"\\Users\\Default\\Documents";
+        int count=qfs_list(q->storage,volume,directory,operation_entries,QFS_ENTRIES);
         for(int i=1;i<1000;i++){
             int k=0;const char *prefix="Note ";
             for(int j=0;prefix[j];j++)filename[k++]=prefix[j];
@@ -882,7 +889,7 @@ static void files_save_notes(QDesktop *q){
             int used=0;
             for(int j=0;j<count;j++)if(files_equal(operation_entries[j].name,filename)){used=1;break;}
             if(used)continue;
-            if(qfs_join(path,sizeof(path),"\\",filename)!=0)break;
+            if(qfs_join(path,sizeof(path),directory,filename)!=0)break;
             if(qfs_write(q->storage,volume,path,q->notes,(size_t)q->note_length)==0){
                 int j=0;for(;path[j];j++)q->note_path[j]=path[j];q->note_path[j]=0;
                 q->note_volume=volume;found=1;break;
@@ -890,7 +897,7 @@ static void files_save_notes(QDesktop *q){
             break;
         }
         if(!found){files_message(q,"Could not create note");return;}
-        q->note_dirty=0;files_message(q,"Saved to Home RAM");return;
+        q->note_dirty=0;files_message(q,volume==q->storage->ram_index?"Saved to Home RAM":"Saved to Documents");return;
     }
     if(qfs_write(q->storage,q->note_volume,q->note_path,q->notes,(size_t)q->note_length)!=0)
         files_message(q,"Could not save note");
@@ -1270,9 +1277,9 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         const int icons[]={QI_FILE_EXPLORER,QI_IMAGE,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_WIFI};
         for(int i=0;i<9;i++){
             int py=sidebar_y+12+i*36+(i>=2?12:0)+(i>=7?18:0);
-            int chosen=(i==0&&q->storage&&q->file_volume==q->storage->ram_index&&files_equal(q->file_path,"\\"))||
+            int chosen=(i==0&&q->storage&&q->file_volume==q->storage->home_index&&files_equal(q->file_path,q->storage->home_index==q->storage->ram_index?"\\":"\\Users\\Default"))||
                 (i==7&&q->file_location)||
-                (i>=2&&i<=6&&q->storage&&q->file_volume==q->storage->ram_index&&files_contains(q->file_path,shortcuts[i]));
+                (i>=2&&i<=6&&q->storage&&q->file_volume==q->storage->home_index&&files_contains(q->file_path,shortcuts[i]));
             if(chosen)surface(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
             sprite(q,left+22,py+13,icons[i],25);
             string_limit(q,left+41,py+20,shortcuts[i],ink,0,side-49,1);
@@ -1664,7 +1671,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
             int rows=count<max_rows?count:max_rows;
             for(int i=0;i<rows;i++){
                 const char *label=q->storage->volumes[i].label;
-                const char *description=i==q->storage->ram_index?"Temporary session storage":"Mounted volume";
+                const char *description=i==q->storage->ram_index?"Temporary session storage":i==q->storage->home_index?"Persistent user files":"Mounted volume";
                 settings_card(q,left,y+124+i*79,width,69,label,description,1);
             }
         }
@@ -2415,11 +2422,12 @@ static void files_shortcut(QDesktop *q,int index){
     if(index==7){files_this_pc(q,1);return;}
     if(index==8){files_message(q,"Network locations are not connected");return;}
     if(index==1){q_open(q,Q_PHOTOS);return;}
-    int volume=q->storage->ram_index;
-    if(index==0){files_go(q,volume,"\\",1);return;}
+    int volume=q->storage->home_index;
+    const char *root=volume==q->storage->ram_index?"\\":"\\Users\\Default";
+    if(index==0){files_go(q,volume,root,1);return;}
     const char *folders[]={"","","Desktop","Documents","Pictures","Music","Videos"};
     char target[QFS_PATH];
-    if(qfs_join(target,sizeof(target),"\\",folders[index])!=0)return;
+    if(qfs_join(target,sizeof(target),root,folders[index])!=0)return;
     QFsEntry item[1];
     if(qfs_list(q->storage,volume,target,item,1)<0)
         if(qfs_mkdir(q->storage,volume,target)!=0){files_message(q,"Cannot open this folder");return;}

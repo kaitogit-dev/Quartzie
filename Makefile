@@ -1,4 +1,4 @@
-VERSION = 0.41.1
+VERSION = 0.42.0
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -6,10 +6,11 @@ FONT_REGULAR ?= /usr/share/fonts/opentype/inter/Inter-Regular.otf
 FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
 OBJECTS = build/boot.obj build/ui.obj build/storage.obj build/media.obj build/codecs.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj build/cursor.obj
-all: Quartzie-x64.iso Quartzie-x64-uefi.img
+all: Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-userdata.img
 release: all
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
 	cp Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.img
+	cp Quartzie-userdata.img Quartzie-$(VERSION)-userdata.img
 build:
 	mkdir -p build
 build/%.obj: src/%.c | build
@@ -37,6 +38,8 @@ build/embed_app.c: build/winapp.exe tools/embed.py
 	$(PYTHON) tools/embed.py build/winapp.exe $@
 build/embed_app.obj: build/embed_app.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
+Quartzie-userdata.img: tools/userdisk.py
+	$(PYTHON) tools/userdisk.py $@
 build/esp.img: build/BOOTX64.EFI build/winapp.exe tools/esp.py tools/media_samples.py
 	$(PYTHON) tools/esp.py build/BOOTX64.EFI $@ build/winapp.exe
 build/esp-iso.img: build/BOOTX64.EFI build/winapp.exe tools/compact_esp.py tools/media_samples.py
@@ -73,12 +76,13 @@ test: build/settings-test build/media-test build/theme-test build/features-test 
 	./build/transitions-test
 verify: all test build/Quartzie.cur
 	$(PYTHON) tests/test_package.py
+	$(PYTHON) tests/test_userdisk.py
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 	$(PYTHON) tools/check_firmware.py build/BOOTX64.EFI
 	$(PYTHON) tools/check_app.py build/winapp.exe Quartzie-x64.iso Quartzie-x64-uefi.img
 	$(PYTHON) tools/verify_cursor.py build/Quartzie.cur assets/cursor.png.base64
 clean:
-	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img
+	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img Quartzie-userdata.img Quartzie-$(VERSION)-userdata.img
 build/theme-test: tests/theme.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/theme.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
 build/features-test: tests/features.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build

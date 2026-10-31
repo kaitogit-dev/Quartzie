@@ -282,6 +282,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
     qc_memory(codec_memory,48u*1024u*1024u);
     qfs_init(native_storage,image,bs);
+    serial_text(native_storage->home_index==native_storage->ram_index?"QUARTZIE-HOME-RAM\n":"QUARTZIE-HOME-PERSISTENT\n");
     q_attach_storage(&desktop,native_storage,media_memory,8u*1024u*1024u);
     q_drag_buffers(&desktop,drag_base_buffer);
     q_dock_buffers(&desktop,dock_base_buffer);

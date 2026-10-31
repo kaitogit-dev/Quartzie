@@ -1,15 +1,18 @@
 $ErrorActionPreference = "Stop"
 $qemu = Join-Path $env:ProgramFiles "qemu"
 $executable = Join-Path $qemu "qemu-system-x86_64.exe"
-$iso = Join-Path $PSScriptRoot "Quartzie-0.41.1-x64.iso"
-if (!(Test-Path $iso)) { $iso = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.41.1-x64.iso" }
+$iso = Join-Path $PSScriptRoot "Quartzie-0.42.0-x64.iso"
+if (!(Test-Path $iso)) { $iso = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.42.0-x64.iso" }
 if (!(Test-Path $executable)) { throw "QEMU not found: $executable" }
 if (!(Test-Path $iso)) { throw "ISO not found: $iso" }
 $firmware = Join-Path $qemu "share\edk2-x86_64-code.fd"
 $variables = Join-Path $qemu "share\edk2-i386-vars.fd"
 if (!(Test-Path $firmware) -or !(Test-Path $variables)) { throw "UEFI firmware not found in QEMU share directory" }
-$variablesCopy = Join-Path $env:TEMP "quartzie-0.41.1-vars.fd"
+$userdisk = Join-Path $PSScriptRoot "Quartzie-0.42.0-userdata.img"
+if (!(Test-Path $userdisk)) { $userdisk = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.42.0-userdata.img" }
+if (!(Test-Path $userdisk)) { throw "Persistent data disk not found: $userdisk" }
+$variablesCopy = Join-Path $env:TEMP "quartzie-0.42.0-vars.fd"
 Copy-Item $variables $variablesCopy -Force
 $displays = (& $executable -display help 2>&1 | Out-String)
 $display = if ($displays -match "(?m)^\s*gtk\s*$") { "gtk,zoom-to-fit=on,show-cursor=off" } else { "sdl,show-cursor=off" }
-& $executable -machine "q35,pcspk-audiodev=quartzie" -audiodev "dsound,id=quartzie" -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -nic none
+& $executable -machine "q35,pcspk-audiodev=quartzie" -audiodev "dsound,id=quartzie" -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -drive "if=none,id=quartzie-user,format=raw,file=$userdisk" -device usb-storage,drive=quartzie-user -nic none
