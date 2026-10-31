@@ -69,3 +69,5 @@ The loader implements relocation, import resolution by name and ordinal, and PE 
 The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`. Media codec notices are in `LICENSES/media-codecs.txt`.
 
 Persistent user files use `Quartzie-0.42.1-userdata.img`, a writable FAT16 volume included with each build. Attach it as a USB mass-storage disk alongside the ISO. Quartzie discovers it from its volume marker and creates `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, and Videos. Reuse the same data disk between boots to retain files. `tools/run-windows.ps1` attaches the data disk automatically. Without this disk Quartzie falls back to temporary Home RAM.
+
+Desktop switcher: the small three-bar control at the right end of the dock opens a choice of three desktops. Click the upper half of a desktop tile to switch; click its bottom row to move the currently focused window there. Hover the maximize button to choose a snap zone. Use Tab to bring forward another open window on the current desktop.

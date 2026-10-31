@@ -62,6 +62,27 @@ static void check_snap_and_desktop(void){
     CHECK(w->snap_zone==1);
 }
 
+
+static void check_window_controls(void){
+    q_init(&ui,1280,720,canvas,background,blurred);
+    q_open(&ui,Q_NOTES);
+    QWindow *w=&ui.windows[Q_NOTES];
+    q_move(&ui,w->x+w->w-90,w->y+26);
+    CHECK(ui.snap_menu_app==Q_NOTES);
+    int sx=w->x+w->w-265,sy=w->y+48;
+    q_click(&ui,sx+11+81+25,sy+37+22);
+    CHECK(w->snap_zone==2);
+    int dock_left=(ui.width-632)/2,dock_top=ui.height-89;
+    q_click(&ui,dock_left+615,dock_top+30);
+    CHECK(ui.desktop_view);
+    int vx=(ui.width-522)/2,vy=dock_top-173;
+    q_click(&ui,vx+16+2*169+35,vy+43+77);
+    CHECK(w->desktop==2&&ui.desktop==0);
+    q_click(&ui,dock_left+615,dock_top+30);
+    q_click(&ui,vx+16+2*169+35,vy+43+20);
+    CHECK(ui.desktop==2&&ui.active==Q_NOTES);
+}
+
 int main(void){
     q_init(&ui,1920,1080,canvas,background,blur);
     q_drag_buffers(&ui,drag);
@@ -158,5 +179,6 @@ int main(void){
     same_as_full();
     puts("PASS: dock toggle, focus, maximize, drag-to-top, drag-to-restore, theme fill, and hover");
     check_snap_and_desktop();
+    check_window_controls();
     return 0;
 }

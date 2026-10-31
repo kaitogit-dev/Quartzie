@@ -613,6 +613,7 @@ int q_dock_hit(QDesktop *q,int x,int y){
     int left=dock_x(q),top=dock_y(q);
     if(hit(x,y,left+11,top+8,52,53))return 10;
     for(int i=0;i<Q_DOCK_APPS;i++)if(hit(x,y,left+77+i*77,top+8,61,53))return i;
+    if(hit(x,y,left+608,top+12,24,48))return 13;
     return -1;
 }
 static void draw_dock(QDesktop *q){
@@ -633,8 +634,10 @@ static void draw_dock(QDesktop *q){
         }
         if(pulse>0)circular(q,xx+30,y+36-lift,22,accent(q),pulse/4);
         app_icon(q,xx+30,y+36-lift,i,40,q->theme?0xd7edfd:0xf6fcff);
-        if(q->windows[i].open)circular(q,xx+30,y+59,3,q->windows[i].minimized?secondary(q):accent(q),255);
+        if(q->windows[i].open)circular(q,xx+30,y+59,3,q->windows[i].desktop!=q->desktop?secondary(q):q->windows[i].minimized?secondary(q):accent(q),255);
     }
+    surface(q,x+608,y+13,23,43,8,q->desktop_view?colors(q)->selected:inner_material(q),q->theme?176:139);
+    for(int i=0;i<3;i++)rectangle(q,x+614,y+21+i*10,11,6,i==q->desktop?accent(q):secondary(q));
     if(q->start_hover){
         int width=text_width("Start",0)+26;
         int tx=clamp(x+37-width/2,12,q->width-width-12);
@@ -2099,9 +2102,46 @@ static void cache_dock_background(QDesktop *q){
     }
     q->dock_cache_valid=1;
 }
+
+static int snap_menu_left(QDesktop *q,QWindow *w){return clamp(w->x+w->w-265,8,q->width-264);}
+static int snap_menu_top(QDesktop *q,QWindow *w){return clamp(w->y+48,8,q->height-143);}
+static void draw_snap_menu(QDesktop *q){
+    int app=q->snap_menu_app;
+    if(app<0||app>=Q_APPS||!q->windows[app].open||q->windows[app].desktop!=q->desktop)return;
+    QWindow *w=&q->windows[app];
+    int x=snap_menu_left(q,w),y=snap_menu_top(q,w);
+    pane(q,x,y,256,133,17,material(q),q->theme?246:231);
+    text(q,x+12,y+26,"Snap layouts",foreground(q),1);
+    for(int i=0;i<6;i++){
+        int bx=x+11+(i%3)*81,by=y+37+(i/3)*43;
+        surface(q,bx,by,74,37,8,w->snap_zone==i+1?colors(q)->selected:inner_material(q),q->theme?178:156);
+        int mid=bx+37;
+        rectangle(q,mid-23,by+7,46,23,q->theme?0x52687f:0xb4c8db);
+        int px=(i==1||i==3||i==5)?mid:mid-23;
+        int py=(i>=4)?by+18:by+7;
+        rectangle(q,px,py,23,i>=2?11:23,accent(q));
+    }
+}
+static void draw_desktop_view(QDesktop *q){
+    if(!q->desktop_view)return;
+    int x=clamp((q->width-522)/2,5,q->width-522),y=dock_y(q)-173;
+    pane(q,x,y,522,157,19,material(q),q->theme?230:218);
+    text(q,x+17,y+30,"Desktops",foreground(q),1);
+    for(int i=0;i<3;i++){
+        int px=x+16+i*169;
+        surface(q,px,y+43,155,98,13,i==q->desktop?colors(q)->selected:inner_material(q),q->theme?191:159);
+        char name[]="Desktop 1";name[8]=(char)('1'+i);
+        text(q,px+17,y+70,name,foreground(q),1);
+        text(q,px+17,y+94,"Switch",secondary(q),0);
+        text(q,px+17,y+121,"Move active",accent(q),0);
+    }
+}
+
 static void draw_overlays(QDesktop *q){
     cache_dock_background(q);
     draw_dock(q);
+    draw_snap_menu(q);
+    draw_desktop_view(q);
     draw_menu(q);
     draw_notifications(q);
     draw_quick(q);
@@ -2789,7 +2829,27 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
 }
 void q_click(QDesktop *q,int x,int y){
     q->hover_only=0;
+    if(q->desktop_view){
+        int vx=clamp((q->width-522)/2,5,q->width-522),vy=dock_y(q)-173;
+        for(int i=0;i<3;i++)if(hit(x,y,vx+16+i*169,vy+43,155,98)){
+            if(y>=vy+101&&q->active>=0)q_move_to_desktop(q,q->active,i);
+            else q_switch_desktop(q,i);
+            return;
+        }
+        q->desktop_view=0;q->dirty=1;
+    }
+    if(q->snap_menu_app>=0){
+        QWindow *sw=&q->windows[q->snap_menu_app];
+        int sx=snap_menu_left(q,sw),sy=snap_menu_top(q,sw);
+        for(int i=0;i<6;i++)if(hit(x,y,sx+11+(i%3)*81,sy+37+(i/3)*43,74,37)){
+            q_snap_window(q,q->snap_menu_app,i+1);return;
+        }
+        q->snap_menu_app=-1;q->dirty=1;
+    }
     int dock=q_dock_hit(q,x,y);
+    if(dock==13){
+        q->desktop_view=!q->desktop_view;q->snap_menu_app=-1;q->dirty=1;return;
+    }
     if(dock==10){
         int was=q->menu;
         close_popups(q);
@@ -2947,6 +3007,13 @@ void q_move(QDesktop *q,int x,int y){
         if(new_x!=w->x||new_y!=w->y){w->x=new_x;w->y=new_y;q->dirty=1;}
     }
     if(q->drag>=0)return;
+    int snap=-1;
+    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop){
+        QWindow *w=&q->windows[i];
+        if(hit(q->mouse_x,q->mouse_y,w->x+w->w-108,w->y+13,36,29)&&(snap<0||w->z>q->windows[snap].z))snap=i;
+        if(i==q->snap_menu_app&&hit(q->mouse_x,q->mouse_y,snap_menu_left(q,w),snap_menu_top(q,w),256,133))snap=i;
+    }
+    if(snap!=q->snap_menu_app){q->snap_menu_app=snap;q->dirty=1;q->hover_only=0;}
     int hover=-1;
     int dock=q_dock_hit(q,q->mouse_x,q->mouse_y);
     int start_hover=dock==10;
@@ -3014,6 +3081,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         if(scan==8){files_delete_selected(q);return;}
     }
     if(ch==9){cycle_window(q);return;}
+    if((scan==23||ch==27)&&q->desktop_view){q->desktop_view=0;q->dirty=1;return;}
     if(scan==24){q_switch_desktop(q,(q->desktop+2)%3);return;}
     if(scan==25){q_switch_desktop(q,(q->desktop+1)%3);return;}
     if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
