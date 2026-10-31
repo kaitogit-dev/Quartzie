@@ -72,7 +72,7 @@ int main(void){
     bmp[30]=0;CHECK(qm_open(&m,bmp,sizeof(bmp))==0);
     int width=0,height=0;qm_image_dimensions(&m,1,&width,&height);
     CHECK(width==2&&height==2);
-    CHECK(qm_image_pixel(&m,1,0,1,0)==0xff0000);
+    CHECK(qm_image_pixel(&m,1,0,0,0)==0xff0000);
     CHECK(qm_image_pixel(&m,0,1,1,1)==0xff0000);
     CHECK(qm_export_bmp(&m,1,1,exported,sizeof(exported),&size)==0&&size==70);
     QMedia copy;

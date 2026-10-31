@@ -437,7 +437,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
     q->file_view=1;q->file_nav=1;q->file_extensions=1;q->file_clip_volume=-1;q->file_history_index=-1;
     q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
-    q->store_confirm_remove=-1;q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
+    q->store_confirm_remove=-1;q->media_volume_level=80;q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
@@ -526,7 +526,12 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
             q->file_click_elapsed_us=0;
         }else q->file_click_elapsed_us+=elapsed_us;
     }
+    int media_playing=q->media.playing;
     if(qm_advance(&q->media,elapsed_us)){
+        if(media_playing&&!q->media.playing&&q->media.kind!=QM_IMAGE){
+            if(q->media_track_index+1<q->media_track_count||q->media_repeat)
+                q_media_next(q,1);
+        }
         if(q->media.kind==QM_VIDEO){q->dirty=1;q->hover_only=0;}
         else if(q->media.kind==QM_AUDIO){
             q->audio_display_us+=elapsed_us;
@@ -1067,6 +1072,109 @@ static void store_remove(QDesktop *q,int index){
     q->store_confirm_remove=-1;store_refresh(q);store_message(q,"Package removed");
 }
 
+void q_attach_photo_output(QDesktop *q,uint8_t *output,size_t capacity){
+    if(!q)return;
+    q->photo_output=output;q->photo_output_capacity=capacity;
+}
+static void media_message(QDesktop *q,const char *text){
+    int i=0;for(;text[i]&&i<95;i++)q->media_status[i]=text[i];
+    q->media_status[i]=0;q->dirty=1;
+}
+static int media_supported(const char *name){
+    return file_suffix(name,".bmp")||file_suffix(name,".png")||file_suffix(name,".jpg")||
+        file_suffix(name,".jpeg")||file_suffix(name,".gif")||file_suffix(name,".tga")||
+        file_suffix(name,".wav")||file_suffix(name,".mp3")||file_suffix(name,".avi");
+}
+static int media_load(QDesktop *q,int volume,const char *path,const char *name){
+    if(!q->media_buffer||!q->storage)return -1;
+    size_t bytes=0;QMedia opened;
+    if(qfs_read(q->storage,volume,path,q->media_buffer,q->media_capacity,&bytes)!=0||
+       qm_open(&opened,q->media_buffer,bytes)!=0)return -1;
+    q->media=opened;q->photo_zoom=0;q->photo_rotation=0;q->photo_flipped=0;
+    q->audio_display_us=0;q->media_volume=volume;
+    int i=0;for(;path[i]&&i<QFS_PATH-1;i++)q->media_path[i]=path[i];
+    q->media_path[i]=0;
+    i=0;for(;name[i]&&i<(int)sizeof(q->media_name)-1;i++)q->media_name[i]=name[i];
+    q->media_name[i]=0;
+    q->media_status[0]=0;q->dirty=1;
+    return 0;
+}
+static void media_album(QDesktop *q,int volume,const char *path,const char *selected,int kind){
+    q->media_track_count=0;q->media_track_index=-1;q->media_track_volume=volume;
+    size_t last=0;for(size_t i=0;path[i];i++)if(path[i]=='\\')last=i;
+    if(!last)last=0;
+    size_t k=last==0?1:last;
+    for(size_t i=0;i<k;i++)q->media_track_directory[i]=path[i];
+    q->media_track_directory[k]=0;
+    if(q->media_track_directory[0]!='\\')return;
+    static QFsEntry entries[QFS_ENTRIES];
+    int count=qfs_list(q->storage,volume,q->media_track_directory,entries,QFS_ENTRIES);
+    for(int i=0;i<count&&q->media_track_count<QFS_ENTRIES;i++){
+        QFsEntry *e=&entries[i];
+        if(e->directory||!media_supported(e->name))continue;
+        int valid=kind==QM_IMAGE?
+            (file_suffix(e->name,".bmp")||file_suffix(e->name,".png")||file_suffix(e->name,".jpg")||
+             file_suffix(e->name,".jpeg")||file_suffix(e->name,".gif")||file_suffix(e->name,".tga")):
+            (file_suffix(e->name,".wav")||file_suffix(e->name,".mp3")||file_suffix(e->name,".avi"));
+        if(!valid)continue;
+        if(files_equal(e->name,selected))q->media_track_index=q->media_track_count;
+        q->media_tracks[q->media_track_count++]=*e;
+    }
+}
+int q_media_next(QDesktop *q,int direction){
+    if(!q||!q->storage||!q->media_track_count||!direction)return -1;
+    int original=q->media_track_index;
+    if(original<0)return -1;
+    int start=original;
+    for(int attempt=0;attempt<q->media_track_count;attempt++){
+        int next=start+(direction>0?1:-1);
+        if(next>=q->media_track_count){if(!q->media_repeat)return -1;next=0;}
+        if(next<0){if(!q->media_repeat)return -1;next=q->media_track_count-1;}
+        start=next;
+        char path[QFS_PATH];
+        if(qfs_join(path,sizeof(path),q->media_track_directory,q->media_tracks[start].name)!=0)continue;
+        if(media_load(q,q->media_track_volume,path,q->media_tracks[start].name)!=0)continue;
+        q->media_track_index=start;
+        q->media.playing=q->media.kind!=QM_IMAGE;
+        return 0;
+    }
+    media_message(q,"Could not open next item");
+    return -1;
+}
+int q_photo_save_bmp(QDesktop *q){
+    if(!q||!q->storage||q->media.kind!=QM_IMAGE||!q->photo_output)return -1;
+    size_t size=0;
+    if(qm_export_bmp(&q->media,q->photo_rotation,q->photo_flipped,q->photo_output,q->photo_output_capacity,&size)!=0){
+        media_message(q,"Image exceeds export memory");return -1;
+    }
+    int volume=q->storage->home_index;
+    const char *dir=volume==q->storage->ram_index?"\\Pictures":"\\Users\\Default\\Pictures";
+    static QFsEntry entries[QFS_ENTRIES];
+    int count=qfs_list(q->storage,volume,dir,entries,QFS_ENTRIES);
+    if(count<0){
+        if(qfs_mkdir(q->storage,volume,dir)!=0){media_message(q,"Pictures folder unavailable");return -1;}
+        count=0;
+    }
+    for(int number=1;number<=999;number++){
+        char filename[20]="Edited-000.bmp";
+        filename[7]=(char)('0'+number/100);
+        filename[8]=(char)('0'+number/10%10);
+        filename[9]=(char)('0'+number%10);
+        int taken=0;
+        for(int i=0;i<count;i++)if(files_equal(entries[i].name,filename)){taken=1;break;}
+        if(taken)continue;
+        char path[QFS_PATH];
+        if(qfs_join(path,sizeof(path),dir,filename)!=0)break;
+        if(qfs_write(q->storage,volume,path,q->photo_output,size)==0){
+            media_message(q,volume==q->storage->ram_index?"Saved BMP in Home RAM Pictures":"Saved BMP to Pictures");
+            return 0;
+        }
+        media_message(q,"Could not save image");return -1;
+    }
+    media_message(q,"Pictures folder has no available filenames");
+    return -1;
+}
+
 static void files_open(QDesktop *q,int index){
     if(index<0||index>=q->file_count)return;
     QFsEntry *entry=&q->files[index];
@@ -1094,14 +1202,10 @@ static void files_open(QDesktop *q,int index){
        file_suffix(entry->name,".gif")||file_suffix(entry->name,".tga")||
        file_suffix(entry->name,".wav")||file_suffix(entry->name,".mp3")||
        file_suffix(entry->name,".avi")){
-        size_t length=0;
-        if(!q->media_buffer||!q->storage||qfs_read(q->storage,q->file_volume,path,q->media_buffer,q->media_capacity,&length)!=0){
-            files_message(q,"Media file exceeds memory or cannot be opened");return;
+        if(media_load(q,q->file_volume,path,entry->name)!=0){
+            files_message(q,"Unsupported media file or memory limit");return;
         }
-        if(qm_open(&q->media,q->media_buffer,length)!=0){files_message(q,"Unsupported media encoding");return;}
-        q->photo_zoom=0;q->audio_display_us=0;
-        int i=0;for(;entry->name[i]&&i<71;i++)q->media_name[i]=entry->name[i];q->media_name[i]=0;
-        q->media_volume=q->file_volume;
+        media_album(q,q->file_volume,path,entry->name,q->media.kind);
         q_open(q,q->media.kind==QM_IMAGE?Q_PHOTOS:Q_MEDIA);
         return;
     }
@@ -1712,12 +1816,14 @@ static void draw_media_canvas(QDesktop *q,int x,int y,int w,int h){
     rectangle(q,x,y,w,h,0x101827);
     QMedia *m=&q->media;
     if((m->kind!=QM_IMAGE&&m->kind!=QM_VIDEO)||!m->width||!m->height)return;
+    int source_w=m->width,source_h=m->height;
+    if(q->render_app==Q_PHOTOS)qm_image_dimensions(m,q->photo_rotation,&source_w,&source_h);
     int dw=w-28,dh=h-22;
     if(q->render_app==Q_PHOTOS&&q->photo_zoom){
-        dw=m->width*(q->photo_zoom==2?2:1);
-        dh=m->height*(q->photo_zoom==2?2:1);
-    }else if((int64_t)dw*m->height>(int64_t)dh*m->width)dw=(int)((int64_t)dh*m->width/m->height);
-    else dh=(int)((int64_t)dw*m->height/m->width);
+        dw=source_w*(q->photo_zoom==2?2:1);
+        dh=source_h*(q->photo_zoom==2?2:1);
+    }else if((int64_t)dw*source_h>(int64_t)dh*source_w)dw=(int)((int64_t)dh*source_w/source_h);
+    else dh=(int)((int64_t)dw*source_h/source_w);
     if(dw<1||dh<1)return;
     int px=x+(w-dw)/2,py=y+(h-dh)/2;
     int startx=clamp(px>x?px:x,q->clip_left,q->clip_right);
@@ -1725,13 +1831,17 @@ static void draw_media_canvas(QDesktop *q,int x,int y,int w,int h){
     int starty=clamp(py>y?py:y,q->clip_top,q->clip_bottom);
     int endy=clamp(py+dh<y+h?py+dh:y+h,q->clip_top,q->clip_bottom);
     for(int sy=starty;sy<endy;sy++){
-        int iy=(int)((int64_t)(sy-py)*m->height/dh);
-        for(int sx=startx;sx<endx;sx++)q->pixels[(size_t)sy*q->width+sx]=qm_pixel(m,(int)((int64_t)(sx-px)*m->width/dw),iy);
+        int iy=(int)((int64_t)(sy-py)*source_h/dh);
+        for(int sx=startx;sx<endx;sx++){
+            int ix=(int)((int64_t)(sx-px)*source_w/dw);
+            q->pixels[(size_t)sy*q->width+sx]=q->render_app==Q_PHOTOS?
+                qm_image_pixel(m,q->photo_rotation,q->photo_flipped,ix,iy):qm_pixel(m,ix,iy);
+        }
     }
 }
 static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
     string_limit(q,x,y+26,q->media_name[0]?q->media_name:"No file selected",ink,1,cw-10,1);
-    int height=w->h-178;
+    int height=w->h-223;
     if(height<110)height=110;
     if(app==Q_PHOTOS||q->media.kind==QM_VIDEO)draw_media_canvas(q,x,y+45,cw,height);
     else{
@@ -1772,7 +1882,31 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
             text(q,bx+14,y+86+height,labels[i],ink,0);
         }
     }
+    if(app==Q_PHOTOS){
+        const char *actions[]={"Rotate","Flip","Save BMP","Previous","Next"};
+        const int offsets[]={0,88,161,277,365};
+        for(int i=0;i<5;i++){
+            int bx=x+offsets[i],width=i==2?107:i==1?69:84;
+            if(bx+width>x+cw-2)break;
+            surface(q,bx,y+104+height,width-2,36,10,inner_material(q),q->theme?158:148);
+            text(q,bx+9,y+128+height,actions[i],ink,0);
+        }
+    }else{
+        const char *actions[]={"Previous","Next","Repeat","Vol -","Vol +",q->media_muted?"Unmute":"Mute"};
+        const int offsets[]={0,88,165,245,311,378};
+        for(int i=0;i<6;i++){
+            if(x+offsets[i]+67>x+cw)break;
+            surface(q,x+offsets[i],y+104+height,76,36,10,i==2&&q->media_repeat?colors(q)->selected:inner_material(q),q->theme?173:151);
+            text(q,x+offsets[i]+8,y+128+height,actions[i],ink,0);
+        }
+        char volume_label[20]="Volume: 000%";
+        volume_label[8]=(char)('0'+q->media_volume_level/100);
+        volume_label[9]=(char)('0'+q->media_volume_level/10%10);
+        volume_label[10]=(char)('0'+q->media_volume_level%10);
+        text(q,x+cw-125,y+128+height,volume_label,muted,0);
+    }
     text(q,x+cw-166,y+86+height,"Browse files",muted,0);
+    if(q->media_status[0])string_limit(q,x+5,y+w->h-70,q->media_status,muted,0,cw-10,1);
 }
 
 static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About"};
@@ -1989,7 +2123,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.42.2",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.43.0",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -2151,7 +2285,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.42.2",ink,2);
+        text(q,x,y+45,"Quartzie 0.43.0",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -3074,13 +3208,32 @@ void q_click(QDesktop *q,int x,int y){
                 q->note_path[0]=0;q->note_volume=-1;q->file_status[0]=0;q->dirty=1;return;
             }
         }else if(chosen==Q_PHOTOS||chosen==Q_MEDIA){
-            int view_h=w->h-178;
+            int view_h=w->h-223;
             if(view_h<110)view_h=110;
             if(hit(x,y,bx+w->w-64-176,by+60+view_h,176,38)){q_open(q,Q_FILES);return;}
             if(chosen==Q_PHOTOS){
                 for(int i=0;i<3;i++)if(hit(x,y,bx+i*83,by+60+view_h,78,38)){q->photo_zoom=i;q->dirty=1;return;}
+                const int offsets[]={0,88,161,277,365};
+                for(int i=0;i<5;i++)if(hit(x,y,bx+offsets[i],by+104+view_h,i==2?107:i==1?69:84,36)){
+                    if(i==0)q->photo_rotation=(q->photo_rotation+1)&3;
+                    if(i==1)q->photo_flipped=!q->photo_flipped;
+                    if(i==2)q_photo_save_bmp(q);
+                    if(i==3)q_media_next(q,-1);
+                    if(i==4)q_media_next(q,1);
+                    q->dirty=1;return;
+                }
             }
             if(chosen==Q_MEDIA){
+                const int offsets[]={0,88,165,245,311,378};
+                for(int i=0;i<6;i++)if(hit(x,y,bx+offsets[i],by+104+view_h,76,36)){
+                    if(i==0)q_media_next(q,-1);
+                    if(i==1)q_media_next(q,1);
+                    if(i==2)q->media_repeat=!q->media_repeat;
+                    if(i==3)q->media_volume_level=clamp(q->media_volume_level-10,0,100);
+                    if(i==4)q->media_volume_level=clamp(q->media_volume_level+10,0,100);
+                    if(i==5)q->media_muted=!q->media_muted;
+                    q->dirty=1;return;
+                }
                 int track=w->w-64-300;
                 if(track>60&&hit(x,y,bx+110,by+65+view_h,track+14,20)){
                     uint64_t duration=qm_duration(&q->media);

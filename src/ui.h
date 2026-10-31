@@ -35,6 +35,12 @@ typedef struct {
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
     int terminal_volume,terminal_count,photo_zoom,store_page;
+    int photo_rotation,photo_flipped;
+    int media_track_count,media_track_index,media_track_volume,media_repeat,media_volume_level,media_muted;
+    QFsEntry media_tracks[QFS_ENTRIES];
+    char media_track_directory[QFS_PATH],media_status[96],media_path[QFS_PATH];
+    uint8_t *photo_output;
+    size_t photo_output_capacity;
     int store_view,store_pending,store_source_volume,store_installed_count,store_confirm_remove;
     QPackage store_info;
     QFsEntry store_installed[24];
@@ -90,6 +96,9 @@ void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpape
 void q_draw(QDesktop *q);
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
 void q_attach_kernel(QDesktop *q,QNtKernel *kernel,int (*terminate_process)(QNtKernel *,uint32_t));
+void q_attach_photo_output(QDesktop *q,uint8_t *output,size_t capacity);
+int q_photo_save_bmp(QDesktop *q);
+int q_media_next(QDesktop *q,int direction);
 int q_task_end_selected(QDesktop *q);
 void q_enable_animations(QDesktop *q);
 void q_tick(QDesktop *q);
