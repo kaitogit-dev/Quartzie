@@ -91,6 +91,40 @@ static void check_profile_wallpaper_ui(void){
     CHECK(qfs_read(&profile_storage,0,"\\Users\\Mira\\WALLPAPER.QIMG",saved,sizeof(saved),&count)==0&&count==70);
 }
 
+
+static QDesktop compact_ui;
+static QStorage compact_storage;
+static uint32_t compact_pixels[800*600],compact_wall[800*600],compact_blur[800*600];
+static void check_accounts_and_recovery_navigation(void){
+    qfs_init(&compact_storage,0,0);
+    q_init(&compact_ui,800,600,compact_pixels,compact_wall,compact_blur);
+    q_attach_storage(&compact_ui,&compact_storage,0,0);
+    q_open(&compact_ui,Q_SETTINGS);
+    QWindow *w=&compact_ui.windows[Q_SETTINGS];
+    int bx=w->x+32,by=w->y+60;
+    int side=(w->w-64)/4;
+    if(side<175)side=175;
+    if(side>220)side=220;
+    int left=bx+side+25;
+    q_click(&compact_ui,bx+40,by+128+7*35+18);
+    CHECK(compact_ui.settings_page==7);
+    q_click(&compact_ui,left+30,by+322+15);
+    CHECK(compact_ui.profile_edit==1);
+    const char *name="Kite";
+    for(int i=0;name[i];i++)q_key(&compact_ui,name[i],0);
+    q_key(&compact_ui,'\r',0);
+    CHECK(compact_ui.profile_edit==0);
+    QProfile entries[QPROFILE_LIMIT];
+    CHECK(qprofiles_list(&compact_storage,entries,QPROFILE_LIMIT)==1);
+    CHECK(!strcmp(entries[0].name,"Kite"));
+    q_click(&compact_ui,bx+40,by+128+8*35+18);
+    CHECK(compact_ui.settings_page==8);
+    int row=(w->h-175)/6;
+    q_click(&compact_ui,left+80,by+92+2*row+20);
+    CHECK(compact_ui.active==Q_TERMINAL);
+    CHECK(!strcmp(compact_ui.terminal_lines[6],"Desktop renderer: running"));
+}
+
 int main(void){
     qfs_init(&storage,0,0);
     q_init(&ui,1280,720,pixels,wallpaper,workspace);
@@ -150,5 +184,6 @@ int main(void){
     puts("PASS: Settings navigation, appearance, motion, search, drives and app links");
     check_saved_preferences();
     check_profile_wallpaper_ui();
+    check_accounts_and_recovery_navigation();
     return 0;
 }
