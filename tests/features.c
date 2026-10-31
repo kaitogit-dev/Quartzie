@@ -228,6 +228,49 @@ static void check_task_manager(void){
     CHECK(tasks_ui.task_tab==0);
 }
 
+
+static QDesktop store_ui;
+static QStorage store_storage;
+static uint32_t store_pixels[1024*768],store_wall[1024*768],store_blur[1024*768];
+static uint8_t store_archive[4096];
+static void check_store_import(void){
+    FILE *file=fopen("build/store-test.qapp","rb");
+    CHECK(file);
+    size_t bytes=fread(store_archive,1,sizeof(store_archive),file);
+    fclose(file);
+    CHECK(bytes>300&&bytes<sizeof(store_archive));
+    qfs_init(&store_storage,0,0);
+    CHECK(qfs_write(&store_storage,0,"\\Store.qapp",store_archive,bytes)==0);
+    q_init(&store_ui,1024,768,store_pixels,store_wall,store_blur);
+    q_attach_storage(&store_ui,&store_storage,store_archive,sizeof(store_archive));
+    q_open(&store_ui,Q_FILES);
+    CHECK(store_ui.file_count==1);
+    store_ui.file_selected=0;
+    q_key(&store_ui,'\r',0);
+    CHECK(store_ui.active==Q_STORE&&store_ui.store_pending==1);
+    CHECK(!strcmp(store_ui.store_info.name,"Quartzie Store Test"));
+    CHECK(!strcmp(store_ui.store_info.id,"quartzie.storetest"));
+    QWindow *w=&store_ui.windows[Q_STORE];
+    int x=w->x+32,y=w->y+60;
+    q_click(&store_ui,x+50,y+265);
+    CHECK(store_ui.store_pending==1);
+    CHECK(!strcmp(store_ui.store_status,"Attach persistent Home storage to install"));
+    q_click(&store_ui,x+193,y+265);
+    CHECK(!store_ui.store_pending);
+    CHECK(!strcmp(store_ui.store_status,"Installation cancelled"));
+    store_archive[bytes/2]^=0x20;
+    CHECK(qfs_write(&store_storage,0,"\\Bad.qapp",store_archive,bytes)==0);
+    q_attach_storage(&store_ui,&store_storage,store_archive,sizeof(store_archive));
+    q_open(&store_ui,Q_FILES);
+    int bad=-1;
+    for(int i=0;i<store_ui.file_count;i++)if(!strcmp(store_ui.files[i].name,"Bad.qapp"))bad=i;
+    CHECK(bad>=0);
+    store_ui.file_selected=bad;
+    q_key(&store_ui,'\r',0);
+    CHECK(!store_ui.store_pending);
+    CHECK(!strcmp(store_ui.file_status,"Invalid, corrupt or oversized QApp package"));
+}
+
 int main(void){
     q_init(&ui,1024,768,framebuffer,wallpaper,scratch);
     q_draw(&ui);
@@ -292,6 +335,7 @@ int main(void){
     check_file_selection();
     check_file_moves();
     check_task_manager();
+    check_store_import();
     puts("PASS: file selection, double-click navigation, app launcher, Store and window controls");
     return 0;
 }

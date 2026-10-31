@@ -40,6 +40,8 @@ build/embed_app.obj: build/embed_app.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 Quartzie-userdata.img: tools/userdisk.py
 	$(PYTHON) tools/userdisk.py $@
+build/store-test.qapp: tools/make_store_sample.py tools/qapp.py | build
+	$(PYTHON) tools/make_store_sample.py $@
 build/native-test.qapp: build/winapp.exe tools/qapp.py | build
 	$(PYTHON) tools/qapp.py pack build/winapp.exe -o $@ --name "Quartzie Test" --id quartzie.testapp --version 1.0
 build/package-test: tests/package_native.c src/package.c src/package.h | build
@@ -60,7 +62,7 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
-test: build/package-test build/native-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/package-test build/native-test.qapp build/store-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/package-test build/native-test.qapp
 	./build/settings-test
 	./build/media-test
