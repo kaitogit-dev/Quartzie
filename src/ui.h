@@ -7,6 +7,7 @@
 #include "ntcore.h"
 #include "package.h"
 #include "network.h"
+#include "trash.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
@@ -62,6 +63,7 @@ typedef struct {
     QNtKernel *kernel;
     int (*terminate_process)(QNtKernel *,uint32_t);
     QFsEntry files[QFS_ENTRIES];
+    QTrashEntry trash_entries[QTRASH_LIMIT];
     int file_volume,file_count,file_scroll,file_selected,file_confirm;
     int file_click_index,file_operation,file_input_length;
     int file_view,file_sort,file_desc,file_menu,file_show_hidden,file_extensions,file_compact,file_details,file_nav;

@@ -963,8 +963,20 @@ static void files_refresh(QDesktop *q){
     for(int i=0;i<QFS_ENTRIES;i++)q->file_checked[i]=0;
     q->file_click_index=-1;q->file_click_elapsed_us=0;
     if(!q->storage||q->storage->count<1){files_message(q,"No mounted volumes");return;}
-    int n=qfs_list(q->storage,q->file_volume,q->file_path,q->files,QFS_ENTRIES);
-    if(n<0){files_message(q,"Cannot open this folder");return;}
+    int n;
+    if(q->file_location==2){
+        n=qtrash_list(q->storage,q->trash_entries,QTRASH_LIMIT);
+        if(n<0){files_message(q,"Could not open Recycle Bin");return;}
+        for(int i=0;i<n;i++){
+            QFsEntry *e=&q->files[i];
+            for(size_t j=0;j<sizeof(*e);j++)((uint8_t *)e)[j]=0;
+            int k=0;for(;q->trash_entries[i].name[k]&&k<71;k++)e->name[k]=q->trash_entries[i].name[k];
+            e->name[k]=0;e->directory=q->trash_entries[i].directory;e->size=q->trash_entries[i].size;
+        }
+    }else{
+        n=qfs_list(q->storage,q->file_volume,q->file_path,q->files,QFS_ENTRIES);
+        if(n<0){files_message(q,"Cannot open this folder");return;}
+    }
     q->file_count=n;files_rebuild(q);files_message(q,"");
 }
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity){
@@ -1179,6 +1191,12 @@ int q_photo_save_bmp(QDesktop *q){
 
 static void files_open(QDesktop *q,int index){
     if(index<0||index>=q->file_count)return;
+    if(q->file_location==2){
+        int restored=qtrash_restore(q->storage,q->trash_entries[index].id)==0;
+        files_refresh(q);
+        files_message(q,restored?"Restored to original location":"Could not restore to original location");
+        return;
+    }
     QFsEntry *entry=&q->files[index];
     char path[QFS_PATH];
     if(qfs_join(path,sizeof(path),q->file_path,entry->name)!=0){files_message(q,"Path too long");return;}
@@ -1230,6 +1248,11 @@ static void files_select(QDesktop *q,int index){
     q->dirty=1;
 }
 static void files_parent(QDesktop *q){
+    if(q->file_location==2){
+        int volume=q->storage->home_index;
+        files_go(q,volume,volume==q->storage->ram_index?"\\":"\\Users\\Default",1);
+        return;
+    }
     if(q->file_location)return;
     int end=0;while(q->file_path[end])end++;
     if(end<=1)return;
@@ -1612,7 +1635,8 @@ static void files_back(QDesktop *q,int forward){
     int index=q->file_history_index+(forward?1:-1);
     if(index<0||index>=q->file_history_count)return;
     q->file_history_index=index;
-    if(q->file_history_locations[index])files_this_pc(q,0);
+    if(q->file_history_locations[index]==1)files_this_pc(q,0);
+    else if(q->file_history_locations[index]==2){q->file_location=2;files_refresh(q);}
     else files_go(q,q->file_history_volumes[index],q->file_history_paths[index],0);
 }
 static const char *files_type(const QFsEntry *entry){
@@ -1679,7 +1703,8 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     surface(q,address_x,top+6,address_w,34,6,q->theme?0x333d4b:0xf0f7ff,218);
     char location[QFS_PATH+38];int p=0;
     const char *volume=q->storage&&q->storage->count?q->storage->volumes[q->file_volume].label:"Drives";
-    if(q->file_location)volume="This PC";
+    if(q->file_location==1)volume="This PC";
+    if(q->file_location==2)volume="Recycle Bin";
     while(volume[p]&&p<25){location[p]=volume[p];p++;}
     if(!q->file_location){
         location[p++]=' ';location[p++]='>';
@@ -1692,19 +1717,24 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     thin_rule(q,left,top+50,full,35);
     const char *tools[]={"New v","Cut","Copy","Paste","Rename","Delete","Sort v","View v","..."};
     const int tx[]={5,83,131,186,249,326,407,500,595},tw[]={74,45,52,55,75,76,85,88,45};
-    for(int i=0;i<9;i++)if(tx[i]+tw[i]<=full)
+    if(q->file_location==2){
+        files_button(q,left+5,top+57,100,"Restore",0);
+        files_button(q,left+113,top+57,138,"Delete forever",0);
+        files_button(q,left+259,top+57,126,"Empty Bin",0);
+        files_button(q,left+393,top+57,95,"Refresh",0);
+    }else for(int i=0;i<9;i++)if(tx[i]+tw[i]<=full)
         files_button(q,left+tx[i],top+57,tw[i],tools[i],q->file_menu==((i==0)?1:(i==6)?2:(i==7)?3:(i==8)?4:0));
     thin_rule(q,left,top+97,full,31);
     int canvas_y=top+109,canvas_h=footer-canvas_y;
     rectangle(q,left,canvas_y,full,canvas_h,q->theme?0x191b20:0xf9fcff);
     if(q->file_nav){
         surface(q,left,sidebar_y,side-6,footer-sidebar_y,8,inner_material(q),q->theme?117:143);
-        const char *shortcuts[]={"Home","Gallery","Desktop","Documents","Pictures","Music","Videos","This PC","Network"};
-        const int icons[]={QI_FILE_EXPLORER,QI_IMAGE,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_WIFI};
+        const char *shortcuts[]={"Home","Gallery","Desktop","Documents","Pictures","Music","Videos","This PC","Recycle Bin"};
+        const int icons[]={QI_FILE_EXPLORER,QI_IMAGE,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_FOLDER};
         for(int i=0;i<9;i++){
             int py=sidebar_y+12+i*36+(i>=2?12:0)+(i>=7?18:0);
             int chosen=(i==0&&q->storage&&q->file_volume==q->storage->home_index&&files_equal(q->file_path,q->storage->home_index==q->storage->ram_index?"\\":"\\Users\\Default"))||
-                (i==7&&q->file_location)||
+                (i==7&&q->file_location==1)||(i==8&&q->file_location==2)||
                 (i>=2&&i<=6&&q->storage&&q->file_volume==q->storage->home_index&&files_contains(q->file_path,shortcuts[i]));
             if(chosen)surface(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
             sprite(q,left+22,py+13,icons[i],25);
@@ -1733,7 +1763,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             if(!entry->directory)text(q,dx+13,canvas_y+248,size,muted,0);
         }else text(q,dx+13,canvas_y+78,"Select an item",muted,0);
     }
-    if(q->file_location){
+    if(q->file_location==1){
         text(q,main_x+12,canvas_y+32,"Devices and drives",ink,1);
         if(q->storage)for(int i=0;i<q->storage->count;i++){
             int dx=main_x+8+(i%2)*225,dy=canvas_y+53+(i/2)*90;
@@ -2150,7 +2180,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.43.0",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.43.1",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -2312,7 +2342,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.43.0",ink,2);
+        text(q,x,y+45,"Quartzie 0.43.1",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -2943,22 +2973,33 @@ static void files_clip(QDesktop *q,int cut){
     files_message(q,cut?"Ready to move":"Copied to clipboard");
 }
 static void files_delete_selected(QDesktop *q){
-    if(q->file_location||!q->storage)return;
-    if(!q->file_checked_count&&q->file_selected<0){files_message(q,"Select files first");return;}
-    if(!q->file_confirm){q->file_confirm=1;files_message(q,"Select Delete again to confirm");return;}
+    if(q->file_location==1||!q->storage)return;
+    if(!q->file_checked_count&&q->file_selected<0){files_message(q,"Select items first");return;}
+    if(!q->file_confirm){
+        q->file_confirm=1;
+        files_message(q,q->file_location==2?"Select Delete again to remove forever":"Select Delete again to confirm");
+        return;
+    }
     int failures=0;
     for(int i=0;i<q->file_count;i++)if(q->file_checked[i]||(!q->file_checked_count&&i==q->file_selected)){
-        char path[QFS_PATH];
-        if(qfs_join(path,sizeof(path),q->file_path,q->files[i].name)!=0||
-           files_remove_tree(q,q->file_volume,path,q->files[i].directory,0)!=0)failures++;
+        if(q->file_location==2){
+            if(qtrash_remove(q->storage,q->trash_entries[i].id)!=0)failures++;
+        }else{
+            char path[QFS_PATH];
+            if(qfs_join(path,sizeof(path),q->file_path,q->files[i].name)!=0||
+               (q->file_volume==q->storage->home_index?
+               qtrash_put(q->storage,q->file_volume,path,q->files[i].directory):
+               files_remove_tree(q,q->file_volume,path,q->files[i].directory,0))!=0)failures++;
+        }
     }
+    int bin=q->file_location==2;
     files_refresh(q);
-    if(failures)files_message(q,"Some selected items could not be deleted");
+    files_message(q,failures?"Some selected items could not be deleted":bin?"Permanently deleted":"Moved to Recycle Bin");
 }
 static void files_shortcut(QDesktop *q,int index){
     if(!q->storage)return;
     if(index==7){files_this_pc(q,1);return;}
-    if(index==8){files_message(q,"Network locations are not connected");return;}
+    if(index==8){q->file_location=2;q->file_menu=0;q->file_submenu=0;files_refresh(q);files_history(q);return;}
     if(index==1){q_open(q,Q_PHOTOS);return;}
     int volume=q->storage->home_index;
     const char *root=volume==q->storage->ram_index?"\\":"\\Users\\Default";
@@ -3056,6 +3097,22 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
         q->file_address_active=0;q->file_search_active=0;return 1;
     }
     if(hit(x,y,left,top+51,full,47)){
+        if(q->file_location==2){
+            if(hit(x,y,left+5,top+57,100,33)){
+                if(q->file_selected>=0)files_open(q,q->file_selected);
+                else files_message(q,"Select an item to restore");
+                return 1;
+            }
+            if(hit(x,y,left+113,top+57,138,33)){files_delete_selected(q);return 1;}
+            if(hit(x,y,left+259,top+57,126,33)){
+                if(!q->file_confirm){q->file_confirm=1;files_message(q,"Select Empty Bin again to confirm");return 1;}
+                int ok=qtrash_empty(q->storage)==0;
+                files_refresh(q);files_message(q,ok?"Recycle Bin emptied":"Could not empty Recycle Bin");
+                return 1;
+            }
+            if(hit(x,y,left+393,top+57,95,33)){files_refresh(q);return 1;}
+            return 1;
+        }
         const int tx[]={5,83,131,186,249,326,407,500,595},tw[]={74,45,52,55,75,76,85,88,45};
         for(int i=0;i<9;i++)if(tx[i]+tw[i]<=full&&hit(x,y,left+tx[i],top+57,tw[i],33)){
             if(i==0||i==6||i==7||i==8){q->file_menu=i==0?1:i==6?2:i==7?3:4;q->file_submenu=0;q->dirty=1;}
@@ -3080,7 +3137,7 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
         }
         return 1;
     }
-    if(q->file_location){
+    if(q->file_location==1){
         if(q->storage)for(int i=0;i<q->storage->count;i++){
             int dx=main_x+8+(i%2)*225,dy=canvas_y+53+(i/2)*90;
             if(dx+210>main_x+main_w)break;
