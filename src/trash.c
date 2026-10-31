@@ -23,7 +23,11 @@ static int make_path(char *out,const char *base,const char *id){
     return qfs_join(out,QFS_PATH,base,id);
 }
 static const char *directory(QStorage *s){
-    return s->home_index==s->ram_index?"\\Recycle":"\\Users\\Default\\.Trash";
+    static char path[QFS_PATH];
+    if(s->home_index==s->ram_index&&s->profile[0]=='D'&&s->profile[1]=='e')
+        return "\\Recycle";
+    if(qfs_profile_path(s,".Trash",path,sizeof(path))!=0)return "\\Recycle";
+    return path;
 }
 static int prepare(QStorage *s){
     if(!s||s->home_index<0||s->home_index>=s->count)return -1;

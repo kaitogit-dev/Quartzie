@@ -29,11 +29,13 @@ typedef struct {
     EFI_BOOT_SERVICES *boot;
     QFsVolume volumes[QFS_VOLUMES];
     int count,ram_index,home_index;
+    char profile[25];
     uint64_t change_counter;
     QMemoryFile memory[QFS_MEMORY_FILES];
 } QStorage;
 void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot);
 int qfs_home_setup(QStorage *s);
+int qfs_profile_path(QStorage *s,const char *suffix,char *path,size_t capacity);
 int qfs_space(QStorage *s,int volume,uint64_t *total,uint64_t *free_bytes);
 int qfs_list(QStorage *s,int volume,const char *path,QFsEntry *entries,int limit);
 int qfs_read(QStorage *s,int volume,const char *path,void *data,size_t capacity,size_t *length);

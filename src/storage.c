@@ -143,6 +143,8 @@ static int ram_list(QStorage *s,const char *path,QFsEntry *entries,int limit){
 void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot){
     if(!s)return;
     zero(s,sizeof(*s));s->boot=boot;
+    const char *initial="Default";
+    for(int i=0;initial[i];i++)s->profile[i]=initial[i];
     if(boot&&boot->HandleProtocol&&boot->LocateHandleBuffer){
         EFI_HANDLE preferred=0;
         QLoadedImage *loaded=0;
@@ -191,6 +193,32 @@ void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot){
             for(int i=0;name[i];i++)v->label[i]=name[i];
         }else s->home_index=s->ram_index;
     }
+}
+
+
+int qfs_profile_path(QStorage *s,const char *suffix,char *out,size_t capacity){
+    if(!s||!out||!capacity)return -1;
+    size_t n=0;
+    const char *root="\\Users\\";
+    if(s->home_index==s->ram_index&&
+       s->profile[0]=='D'&&s->profile[1]=='e'&&s->profile[2]=='f'&&
+       s->profile[3]=='a'&&s->profile[4]=='u'&&s->profile[5]=='l'&&
+       s->profile[6]=='t'&&!s->profile[7]){
+        root="\\";
+        for(size_t i=0;root[i];i++){if(n+1>=capacity)return -1;out[n++]=root[i];}
+    }else{
+        for(size_t i=0;root[i];i++){if(n+1>=capacity)return -1;out[n++]=root[i];}
+        for(size_t i=0;s->profile[i];i++){if(n+1>=capacity)return -1;out[n++]=s->profile[i];}
+    }
+    if(suffix&&suffix[0]){
+        if(n&&out[n-1]!='\\'){if(n+1>=capacity)return -1;out[n++]='\\';}
+        for(size_t i=0;suffix[i];i++){
+            if(suffix[i]=='/'||(unsigned char)suffix[i]<32||suffix[i]==':')return -1;
+            if(n+1>=capacity)return -1;
+            out[n++]=suffix[i];
+        }
+    }
+    out[n]=0;return 0;
 }
 
 int qfs_space(QStorage *s,int volume,uint64_t *total,uint64_t *free_bytes){
