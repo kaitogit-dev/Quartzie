@@ -106,7 +106,7 @@ build/tween-test: tests/tween.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/layout.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h src/cursor.h build/cursor.c build/font.c build/icons.c build/embed_app.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/storage.c src/media.c src/codecs.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c src/package.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/storage.c src/media.c src/codecs.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c src/package.c src/network.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c src/package.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
