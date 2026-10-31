@@ -423,8 +423,15 @@ static void check_recycle_bin_ui(void){
     q_click(&trash_ui,sidebar_x+55,sidebar_y+12+8*36+12+18+12);
     CHECK(trash_ui.file_count==2);
     int left=w->x+15,top=w->y+60;
+    trash_ui.file_selected=0;
+    q_key(&trash_ui,0,8);
+    CHECK(trash_ui.file_confirm==1);
     q_click(&trash_ui,left+274,top+70);
-    CHECK(trash_ui.file_confirm);
+    CHECK(trash_ui.file_confirm==2&&trash_ui.file_count==2);
+    q_click(&trash_ui,left+135,top+70);
+    CHECK(trash_ui.file_confirm==1&&trash_ui.file_count==2);
+    q_click(&trash_ui,left+274,top+70);
+    CHECK(trash_ui.file_confirm==2&&trash_ui.file_count==2);
     q_click(&trash_ui,left+274,top+70);
     CHECK(trash_ui.file_count==0);
     CHECK(qtrash_list(&trash_storage,trash_entries,QTRASH_LIMIT)==0);

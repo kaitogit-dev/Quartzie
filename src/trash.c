@@ -62,6 +62,15 @@ static int read_info(QStorage *s,const char *id,QTrashEntry *out){
     char restored[QFS_PATH];
     for(size_t i=0;i<path_length;i++)restored[i]=bytes[7+i];
     restored[path_length]=0;
+    size_t segment=1;
+    for(size_t i=1;i<=path_length;i++){
+        if(i==path_length||restored[i]=='\\'){
+            size_t count=i-segment;
+            if(!count||(count==1&&restored[segment]=='.')||
+               (count==2&&restored[segment]=='.'&&restored[segment+1]=='.'))return -1;
+            segment=i+1;
+        }else if((unsigned char)restored[i]<32||restored[i]=='/'||restored[i]==':')return -1;
+    }
     if(prefix(restored,directory(s)))return -1;
     if(qfs_list(s,s->home_index,directory(s),entries,1)<0)return -1;
     int count=qfs_list(s,s->home_index,directory(s),trash_list_buffer,QFS_ENTRIES);
