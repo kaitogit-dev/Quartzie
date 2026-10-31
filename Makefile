@@ -57,7 +57,7 @@ Quartzie-x64.iso: build/esp-iso.img tools/iso.py
 build/ui-test: tests/ui.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ui.c src/ui.c src/storage.c src/media.c src/codecs.c src/package.c build/font.c build/icons.c -o $@
 build/ps2-test: tests/ps2.c src/ps2.c src/ps2.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ps2.c src/ps2.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ps2.c src/ps2.c src/package.c -o $@
 build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
@@ -91,7 +91,7 @@ verify: all test build/Quartzie.cur
 clean:
 	rm -rf build Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.iso Quartzie-$(VERSION)-x64.img Quartzie-userdata.img Quartzie-$(VERSION)-userdata.img
 build/theme-test: tests/theme.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/theme.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/theme.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/features-test: tests/features.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/features.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/start-test: tests/start.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
@@ -105,7 +105,7 @@ build/layout-test: tests/layout.c src/ui.c src/ui.h src/font.h src/icons.h build
 build/cursor-test: tests/cursor.c src/boot.c src/ui.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c src/ui.h src/efi.h src/cursor.h build/cursor.c build/font.c build/icons.c build/embed_app.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/cursor.c src/ui.c src/storage.c src/media.c src/codecs.c src/ps2.c src/winapi.c src/ntcore.c src/pe64.c src/fileboot.c src/hostcursor.c build/cursor.c build/font.c build/icons.c build/embed_app.c src/package.c -o $@
 build/ntcore-test: tests/ntcore.c src/ntcore.c src/ntcore.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ntcore.c src/ntcore.c src/package.c -o $@
 build/kernel32.lib: tests/kernel32.def | build
 	$(LINK) /dll /noentry /machine:x64 /def:tests/kernel32.def /out:build/kernel32.dll /implib:$@
 build/winapp.obj: tests/win32_app.c | build
@@ -113,13 +113,13 @@ build/winapp.obj: tests/win32_app.c | build
 build/winapp.exe: build/winapp.obj build/kernel32.lib
 	$(LINK) /subsystem:console /entry:mainCRTStartup /nodefaultlib /dynamicbase /machine:x64 /out:$@ build/winapp.obj build/kernel32.lib
 build/pe-test: tests/pe64.c src/pe64.c src/pe64.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/pe64.c src/pe64.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/pe64.c src/pe64.c src/package.c -o $@
 build/icons-test: tests/icons.c build/icons.c src/icons.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/icons.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/icons.c build/icons.c src/package.c -o $@
 build/timing-test: tests/timing.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/timing.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 build/media-test: tests/media.c src/media.c src/media.h src/storage.c src/storage.h src/codecs.c src/codecs.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/media.c src/media.c src/storage.c src/codecs.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/media.c src/media.c src/storage.c src/codecs.c src/package.c -o $@
 build/settings-test: tests/settings.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/settings.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c -o $@
 .PHONY: all release test verify clean
