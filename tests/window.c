@@ -22,7 +22,7 @@ static void same_as_full(void){
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL window line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 
 static void check_snap_and_desktop(void){
-    q_init(&ui,1280,720,canvas,background,blurred);
+    q_init(&ui,1280,720,canvas,background,blur);
     q_open(&ui,Q_NOTES);
     QWindow *w=&ui.windows[Q_NOTES];
     QWindow initial=*w;
@@ -64,7 +64,7 @@ static void check_snap_and_desktop(void){
 
 
 static void check_window_controls(void){
-    q_init(&ui,1280,720,canvas,background,blurred);
+    q_init(&ui,1280,720,canvas,background,blur);
     q_open(&ui,Q_NOTES);
     QWindow *w=&ui.windows[Q_NOTES];
     q_move(&ui,w->x+w->w-90,w->y+26);
