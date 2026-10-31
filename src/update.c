@@ -16,9 +16,9 @@ static int has_file(QStorage *s,int volume,const char *path){
     int cut=0;
     for(int i=0;path[i];i++)if(path[i]=='\\')cut=i;
     char parent[QFS_PATH],name[72];int i=0;
-    if(!cut)return 0;
-    for(;i<cut;i++)parent[i]=path[i];
-    parent[i]=0;int at=0;
+    if(cut==0){parent[0]='\\';parent[1]=0;}
+    else{for(;i<cut;i++)parent[i]=path[i];parent[i]=0;}
+    int at=0;
     for(i=cut+1;path[i]&&at<71;i++)name[at++]=path[i];
     name[at]=0;
     static QFsEntry files[QFS_ENTRIES];
