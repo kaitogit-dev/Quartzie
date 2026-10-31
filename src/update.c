@@ -69,7 +69,7 @@ int qupd_find(QStorage *s,int *volume,char *path,size_t capacity){
 int qupd_target(QStorage *s,int require_backup){
     if(!s)return -1;
     for(int v=0;v<s->ram_index;v++){
-        if(!has_file(s,v,firmware)||require_backup&&!has_file(s,v,backup))continue;
+        if(!has_file(s,v,firmware)||(require_backup&&!has_file(s,v,backup)))continue;
         if(qfs_write(s,v,probe,"Q",1)!=0)continue;
         qfs_delete(s,v,probe);
         return v;
