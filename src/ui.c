@@ -458,6 +458,22 @@ static void close_popups(QDesktop *q){
     q->menu_search_length=0;q->menu_search[0]=0;
     q->desktop_view=0;q->snap_menu_app=-1;
 }
+static const char *preferences_path(QDesktop *q){
+    return q->storage->home_index==q->storage->ram_index?"\\QUARTZIE.CFG":"\\Users\\Default\\QUARTZIE.CFG";
+}
+int q_save_preferences(QDesktop *q){
+    if(!q||!q->storage)return -1;
+    const uint8_t data[10]={'Q','Z','P','R',1,(uint8_t)q->theme,(uint8_t)q->accent,
+        (uint8_t)q->animations_enabled,0,0};
+    return qfs_write(q->storage,q->storage->home_index,preferences_path(q),data,sizeof(data));
+}
+void q_set_accent(QDesktop *q,int value){
+    if(!q||value<0||value>3||q->accent==value)return;
+    q->accent=value;q->dirty=1;q->hover_only=0;
+    q->drag_cache_valid=0;q->dock_cache_valid=0;q->glass_cached_app=-1;
+    q_save_preferences(q);
+}
+
 void q_set_theme(QDesktop *q,int dark){
     dark=dark!=0;
     if(q->theme==dark)return;
@@ -470,6 +486,7 @@ void q_set_theme(QDesktop *q,int dark){
     q->scene_tween_active=0;
     q->damage_valid=0;
     q->dirty=1;
+    q_save_preferences(q);
 }
 static void begin_scene_tween(QDesktop *q,int kind){
     if(!q->animations_enabled||q->drag>=0)return;
@@ -495,7 +512,7 @@ static void start_tween(QDesktop *q,int app,int kind,int x,int y,int w,int h){
     q->drag_cache_valid=0;
 }
 void q_enable_animations(QDesktop *q){
-    q->animations_enabled=1;
+    if(!q->settings_loaded)q->animations_enabled=1;
 }
 void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
     q->uptime_us+=elapsed_us;
@@ -948,6 +965,15 @@ static void files_refresh(QDesktop *q){
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity){
     if(!q)return;
     q->storage=storage;q->media_buffer=buffer;q->media_capacity=capacity;
+    if(storage){
+        uint8_t settings[10];size_t length=0;
+        if(qfs_read(storage,storage->home_index,preferences_path(q),settings,sizeof(settings),&length)==0&&
+           length==sizeof(settings)&&settings[0]=='Q'&&settings[1]=='Z'&&settings[2]=='P'&&settings[3]=='R'&&
+           settings[4]==1&&settings[5]<=1&&settings[6]<=3&&settings[7]<=1){
+            q->theme=settings[5];q->accent=settings[6];q->animations_enabled=settings[7];q->settings_loaded=1;
+            q->dirty=1;q->glass_cached_app=-1;q->dock_cache_valid=0;
+        }
+    }
     q->terminal_volume=storage?storage->home_index:0;
     q->file_volume=storage?storage->home_index:0;
     q->file_path[0]='\\';q->file_path[1]=0;
@@ -1737,6 +1763,7 @@ static void settings_motion(QDesktop *q,int enabled){
     }
     if(!enabled)q->start_lift=q->start_pulse=0;
     q->dirty=1;
+    q_save_preferences(q);
 }
 static void settings_number(char *out,int value){
     char reverse[12];int n=0,j=0;
@@ -1939,10 +1966,7 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
             for(int i=0;i<4;i++){
                 int cx=left+44+i*61;
                 if(hit(x,y,cx-22,by+285,44,44)){
-                    if(q->accent!=i){
-                        q->accent=i;q->dirty=1;q->hover_only=0;
-                        q->drag_cache_valid=0;q->dock_cache_valid=0;q->glass_cached_app=-1;
-                    }
+                    q_set_accent(q,i);
                     return;
                 }
             }
@@ -2888,8 +2912,8 @@ void q_click(QDesktop *q,int x,int y){
         int bx=q->width-363,by=72;
         if(hit(x,y,bx+19,by+80,298,72)){q_set_theme(q,!q->theme);return;}
         if(hit(x,y,bx+19,by+164,298,68)){
-            if(x>=bx+178&&x<=bx+295)q->accent=clamp((x-(bx+162))/32,0,3);
-            else q->accent=(q->accent+1)%4;
+            if(x>=bx+178&&x<=bx+295)q_set_accent(q,clamp((x-(bx+162))/32,0,3));
+            else q_set_accent(q,(q->accent+1)%4);
             q->dirty=1;return;
         }
         if(hit(x,y,bx+19,by+243,298,43)){q_open(q,Q_SETTINGS);return;}

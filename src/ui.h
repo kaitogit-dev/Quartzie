@@ -40,7 +40,7 @@ typedef struct {
     uint32_t audio_display_us;
     char terminal_path[QFS_PATH],terminal_lines[7][96];
     int menu_search_length,calc_history_count;
-    int settings_page,settings_search_length;
+    int settings_page,settings_search_length,settings_loaded;
     char settings_search[32];
     char notes[2048],command[128],calc[64],answer[64],status[96];
     char menu_search[24],calc_history[3][64];
@@ -97,6 +97,8 @@ void q_release(QDesktop *q);
 void q_move(QDesktop *q,int x,int y);
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan);
 void q_set_theme(QDesktop *q,int dark);
+void q_set_accent(QDesktop *q,int accent);
+int q_save_preferences(QDesktop *q);
 void q_open(QDesktop *q,int app);
 void q_switch_desktop(QDesktop *q,int desktop);
 void q_move_to_desktop(QDesktop *q,int app,int desktop);

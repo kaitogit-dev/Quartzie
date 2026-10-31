@@ -17,6 +17,30 @@ static void nav(int page){
     q_click(&ui,w->x+32+36,w->y+60+128+page*43+19);
     CHECK(ui.settings_page==page);
 }
+
+static void check_saved_preferences(void){
+    static QStorage preferences;
+    static QDesktop first,second;
+    qfs_init(&preferences,0,0);
+    q_init(&first,1280,720,pixels,wallpaper,workspace);
+    q_attach_storage(&first,&preferences,0,0);
+    q_enable_animations(&first);
+    q_set_theme(&first,1);
+    q_set_accent(&first,3);
+    first.animations_enabled=0;
+    CHECK(q_save_preferences(&first)==0);
+    q_init(&second,1280,720,pixels,wallpaper,workspace);
+    q_attach_storage(&second,&preferences,0,0);
+    q_enable_animations(&second);
+    CHECK(second.settings_loaded&&second.theme==1&&second.accent==3&&!second.animations_enabled);
+    uint8_t bad[10]={0};
+    CHECK(qfs_write(&preferences,preferences.home_index,"\\QUARTZIE.CFG",bad,sizeof(bad))==0);
+    q_init(&second,1280,720,pixels,wallpaper,workspace);
+    q_attach_storage(&second,&preferences,0,0);
+    q_enable_animations(&second);
+    CHECK(!second.settings_loaded&&!second.theme&&second.animations_enabled);
+}
+
 int main(void){
     qfs_init(&storage,0,0);
     q_init(&ui,1280,720,pixels,wallpaper,workspace);
@@ -74,5 +98,6 @@ int main(void){
     CHECK(ui.active==Q_SETTINGS);
     CHECK(ui.settings_page==5);
     puts("PASS: Settings navigation, appearance, motion, search, drives and app links");
+    check_saved_preferences();
     return 0;
 }
