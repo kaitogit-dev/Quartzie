@@ -58,7 +58,7 @@ static int read_info(QStorage *s,const char *id,QTrashEntry *out){
     QFsEntry entries[1];
     int last=0;
     for(size_t i=0;i<path_length;i++)if(bytes[7+i]=='\\')last=(int)i;
-    if(!last||path_length==(size_t)last+1)return -1;
+    if(path_length==(size_t)last+1)return -1;
     char restored[QFS_PATH];
     for(size_t i=0;i<path_length;i++)restored[i]=bytes[7+i];
     restored[path_length]=0;
