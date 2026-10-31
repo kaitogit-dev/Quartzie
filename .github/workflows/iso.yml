@@ -42,6 +42,8 @@ jobs:
             build/Quartzie-0.44.0.UPD
             build/BOOTX64.EFI
             build/Quartzie.cur
+            tools/run-windows.ps1
+            tools/update.py
             assets/icons.zip
             build/*-screen.ppm
             build/settings.ppm
