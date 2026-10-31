@@ -106,7 +106,7 @@ static void check_accounts_and_recovery_navigation(void){
     if(side<175)side=175;
     if(side>220)side=220;
     int left=bx+side+25;
-    q_click(&compact_ui,bx+40,by+128+7*35+18);
+    q_click(&compact_ui,bx+40,by+128+7*30+15);
     CHECK(compact_ui.settings_page==7);
     q_click(&compact_ui,left+30,by+322+15);
     CHECK(compact_ui.profile_edit==1);
@@ -117,7 +117,7 @@ static void check_accounts_and_recovery_navigation(void){
     QProfile entries[QPROFILE_LIMIT];
     CHECK(qprofiles_list(&compact_storage,entries,QPROFILE_LIMIT)==1);
     CHECK(!strcmp(entries[0].name,"Kite"));
-    q_click(&compact_ui,bx+40,by+128+8*35+18);
+    q_click(&compact_ui,bx+40,by+128+8*30+15);
     CHECK(compact_ui.settings_page==8);
     int row=(w->h-175)/6;
     q_click(&compact_ui,left+80,by+92+2*row+20);

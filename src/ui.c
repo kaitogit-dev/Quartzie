@@ -2333,9 +2333,9 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     surface(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
     string_limit(q,x+27,y+105,q->settings_search_length?q->settings_search:"Find a setting",q->settings_search_length?foreground(q):secondary(q),0,side-51,1);
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
-        int yy=y+128+i*(w->h<600?35:43);
+        int yy=y+128+i*(w->h<600?30:43);
         if(q->settings_page==i){
-            surface(q,x+10,yy,side-20,38,10,colors(q)->selected,q->theme?182:167);
+            surface(q,x+10,yy,side-20,w->h<600?29:38,10,colors(q)->selected,q->theme?182:167);
             rectangle(q,x+11,yy+8,3,22,accent(q));
         }
         settings_icon(q,x+32,yy+19,i);
@@ -2522,7 +2522,7 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
     int side=settings_sidebar_width(cw);
     int left=bx+side+25,width=cw-side-25;
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
-        if(hit(x,y,bx+10,by+128+i*(w->h<600?35:43),side-20,38)){settings_navigate(q,i);return;}
+        if(hit(x,y,bx+10,by+128+i*(w->h<600?30:43),side-20,w->h<600?29:38)){settings_navigate(q,i);return;}
     }
     if(hit(x,y,bx+14,by+82,side-28,36)){q->dirty=1;return;}
     if(q->settings_search_length){
