@@ -8,6 +8,8 @@
 #include "package.h"
 #include "network.h"
 #include "trash.h"
+#include "profiles.h"
+#include "update.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
@@ -23,7 +25,7 @@
 #define Q_PHOTOS 7
 #define Q_MEDIA 8
 #define Q_TASKS 9
-#define Q_SETTINGS_PAGES 7
+#define Q_SETTINGS_PAGES 9
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
@@ -54,6 +56,10 @@ typedef struct {
     char terminal_path[QFS_PATH],terminal_lines[7][96];
     int menu_search_length,calc_history_count;
     int settings_page,settings_search_length,settings_loaded;
+    int wallpaper_mode,locked,profile_edit,profile_input_len,profile_target,profile_count,pin_input_len;
+    int update_found,update_source_volume,update_target,update_confirm;
+    QProfile profiles[QPROFILE_LIMIT];
+    char profile_input[25],pin_input[25],profile_status[96],update_status[96],update_source_path[QFS_PATH];
     char settings_search[32];
     char notes[2048],command[128],calc[64],answer[64],status[96];
     char menu_search[24],calc_history[3][64];
@@ -118,6 +124,9 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan);
 void q_set_theme(QDesktop *q,int dark);
 void q_set_accent(QDesktop *q,int accent);
 int q_save_preferences(QDesktop *q);
+int q_wallpaper_photo(QDesktop *q);
+int q_wallpaper_mode(QDesktop *q,int mode);
+void q_lock(QDesktop *q);
 void q_open(QDesktop *q,int app);
 void q_switch_desktop(QDesktop *q,int desktop);
 void q_move_to_desktop(QDesktop *q,int app,int desktop);
