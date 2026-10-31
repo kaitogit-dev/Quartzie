@@ -890,8 +890,10 @@ void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capac
     q->file_path[0]='\\';q->file_path[1]=0;
     if(storage&&storage->home_index!=storage->ram_index){
         const char *home="\\Users\\Default";int i=0;
-        for(;home[i];i++)q->file_path[i]=home[i];q->file_path[i]=0;
-        for(i=0;home[i];i++)q->terminal_path[i]=home[i];q->terminal_path[i]=0;
+        for(;home[i];i++)q->file_path[i]=home[i];
+        q->file_path[i]=0;
+        for(i=0;home[i];i++)q->terminal_path[i]=home[i];
+        q->terminal_path[i]=0;
     }
     files_refresh(q);files_history(q);
 }
