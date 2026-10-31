@@ -20,7 +20,7 @@ def choose_firmware():
     raise RuntimeError('OVMF firmware files not found')
 
 
-def run_image(image, kind):
+def run_image(image, kind, userdata=None):
     code, variables = choose_firmware()
     with tempfile.TemporaryDirectory() as tmp:
         tmp = pathlib.Path(tmp)
@@ -37,14 +37,19 @@ def run_image(image, kind):
             '-serial', f'file:{serial}',
             '-monitor', f'unix:{monitor},server,nowait',
         ]
-        if kind == 'iso':
+        if kind in ('iso', 'iso-user'):
             command += ['-cdrom', str(image), '-boot', 'order=d']
         else:
             command += ['-drive', f'file={image},format=raw,if=virtio', '-boot', 'order=c']
+        if userdata is not None:
+            command += ['-usb', '-drive', f'if=none,id=userdata,format=raw,file={userdata}',
+                        '-device', 'usb-storage,drive=userdata']
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
             for _ in range(180):
                 if serial.exists() and b'QUARTZIE-DESKTOP-READY' in serial.read_bytes():
+                    if userdata is not None and b'QUARTZIE-HOME-PERSISTENT' not in serial.read_bytes():
+                        raise RuntimeError(f'{kind} did not mount writable user home: {serial.read_text(errors="replace")}')
                     if b'QUARTZIE-WIN32-FILE' not in serial.read_bytes():
                         raise RuntimeError(f'{kind} did not load QSTART.EXE from EFI filesystem: {serial.read_text(errors="replace")}')
                     if b'QUARTZIE-WIN32-READY' not in serial.read_bytes() or b'Quartzie Win32 PE64 app' not in serial.read_bytes():
@@ -79,4 +84,5 @@ def run_image(image, kind):
 
 
 if __name__ == '__main__':
-    run_image((ROOT / sys.argv[1]).resolve(), sys.argv[2])
+    run_image((ROOT / sys.argv[1]).resolve(), sys.argv[2],
+              (ROOT / sys.argv[3]).resolve() if len(sys.argv) > 3 else None)
