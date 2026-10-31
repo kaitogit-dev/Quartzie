@@ -41,6 +41,53 @@ static void check_saved_preferences(void){
     CHECK(!second.settings_loaded&&!second.theme&&second.animations_enabled);
 }
 
+
+static QDesktop profile_ui;
+static QStorage profile_storage;
+static uint32_t profile_pixels[800*600],profile_wall[800*600],profile_blur[800*600];
+static uint8_t profile_buffer[65536];
+static void check_profile_wallpaper_ui(void){
+    qfs_init(&profile_storage,0,0);
+    CHECK(qprofiles_create(&profile_storage,"Mira")==0);
+    q_init(&profile_ui,800,600,profile_pixels,profile_wall,profile_blur);
+    q_attach_storage(&profile_ui,&profile_storage,profile_buffer,sizeof(profile_buffer));
+    q_lock(&profile_ui);
+    CHECK(profile_ui.locked&&profile_ui.profile_count==2);
+    int mira=-1;
+    for(int i=0;i<profile_ui.profile_count;i++)if(!strcmp(profile_ui.profiles[i].name,"Mira"))mira=i;
+    CHECK(mira>=0);
+    profile_ui.profile_target=mira;
+    q_key(&profile_ui,'\r',0);
+    CHECK(!profile_ui.locked&&!strcmp(profile_storage.profile,"Mira"));
+    CHECK(!strcmp(profile_ui.file_path,"\\Users\\Mira"));
+    CHECK(qprofiles_set_pin(&profile_storage,"2468")==0);
+    CHECK(q_wallpaper_mode(&profile_ui,1)==0&&profile_ui.wallpaper_mode==1);
+    q_lock(&profile_ui);
+    CHECK(profile_ui.locked);
+    q_key(&profile_ui,'1',0);q_key(&profile_ui,'2',0);q_key(&profile_ui,'3',0);q_key(&profile_ui,'4',0);
+    q_key(&profile_ui,'\r',0);
+    CHECK(profile_ui.locked);
+    for(int i=0;i<4;i++)q_key(&profile_ui,8,0);
+    q_key(&profile_ui,'2',0);q_key(&profile_ui,'4',0);q_key(&profile_ui,'6',0);q_key(&profile_ui,'8',0);
+    q_key(&profile_ui,'\r',0);
+    CHECK(!profile_ui.locked);
+    QDesktop reboot;
+    static uint32_t pixels2[800*600],wall2[800*600],blur2[800*600];
+    q_init(&reboot,800,600,pixels2,wall2,blur2);
+    q_attach_storage(&reboot,&profile_storage,profile_buffer,sizeof(profile_buffer));
+    CHECK(reboot.wallpaper_mode==1&&reboot.settings_loaded==1);
+    uint8_t bmp[70]={0};
+    bmp[0]='B';bmp[1]='M';bmp[10]=54;bmp[14]=40;bmp[18]=2;bmp[22]=2;bmp[26]=1;bmp[28]=24;
+    bmp[54]=255;bmp[55]=0;bmp[56]=0;
+    CHECK(qm_open(&reboot.media,bmp,sizeof(bmp))==0);
+    CHECK(q_wallpaper_photo(&reboot)==0&&reboot.wallpaper_mode==3);
+    CHECK(q_wallpaper_mode(&reboot,0)==0);
+    CHECK(q_wallpaper_mode(&reboot,3)==0);
+    CHECK(reboot.wallpaper_mode==3);
+    size_t count=0;uint8_t saved[80];
+    CHECK(qfs_read(&profile_storage,0,"\\Users\\Mira\\WALLPAPER.QIMG",saved,sizeof(saved),&count)==0&&count==70);
+}
+
 int main(void){
     qfs_init(&storage,0,0);
     q_init(&ui,1280,720,pixels,wallpaper,workspace);
@@ -99,5 +146,6 @@ int main(void){
     CHECK(ui.settings_page==5);
     puts("PASS: Settings navigation, appearance, motion, search, drives and app links");
     check_saved_preferences();
+    check_profile_wallpaper_ui();
     return 0;
 }

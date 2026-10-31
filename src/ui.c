@@ -1042,10 +1042,14 @@ void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capac
     if(storage){
         qprofiles_load(storage);
         q->profile_count=qprofiles_list(storage,q->profiles,QPROFILE_LIMIT);
-        if(q->profile_count<=0){
-            const char *default_name="Default";
-            int i=0;for(;default_name[i];i++)q->profiles[0].name[i]=default_name[i];
-            q->profiles[0].name[i]=0;q->profiles[0].has_pin=0;q->profile_count=1;
+        if(q->profile_count<0)q->profile_count=0;
+        int current_found=0;
+        for(int j=0;j<q->profile_count;j++)
+            if(files_equal(q->profiles[j].name,storage->profile))current_found=1;
+        if(!current_found&&q->profile_count<QPROFILE_LIMIT){
+            QProfile *extra=&q->profiles[q->profile_count++];
+            int i=0;for(;storage->profile[i]&&i<24;i++)extra->name[i]=storage->profile[i];
+            extra->name[i]=0;extra->has_pin=0;
         }
         q->profile_target=0;
         for(int j=0;j<q->profile_count;j++)
@@ -2141,10 +2145,13 @@ static void update_message(QDesktop *q,const char *value){
 static void profile_refresh(QDesktop *q){
     if(!q->storage)return;
     q->profile_count=qprofiles_list(q->storage,q->profiles,QPROFILE_LIMIT);
-    if(q->profile_count<=0){
-        const char *name="Default";int i=0;
-        for(;name[i];i++)q->profiles[0].name[i]=name[i];
-        q->profiles[0].name[i]=0;q->profiles[0].has_pin=0;q->profile_count=1;
+    if(q->profile_count<0)q->profile_count=0;
+    int current_found=0;
+    for(int i=0;i<q->profile_count;i++)if(files_equal(q->profiles[i].name,q->storage->profile))current_found=1;
+    if(!current_found&&q->profile_count<QPROFILE_LIMIT){
+        QProfile *extra=&q->profiles[q->profile_count++];
+        int i=0;for(;q->storage->profile[i]&&i<24;i++)extra->name[i]=q->storage->profile[i];
+        extra->name[i]=0;extra->has_pin=0;
     }
     for(int i=0;i<q->profile_count;i++)
         if(files_equal(q->profiles[i].name,q->storage->profile))q->profile_target=i;

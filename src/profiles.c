@@ -69,8 +69,11 @@ int qprofiles_check_pin(QStorage *s,const char *name,const char *pin){
 }
 int qprofiles_load(QStorage *s){
     if(!s)return -1;
+    if(s->home_index==s->ram_index){
+        if(valid(s->profile)&&(equal(s->profile,"Default")||has_user(s,s->profile)))return 0;
+        assign(s->profile,"Default");return 0;
+    }
     assign(s->profile,"Default");
-    if(s->home_index==s->ram_index)return 0;
     uint8_t name[25]={0};size_t length=0;
     if(qfs_read(s,s->home_index,"\\Users\\ACTIVE.CFG",name,sizeof(name),&length)!=0||
        length<1||length>=sizeof(name))return 0;
