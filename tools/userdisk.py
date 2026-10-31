@@ -24,7 +24,7 @@ def create():
     for index,value in ((0,0xfff8),(1,0xffff),(2,0xffff)):
         struct.pack_into("<H",fat,2*index,value)
     image[RESERVED*512:(RESERVED+FAT_SECTORS)*512]=fat
-    image[(RESERVED+FAT_SECTORS)*512:START*512]=fat
+    image[(RESERVED+FAT_SECTORS)*512:(RESERVED+2*FAT_SECTORS)*512]=fat
     root=(RESERVED+2*FAT_SECTORS)*512
     image[root:root+11]=b"QUSER   DAT"
     image[root+11]=0x20
