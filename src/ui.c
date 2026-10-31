@@ -2026,7 +2026,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     if(q->media_status[0])string_limit(q,x+5,y+w->h-70,q->media_status,muted,0,cw-10,1);
 }
 
-static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About","Network"};
+static const char *settings_pages[Q_SETTINGS_PAGES]={"Home","System","Personalization","Apps","Storage","About","Network","Accounts","Update & Recovery"};
 static int settings_sidebar_width(int width){return clamp(width/4,175,220);}
 static int settings_find(const char *haystack,const char *needle){
     if(!needle[0])return 1;
@@ -2048,11 +2048,13 @@ static int settings_result(QDesktop *q,int page){
     const char *keywords[Q_SETTINGS_PAGES]={
         "welcome quick settings desktop",
         "display resolution motion animation performance",
-        "theme light dark accent color appearance",
+        "theme light dark accent color wallpaper background",
         "installed applications open launch store photos media",
         "drives volumes home files disk",
         "device version hardware system information",
-        "network ethernet adapter mac address link cable"
+        "network ethernet adapter mac address link cable",
+        "users profiles accounts pin password lock login",
+        "install update recovery rollback integrity diagnostics repair"
     };
     return settings_find(keywords[page],q->settings_search);
 }
@@ -2119,9 +2121,156 @@ static void settings_card(QDesktop *q,int x,int y,int w,int h,const char *headin
 static void settings_icon(QDesktop *q,int x,int y,int page){
     uint32_t ink=page==q->settings_page?accent(q):secondary(q);
     circular(q,x,y,13,ink,48);
-    const char *letters[Q_SETTINGS_PAGES]={"H","S","P","A","D","i","N"};
+    const char *letters[Q_SETTINGS_PAGES]={"H","S","P","A","D","i","N","U","R"};
     text(q,x-5,y+5,letters[page],ink,0);
 }
+
+static void profile_message(QDesktop *q,const char *value){
+    int i=0;for(;value[i]&&i<95;i++)q->profile_status[i]=value[i];
+    q->profile_status[i]=0;q->dirty=1;
+}
+static void update_message(QDesktop *q,const char *value){
+    int i=0;for(;value[i]&&i<95;i++)q->update_status[i]=value[i];
+    q->update_status[i]=0;q->dirty=1;
+}
+static void profile_refresh(QDesktop *q){
+    if(!q->storage)return;
+    q->profile_count=qprofiles_list(q->storage,q->profiles,QPROFILE_LIMIT);
+    if(q->profile_count<0)q->profile_count=0;
+    for(int i=0;i<q->profile_count;i++)
+        if(files_equal(q->profiles[i].name,q->storage->profile))q->profile_target=i;
+}
+static void profile_activate(QDesktop *q,const char *name,const char *pin){
+    if(!q->storage||qprofiles_switch(q->storage,name,pin)!=0){
+        profile_message(q,"Incorrect PIN or account unavailable");return;
+    }
+    for(int i=0;i<Q_APPS;i++){q->windows[i].open=0;q->windows[i].minimized=0;q->windows[i].desktop=0;}
+    q->active=-1;q->desktop=0;q->note_length=0;q->notes[0]=0;q->note_path[0]=0;
+    q->note_dirty=0;q->media.playing=0;q->media.kind=QM_NONE;q->media_track_count=0;
+    q->file_clip_count=0;q->terminal_count=0;q->locked=0;
+    q->settings_loaded=0;q->theme=0;q->accent=0;q->wallpaper_mode=0;q->animations_enabled=1;
+    wallpaper(q);
+    q_attach_storage(q,q->storage,q->media_buffer,q->media_capacity);
+    q->scene_tween_active=0;q->scene_tween_pending=0;q->hover_only=0;
+    q->dock_cache_valid=0;q->drag_cache_valid=0;q->glass_cached_app=-1;
+    q->pin_input_len=0;q->pin_input[0]=0;
+    profile_message(q,"");
+    q->dirty=1;
+}
+void q_lock(QDesktop *q){
+    if(!q||!q->storage)return;
+    profile_refresh(q);
+    q->locked=1;q->pin_input_len=0;q->pin_input[0]=0;
+    q->scene_tween_active=0;q->scene_tween_pending=0;
+    close_popups(q);q->dirty=1;q->hover_only=0;
+}
+static void profile_unlock(QDesktop *q){
+    if(q->profile_target<0||q->profile_target>=q->profile_count)return;
+    profile_activate(q,q->profiles[q->profile_target].name,q->pin_input);
+}
+static void profile_edit_submit(QDesktop *q){
+    if(q->profile_edit==1){
+        if(qprofiles_create(q->storage,q->profile_input)==0){
+            profile_refresh(q);
+            profile_message(q,"Account created. Select it on the lock screen");
+        }else profile_message(q,"Could not create account");
+    }else if(q->profile_edit==2){
+        if(qprofiles_set_pin(q->storage,q->profile_input)==0)profile_message(q,"PIN updated");
+        else profile_message(q,"PIN must contain at least four characters");
+        profile_refresh(q);
+    }
+    q->profile_edit=0;q->profile_input_len=0;q->profile_input[0]=0;q->dirty=1;
+}
+static void update_check(QDesktop *q){
+    if(!q->storage||!q->media_buffer){update_message(q,"Storage unavailable");return;}
+    int volume=-1;char path[QFS_PATH];
+    q->update_found=0;
+    if(qupd_find(q->storage,&volume,path,sizeof(path))!=0){
+        update_message(q,"Place QUARTZIE.UPD on a FAT drive or in Downloads");return;
+    }
+    size_t length=0;QUpdate package={0};
+    if(qfs_read(q->storage,volume,path,q->media_buffer,q->media_capacity,&length)!=0||
+       qupd_verify(q->media_buffer,length,&package)!=0){
+        update_message(q,"Update file failed integrity or EFI verification");return;
+    }
+    q->update_source_volume=volume;
+    int j=0;for(;path[j]&&j<QFS_PATH-1;j++)q->update_source_path[j]=path[j];
+    q->update_source_path[j]=0;
+    q->update_target=qupd_target(q->storage,0);q->update_found=1;q->update_confirm=0;
+    update_message(q,q->update_target>=0?"Verified update. Select Install to continue":
+        "Verified update. Writable EFI system disk required");
+}
+static void update_install(QDesktop *q){
+    if(!q->update_found||q->update_target<0){update_message(q,"Check for an update on a writable EFI disk");return;}
+    if(q->update_confirm!=1){q->update_confirm=1;update_message(q,"Select Install again to replace EFI firmware");return;}
+    q->update_confirm=0;
+    if(qupd_apply(q->storage,q->update_target,q->update_source_volume,q->update_source_path,
+                  q->media_buffer,q->media_capacity)==0){
+        q->update_found=0;update_message(q,"Installed and verified. Reboot to start the new version");
+    }else update_message(q,"Install failed. Check backup and writable EFI disk");
+}
+static void update_integrity(QDesktop *q){
+    if(!q->storage||!q->media_buffer)return;
+    int target=qupd_target(q->storage,0);
+    if(target<0){update_message(q,"No writable EFI system disk detected");return;}
+    q->update_target=target;
+    int result=qupd_health(q->storage,target,q->media_buffer,q->media_capacity);
+    update_message(q,result==0?"EFI image and recorded hash verified":"EFI image damaged or integrity check failed");
+}
+static void update_rollback(QDesktop *q){
+    if(!q->storage||!q->media_buffer)return;
+    int target=qupd_target(q->storage,1);
+    if(target<0){update_message(q,"No writable EFI disk with a previous version");return;}
+    if(q->update_confirm!=2){q->update_confirm=2;update_message(q,"Select Roll Back again to restore previous EFI");return;}
+    q->update_confirm=0;
+    int ok=qupd_rollback(q->storage,target,q->media_buffer,q->media_capacity)==0;
+    update_message(q,ok?"Previous firmware restored. Reboot to use it":"Rollback failed. Use recovery media");
+}
+static void update_restore_settings(QDesktop *q){
+    if(!q->storage)return;
+    char original[QFS_PATH],backup[QFS_PATH];
+    if(qfs_profile_path(q->storage,"QUARTZIE.CFG",original,sizeof(original))!=0||
+       qfs_profile_path(q->storage,"QUARTZIE.BAK",backup,sizeof(backup))!=0)return;
+    uint8_t settings[10];size_t len=0;
+    if(qfs_read(q->storage,q->storage->home_index,backup,settings,sizeof(settings),&len)!=0||
+       len!=10||settings[0]!='Q'||settings[1]!='Z'||settings[2]!='P'||settings[3]!='R'||
+       settings[4]!=1||settings[5]>1||settings[6]>7||settings[7]>1||settings[8]>3){
+        update_message(q,"No valid settings backup");return;
+    }
+    if(qfs_write(q->storage,q->storage->home_index,original,settings,len)!=0){
+        update_message(q,"Could not restore settings backup");return;
+    }
+    q->theme=settings[5];q->accent=settings[6];q->animations_enabled=settings[7];
+    q->wallpaper_mode=settings[8];
+    if(q->wallpaper_mode==3){if(wallpaper_saved(q)!=0){q->wallpaper_mode=0;wallpaper(q);}}
+    else wallpaper(q);
+    q->dock_cache_valid=0;q->drag_cache_valid=0;q->glass_cached_app=-1;q->dirty=1;
+    update_message(q,"Previous appearance settings restored");
+}
+static void draw_lock_screen(QDesktop *q){
+    if(!q->locked)return;
+    for(int y=0;y<q->height;y++)for(int x=0;x<q->width;x++){
+        size_t at=(size_t)y*q->width+x;
+        q->pixels[at]=blend(q->wallpaper[at],0x071522,165);
+    }
+    int x=q->width/2-225,y=q->height/2-180;
+    pane(q,x,y,450,362,22,material(q),224);
+    text(q,x+33,y+55,"Quartzie",foreground(q),2);
+    const char *name=q->storage?q->storage->profile:"Default";
+    if(q->profile_target>=0&&q->profile_target<q->profile_count)name=q->profiles[q->profile_target].name;
+    string_limit(q,x+36,y+111,name,foreground(q),2,365,1);
+    text(q,x+36,y+155,q->profile_count>1?"Previous user  <       >  Next user":"",secondary(q),0);
+    surface(q,x+35,y+186,380,49,12,inner_material(q),205);
+    if(q->pin_input_len){
+        char marks[26];int n=0;
+        for(;n<q->pin_input_len;n++)marks[n]='*';
+        marks[n]=0;text(q,x+53,y+218,marks,foreground(q),1);
+    }else text(q,x+53,y+218,"Account PIN",secondary(q),0);
+    surface(q,x+35,y+250,380,49,12,colors(q)->selected,195);
+    text(q,x+175,y+282,"Unlock",foreground(q),1);
+    if(q->profile_status[0])string_limit(q,x+35,y+330,q->profile_status,secondary(q),0,382,1);
+}
+
 static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     int side=settings_sidebar_width(cw);
     int left=x+side+25;
@@ -2142,14 +2291,14 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.43.1",secondary(q),0);
+    if(w->h>=700)text(q,x+21,y+w->h-113,"Quartzie 0.44.0",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
         for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){
             int yy=y+76+row*75;
             if(yy+67>y+w->h-76)break;
-            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and theme","Installed applications","Volumes and drives","Device information","Network interfaces"};
+            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and wallpapers","Installed applications","Volumes and drives","Device information","Network interfaces","User profiles and screen lock","Firmware installation and recovery"};
             settings_card(q,left,yy,width,66,settings_pages[i],subtitles[i],1);
             row++;
         }
@@ -2165,7 +2314,9 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         "Open your applications",
         "Manage local storage",
         "Device information",
-        "Network adapters and link status"
+        "Network adapters and link status",
+        "User accounts and sign-in",
+        "Updates, integrity and recovery"
     };
     text(q,left,y+69,subtitles[page],secondary(q),0);
     if(page==0){
@@ -2200,16 +2351,24 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         }
         surface(q,left,y+230,width,116,18,inner_material(q),q->theme?124:166);
         text(q,left+20,y+263,"Accent color",foreground(q),1);
-        const uint32_t accents[4]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85};
-        for(int i=0;i<4;i++){
-            int cx=left+44+i*61;
-            circular(q,cx,y+307,18,accents[i],255);
+        const uint32_t accents[8]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85,0xef709a,0xe8ca70,0x69a6ff,0xadaee7};
+        for(int i=0;i<8;i++){
+            int cx=left+44+(i%4)*61,cy=y+307+(i/4)*44;
+            circular(q,cx,cy,18,accents[i],255);
             if(i==q->accent){
-                circular(q,cx,y+307,8,0xffffff,226);
-                circular(q,cx,y+307,4,accents[i],255);
+                circular(q,cx,cy,8,0xffffff,226);
+                circular(q,cx,cy,4,accents[i],255);
             }
         }
-        if(w->h>=550)settings_card(q,left,y+358,width,72,"Window animations","Change motion in System",1);
+        text(q,left+4,y+400,"Background",foreground(q),1);
+        const char *styles[4]={"Quartz","Sunset","Mint","My photo"};
+        for(int i=0;i<4;i++){
+            int xx=left+i*118,yy=y+416;
+            if(xx+112>left+width)break;
+            surface(q,xx,yy,112,47,11,q->wallpaper_mode==i?colors(q)->selected:inner_material(q),q->theme?188:157);
+            text(q,xx+10,yy+30,styles[i],foreground(q),0);
+        }
+        if(w->h>=570)settings_card(q,left,y+473,width,58,"Set a photo as wallpaper","Open Photos and select Set wallpaper",1);
     }else if(page==3){
         const int apps[5]={Q_FILES,Q_NOTES,Q_PHOTOS,Q_MEDIA,Q_STORE};
         const char *descriptions[5]={"Browse your drives","Edit text files","View pictures","Play audio and video","Explore available apps"};
@@ -2253,6 +2412,31 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
             }
         }
         text(q,left+5,y+w->h-109,"Select a drive to browse it in Files.",secondary(q),0);
+    }else if(page==7){
+        settings_card(q,left,y+92,width,76,"Signed in",q->storage?q->storage->profile:"Default",0);
+        text(q,left+5,y+196,"Accounts",foreground(q),1);
+        for(int i=0;i<q->profile_count&&i<5;i++){
+            int yy=y+211+i*43;
+            surface(q,left+2,yy,width-4,38,11,q->profile_target==i?colors(q)->selected:inner_material(q),165);
+            string_limit(q,left+19,yy+26,q->profiles[i].name,foreground(q),0,width-120,1);
+            text(q,left+width-90,yy+25,q->profiles[i].has_pin?"PIN":"No PIN",secondary(q),0);
+        }
+        surface(q,left+2,y+446,175,41,11,inner_material(q),175);
+        text(q,left+15,y+472,"Create account",foreground(q),0);
+        surface(q,left+185,y+446,175,41,11,inner_material(q),175);
+        text(q,left+202,y+472,"Set account PIN",foreground(q),0);
+        surface(q,left+2,y+499,176,41,11,colors(q)->selected,185);
+        text(q,left+27,y+525,"Lock screen",foreground(q),0);
+        if(q->profile_edit){
+            surface(q,left+189,y+499,width-191,41,11,inner_material(q),185);
+            string_limit(q,left+202,y+525,q->profile_input_len?q->profile_input:"Type and press Enter",foreground(q),0,width-211,1);
+        }
+        if(q->profile_status[0])string_limit(q,left+7,y+560,q->profile_status,secondary(q),0,width-12,1);
+    }else if(page==8){
+        const char *actions[]={"Check for updates","Install verified update","Verify EFI integrity","Roll back firmware","Restore appearance settings"};
+        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Check the boot binary and its saved hash","Restore the saved previous version","Recover the last saved configuration"};
+        for(int i=0;i<5;i++)settings_card(q,left,y+92+i*88,width,78,actions[i],descs[i],1);
+        if(q->update_status[0])string_limit(q,left+5,y+549,q->update_status,secondary(q),0,width-10,1);
     }else if(page==6){
         text(q,left+5,y+112,"Detected network interfaces",foreground(q),1);
         if(!q->network||!q->network->count)
@@ -2311,14 +2495,14 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
         case 2:{
             int button=(width-48)/2;
             for(int i=0;i<2;i++)if(hit(x,y,left+19+i*(button+10),by+144,button,52)){q_set_theme(q,i);return;}
-            for(int i=0;i<4;i++){
-                int cx=left+44+i*61;
-                if(hit(x,y,cx-22,by+285,44,44)){
-                    q_set_accent(q,i);
-                    return;
-                }
+            for(int i=0;i<8;i++){
+                int cx=left+44+(i%4)*61,cy=by+307+(i/4)*44;
+                if(hit(x,y,cx-22,cy-22,44,44)){q_set_accent(q,i);return;}
             }
-            if(w->h>=550&&hit(x,y,left,by+358,width,72)){settings_navigate(q,1);return;}
+            for(int i=0;i<4;i++)if(hit(x,y,left+i*118,by+416,112,47)){
+                if(q_wallpaper_mode(q,i)!=0)profile_message(q,"No saved photo wallpaper");return;
+            }
+            if(w->h>=570&&hit(x,y,left,by+473,width,58)){q_open(q,Q_PHOTOS);return;}
             break;
         }
         case 3:{
@@ -2326,6 +2510,30 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
             int row_h=clamp((w->h-230)/5,45,64);
             for(int i=0;i<5;i++)if(hit(x,y,left,by+92+i*(row_h+9),width,row_h)){
                 q_open(q,apps[i]);return;
+            }
+            break;
+        }
+        case 7:{
+            if(hit(x,y,left+2,by+446,175,41)){
+                q->profile_edit=1;q->profile_input_len=0;q->profile_input[0]=0;q->dirty=1;return;
+            }
+            if(hit(x,y,left+185,by+446,175,41)){
+                q->profile_edit=2;q->profile_input_len=0;q->profile_input[0]=0;q->dirty=1;return;
+            }
+            if(hit(x,y,left+2,by+499,176,41)){q_lock(q);return;}
+            for(int i=0;i<q->profile_count&&i<5;i++)if(hit(x,y,left+2,by+211+i*43,width-4,38)){
+                q->profile_target=i;q_lock(q);return;
+            }
+            break;
+        }
+        case 8:{
+            for(int i=0;i<5;i++)if(hit(x,y,left,by+92+i*88,width,78)){
+                if(i==0)update_check(q);
+                if(i==1)update_install(q);
+                if(i==2)update_integrity(q);
+                if(i==3)update_rollback(q);
+                if(i==4)update_restore_settings(q);
+                return;
             }
             break;
         }
@@ -2816,6 +3024,7 @@ void q_draw(QDesktop *q){
     }
     q->hover_only=0;
     q->hover_last=q->hover;
+    if(q->locked){clip_full(q);draw_lock_screen(q);q->damage_valid=0;}
     q->frame_count++;
     q->dirty=0;
 }
@@ -3263,6 +3472,15 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
 }
 void q_click(QDesktop *q,int x,int y){
     q->hover_only=0;
+    if(q->locked){
+        int bx=q->width/2-225,by=q->height/2-180;
+        if(q->profile_count>1&&hit(x,y,bx+33,by+130,390,42)){
+            q->profile_target=(q->profile_target+(x<bx+225?q->profile_count-1:1))%q->profile_count;
+            q->pin_input_len=0;q->pin_input[0]=0;profile_message(q,"");return;
+        }
+        if(hit(x,y,bx+35,by+250,380,49))profile_unlock(q);
+        return;
+    }
     if(q->desktop_view){
         int vx=clamp((q->width-522)/2,5,q->width-522),vy=dock_y(q)-173;
         for(int i=0;i<3;i++)if(hit(x,y,vx+16+i*169,vy+43,155,98)){
@@ -3506,6 +3724,28 @@ void q_move(QDesktop *q,int x,int y){
 }
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     q->hover_only=0;
+    if(q->locked){
+        if(ch=='\r'){profile_unlock(q);return;}
+        if(ch==8&&q->pin_input_len){q->pin_input[--q->pin_input_len]=0;q->dirty=1;return;}
+        if((scan==3||scan==4)&&q->profile_count>1){
+            q->profile_target=(q->profile_target+(scan==3?1:q->profile_count-1))%q->profile_count;
+            q->pin_input_len=0;q->pin_input[0]=0;q->dirty=1;return;
+        }
+        if(ch>=32&&ch<=126&&q->pin_input_len<24){
+            q->pin_input[q->pin_input_len++]=(char)ch;q->pin_input[q->pin_input_len]=0;q->dirty=1;
+        }
+        return;
+    }
+    if(q->active==Q_SETTINGS&&q->profile_edit){
+        if(ch==27){q->profile_edit=0;q->dirty=1;return;}
+        if(ch=='\r'){profile_edit_submit(q);return;}
+        if(ch==8&&q->profile_input_len)q->profile_input[--q->profile_input_len]=0;
+        else if(ch>=32&&ch<=126&&q->profile_input_len<24){
+            q->profile_input[q->profile_input_len++]=(char)ch;q->profile_input[q->profile_input_len]=0;
+        }
+        q->dirty=1;return;
+    }
+    if(ch==12){q_lock(q);return;}
     if(q->active==Q_FILES&&q->file_operation){
         if(ch==27||scan==23){q->file_operation=0;q->dirty=1;return;}
         if(ch==8){if(q->file_input_length)q->file_input[--q->file_input_length]=0;q->dirty=1;return;}
