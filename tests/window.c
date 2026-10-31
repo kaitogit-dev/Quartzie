@@ -20,6 +20,48 @@ static void same_as_full(void){
 }
 
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"FAIL window line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
+
+static void check_snap_and_desktop(void){
+    q_init(&ui,1280,720,canvas,background,blurred);
+    q_open(&ui,Q_NOTES);
+    QWindow *w=&ui.windows[Q_NOTES];
+    QWindow initial=*w;
+    q_snap_window(&ui,Q_NOTES,1);
+    CHECK(w->snap_zone==1&&w->x==8&&w->w==632&&w->h==615);
+    q_snap_window(&ui,Q_NOTES,2);
+    CHECK(w->x==640&&w->w==632);
+    q_snap_window(&ui,Q_NOTES,6);
+    CHECK(w->x==640&&w->y==315&&w->h==308);
+    q_snap_window(&ui,Q_NOTES,0);
+    CHECK(!w->snap_zone&&w->x==initial.x&&w->y==initial.y&&w->w==initial.w);
+    q_snap_window(&ui,Q_NOTES,1);
+    q_key(&ui,0,21);
+    CHECK(w->maximized&&!w->snap_zone);
+    q_key(&ui,0,21);
+    CHECK(!w->maximized&&w->x==initial.x&&w->w==initial.w);
+    q_open(&ui,Q_FILES);
+    q_switch_desktop(&ui,1);
+    CHECK(ui.active==-1&&ui.desktop==1);
+    q_open(&ui,Q_TERMINAL);
+    CHECK(ui.windows[Q_TERMINAL].desktop==1);
+    q_move_to_desktop(&ui,Q_NOTES,1);
+    q_key(&ui,9,0);
+    CHECK(ui.active==Q_NOTES);
+    q_switch_desktop(&ui,0);
+    CHECK(ui.active==Q_FILES);
+    q_open(&ui,Q_NOTES);
+    CHECK(ui.active==Q_NOTES&&ui.desktop==1);
+    q_snap_window(&ui,Q_NOTES,1);
+    q_press(&ui,w->x+155,w->y+28);
+    q_move(&ui,530,230);
+    q_release(&ui);
+    CHECK(w->snap_zone==0&&w->w==initial.w);
+    q_press(&ui,w->x+125,w->y+25);
+    q_move(&ui,1,340);
+    q_release(&ui);
+    CHECK(w->snap_zone==1);
+}
+
 int main(void){
     q_init(&ui,1920,1080,canvas,background,blur);
     q_drag_buffers(&ui,drag);
@@ -115,5 +157,6 @@ int main(void){
     CHECK(ui.damage_valid);
     same_as_full();
     puts("PASS: dock toggle, focus, maximize, drag-to-top, drag-to-restore, theme fill, and hover");
+    check_snap_and_desktop();
     return 0;
 }

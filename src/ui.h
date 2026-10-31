@@ -24,11 +24,13 @@
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
+    int desktop,snap_zone;
 } QWindow;
 typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
     int menu,notifications,quick,active,drag,drag_x,drag_y;
     int pressed,last_button,frame_count,hover;
+    int desktop,desktop_view,snap_menu_app;
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
     int terminal_volume,terminal_count,photo_zoom,store_page;
@@ -96,5 +98,8 @@ void q_move(QDesktop *q,int x,int y);
 void q_key(QDesktop *q,uint16_t ch,uint16_t scan);
 void q_set_theme(QDesktop *q,int dark);
 void q_open(QDesktop *q,int app);
+void q_switch_desktop(QDesktop *q,int desktop);
+void q_move_to_desktop(QDesktop *q,int app,int desktop);
+void q_snap_window(QDesktop *q,int app,int zone);
 int q_dock_hit(QDesktop *q,int x,int y);
 #endif

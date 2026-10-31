@@ -12,7 +12,7 @@ make verify
 make release
 ```
 
-The release artifacts are `Quartzie-0.42.0-x64.iso` and `Quartzie-0.42.0-x64.img`. GitHub Actions builds and tests both boot formats and publishes them as workflow artifacts.
+The release artifacts are `Quartzie-0.42.1-x64.iso` and `Quartzie-0.42.1-x64.img`. GitHub Actions builds and tests both boot formats and publishes them as workflow artifacts.
 
 ## Boot
 
@@ -21,7 +21,7 @@ Boot the ISO with x86-64 QEMU and OVMF:
 ```sh
 qemu-system-x86_64 -machine q35 -m 512 -vga std \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.42.0-x64.iso -usb -device usb-tablet
+  -cdrom Quartzie-0.42.1-x64.iso -usb -device usb-tablet
 ```
 
 For Windows QEMU, use `tools/run-windows.ps1`.
@@ -54,7 +54,7 @@ The boot volume includes `PHOTO.BMP`, `SOUND.WAV`, and `CLIP.AVI` as viewer test
 The boot volume includes `QSTART.EXE`. To replace it with an AMD64 PE32+ executable:
 
 ```sh
-python3 tools/replace_app.py Quartzie-0.42.0-x64.iso program.exe Quartzie-custom.iso
+python3 tools/replace_app.py Quartzie-0.42.1-x64.iso program.exe Quartzie-custom.iso
 ```
 
 The loader implements relocation, import resolution by name and ordinal, and PE export lookup. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`. This is a targeted compatibility layer, not a complete Win32 environment.
@@ -68,4 +68,4 @@ The loader implements relocation, import resolution by name and ordinal, and PE 
 
 The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`. Media codec notices are in `LICENSES/media-codecs.txt`.
 
-Persistent user files use `Quartzie-0.42.0-userdata.img`, a writable FAT16 volume included with each build. Attach it as a USB mass-storage disk alongside the ISO. Quartzie discovers it from its volume marker and creates `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, and Videos. Reuse the same data disk between boots to retain files. `tools/run-windows.ps1` attaches the data disk automatically. Without this disk Quartzie falls back to temporary Home RAM.
+Persistent user files use `Quartzie-0.42.1-userdata.img`, a writable FAT16 volume included with each build. Attach it as a USB mass-storage disk alongside the ISO. Quartzie discovers it from its volume marker and creates `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, and Videos. Reuse the same data disk between boots to retain files. `tools/run-windows.ps1` attaches the data disk automatically. Without this disk Quartzie falls back to temporary Home RAM.

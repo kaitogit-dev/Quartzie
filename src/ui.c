@@ -437,7 +437,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
     q->file_view=1;q->file_nav=1;q->file_extensions=1;q->file_clip_volume=-1;q->file_history_index=-1;
     q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
-    q->task_selected=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
+    q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
@@ -456,6 +456,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
 static void close_popups(QDesktop *q){
     q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;
     q->menu_search_length=0;q->menu_search[0]=0;
+    q->desktop_view=0;q->snap_menu_app=-1;
 }
 void q_set_theme(QDesktop *q,int dark){
     dark=dark!=0;
@@ -598,9 +599,11 @@ void q_open(QDesktop *q,int app){
     int z=0;for(int i=0;i<Q_APPS;i++)if(q->windows[i].z>z)z=q->windows[i].z;
     if(z>10000){for(int i=0;i<Q_APPS;i++)q->windows[i].z=i+1;z=Q_APPS;}
     int was_hidden=!q->windows[app].open||q->windows[app].minimized;
+    if(q->windows[app].open&&q->windows[app].desktop!=q->desktop)q_switch_desktop(q,q->windows[app].desktop);
     q->windows[app].open=1;q->windows[app].minimized=0;q->windows[app].z=z+1;q->active=app;
     if(was_hidden){
         QWindow *w=&q->windows[app];
+        if(w->z==z+1&&w->desktop!=q->desktop)w->desktop=q->desktop;
         start_tween(q,app,1,w->x+12,w->y+20,w->w-24,w->h-40);
         begin_scene_tween(q,1);
     }
@@ -695,7 +698,7 @@ static void draw_quick(QDesktop *q){
 }
 static void focus_remaining(QDesktop *q){
     q->active=-1;
-    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&
+    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
        (q->active<0||q->windows[i].z>q->windows[q->active].z))q->active=i;
 }
 static void close_window(QDesktop *q,int app){
@@ -703,7 +706,11 @@ static void close_window(QDesktop *q,int app){
         QWindow *w=&q->windows[app];
         w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;
     }
-    q->windows[app].open=0;q->windows[app].minimized=0;q->windows[app].maximized=0;
+    if(q->windows[app].snap_zone){
+        QWindow *w=&q->windows[app];
+        w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;
+    }
+    q->windows[app].snap_zone=0;q->windows[app].open=0;q->windows[app].minimized=0;q->windows[app].maximized=0;
     q->windows[app].tween_kind=0;
     q->dock_pulse[app]=q->animations_enabled?256:0;
     begin_scene_tween(q,4);
@@ -720,7 +727,8 @@ static void maximize_window(QDesktop *q,int app){
     QWindow *w=&q->windows[app];
     int from_x=w->x,from_y=w->y,from_w=w->w,from_h=w->h;
     if(!w->maximized){
-        w->restore_x=w->x;w->restore_y=w->y;w->restore_w=w->w;w->restore_h=w->h;
+        if(!w->snap_zone){w->restore_x=w->x;w->restore_y=w->y;w->restore_w=w->w;w->restore_h=w->h;}
+        w->snap_zone=0;
         w->x=0;w->y=0;w->w=q->width;w->h=q->height;w->maximized=1;
     }else{
         w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;w->maximized=0;
@@ -728,6 +736,58 @@ static void maximize_window(QDesktop *q,int app){
     start_tween(q,app,2,from_x,from_y,from_w,from_h);
     begin_scene_tween(q,2);
     q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
+}
+
+
+void q_snap_window(QDesktop *q,int app,int zone){
+    if(!q||app<0||app>=Q_APPS||!q->windows[app].open||zone<0||zone>6)return;
+    QWindow *w=&q->windows[app];
+    if(!zone){
+        if(!w->snap_zone&&!w->maximized)return;
+        w->x=w->restore_x;w->y=w->restore_y;w->w=w->restore_w;w->h=w->restore_h;
+        w->snap_zone=0;w->maximized=0;
+    }else{
+        if(!w->snap_zone&&!w->maximized){
+            w->restore_x=w->x;w->restore_y=w->y;
+            w->restore_w=w->w;w->restore_h=w->h;
+        }
+        int left=8,top=8,width=q->width-16,height=q->height-105;
+        if(width<400)width=q->width;
+        if(height<240)height=q->height-24;
+        int half=width/2,mid=height/2;
+        w->x=left+((zone==2||zone==4||zone==6)?half:0);
+        w->y=top+((zone==5||zone==6)?mid:0);
+        w->w=(zone==1||zone==3||zone==5)?half:width-half;
+        w->h=zone<=2?height:(zone<=4?mid:height-mid);
+        w->maximized=0;w->snap_zone=zone;
+    }
+    w->tween_kind=0;
+    q->snap_menu_app=-1;q->drag_cache_valid=0;q->glass_cached_app=-1;
+    q->dock_cache_valid=0;q->hover_only=0;q->dirty=1;
+}
+void q_switch_desktop(QDesktop *q,int desktop){
+    if(!q||desktop<0||desktop>2)return;
+    q->desktop=desktop;q->desktop_view=0;q->snap_menu_app=-1;
+    q->scene_tween_active=0;q->scene_tween_pending=0;
+    q->drag=-1;q->pressed=0;q->drag_cache_valid=0;
+    q->glass_cached_app=-1;q->dock_cache_valid=0;
+    focus_remaining(q);
+    q->hover_only=0;q->dirty=1;
+}
+void q_move_to_desktop(QDesktop *q,int app,int desktop){
+    if(!q||desktop<0||desktop>2||app<0||app>=Q_APPS||!q->windows[app].open)return;
+    q->windows[app].desktop=desktop;
+    if(q->active==app)focus_remaining(q);
+    q->scene_tween_active=0;q->scene_tween_pending=0;
+    q->desktop_view=0;q->drag_cache_valid=0;q->dock_cache_valid=0;q->glass_cached_app=-1;
+    q->hover_only=0;q->dirty=1;
+}
+static void cycle_window(QDesktop *q){
+    int best=-1,best_z=-1;
+    for(int i=0;i<Q_APPS;i++)if(i!=q->active&&q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop){
+        if(q->windows[i].z>best_z){best=i;best_z=q->windows[i].z;}
+    }
+    if(best>=0)q_open(q,best);
 }
 
 void q_attach_kernel(QDesktop *q,QNtKernel *kernel,int (*terminate_process)(QNtKernel *,uint32_t)){
@@ -1830,7 +1890,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.42.0",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.42.1",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -1963,7 +2023,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
         text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
     }else{
-        text(q,x,y+45,"Quartzie 0.42.0",ink,2);
+        text(q,x,y+45,"Quartzie 0.42.1",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
@@ -1977,7 +2037,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
 static void prepare_window_glass(QDesktop *q,int app,QWindow *w);
 static void draw_window(QDesktop *q,int app){
     QWindow *w=&q->windows[app];
-    if(!w->open||w->minimized)return;
+    if(!w->open||w->minimized||w->desktop!=q->desktop)return;
     int previous_render_app=q->render_app;
     q->render_app=app;
     prepare_window_glass(q,app,w);
@@ -2024,7 +2084,7 @@ static void draw_base(QDesktop *q,int skip){
     int drawn[Q_APPS]={0};
     for(int layer=0;layer<Q_APPS;layer++){
         int app=-1;
-        for(int i=0;i<Q_APPS;i++)if(i!=skip&&!drawn[i]&&q->windows[i].open&&!q->windows[i].minimized&&(app<0||q->windows[i].z<q->windows[app].z))app=i;
+        for(int i=0;i<Q_APPS;i++)if(i!=skip&&!drawn[i]&&q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&(app<0||q->windows[i].z<q->windows[app].z))app=i;
         if(app<0)break;
         drawn[app]=1;draw_window(q,app);
     }
@@ -2777,7 +2837,7 @@ void q_click(QDesktop *q,int x,int y){
         q->quick=0;q->dirty=1;
     }
     int chosen=-1;
-    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h)&&
+    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h)&&
         (chosen<0||q->windows[i].z>q->windows[chosen].z))chosen=i;
     if(chosen>=0&&chosen<Q_APPS){
         QWindow *w=&q->windows[chosen];
@@ -2853,7 +2913,13 @@ void q_release(QDesktop *q){
     if(q->drag>=0){
         int app=q->drag;
         q->drag=-1;
-        if(q->drag_moved&&!q->windows[app].maximized&&q->mouse_y<=16)maximize_window(q,app);
+        if(q->drag_moved&&!q->windows[app].maximized){
+            int zone=0;
+            if(q->mouse_x<=16)zone=q->mouse_y<70?3:q->mouse_y>q->height-70?5:1;
+            else if(q->mouse_x>=q->width-17)zone=q->mouse_y<70?4:q->mouse_y>q->height-70?6:2;
+            if(zone)q_snap_window(q,app,zone);
+            else if(q->mouse_y<=16)maximize_window(q,app);
+        }
         q->dirty=1;q->drag_cache_valid=0;q->glass_cached_app=-1;
     }
     q->drag=-1;
@@ -2864,12 +2930,12 @@ void q_move(QDesktop *q,int x,int y){
         QWindow *w=&q->windows[q->drag];
         int dx=q->mouse_x-q->drag_start_x,dy=q->mouse_y-q->drag_start_y;
         if(dx>8||dx< -8||dy>8||dy< -8)q->drag_moved=1;
-        if(w->maximized){
+        if(w->maximized||w->snap_zone){
             if(!q->drag_moved)return;
-            int anchor_x=(int)((int64_t)q->drag_start_x*w->restore_w/q->width);
+            int anchor_x=(int)((int64_t)(q->drag_start_x-w->x)*w->restore_w/w->w);
             w->w=w->restore_w;w->h=w->restore_h;
             w->x=clamp(q->mouse_x-anchor_x,0,q->width-w->w);
-            w->y=12;w->maximized=0;
+            w->y=12;w->maximized=0;w->snap_zone=0;
             q->drag_x=anchor_x;q->drag_y=28;
             q->dirty=1;q->hover_only=0;
             q->drag_cache_valid=0;q->glass_cached_app=-1;
@@ -2947,6 +3013,9 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         if(ch==22){files_paste(q);return;}
         if(scan==8){files_delete_selected(q);return;}
     }
+    if(ch==9){cycle_window(q);return;}
+    if(scan==24){q_switch_desktop(q,(q->desktop+2)%3);return;}
+    if(scan==25){q_switch_desktop(q,(q->desktop+1)%3);return;}
     if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
         q->settings_search_length=0;q->settings_search[0]=0;q->dirty=1;return;
     }
