@@ -45,7 +45,7 @@ build/store-test.qapp: tools/make_store_sample.py tools/qapp.py | build
 build/native-test.qapp: build/winapp.exe tools/qapp.py | build
 	$(PYTHON) tools/qapp.py pack build/winapp.exe -o $@ --name "Quartzie Test" --id quartzie.testapp --version 1.0
 build/profiles-test: tests/profiles.c src/profiles.c src/profiles.h src/package.c src/storage.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/profiles.c src/profiles.c src/package.c src/storage.c src/profiles.c src/update.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/profiles.c src/profiles.c src/package.c src/storage.c -o $@
 build/update-test: tests/update.c src/update.c src/update.h src/package.c src/storage.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/update.c src/update.c src/package.c src/storage.c -o $@
 build/trash-test: tests/trash.c src/trash.c src/storage.c src/trash.h src/storage.h | build
