@@ -197,7 +197,7 @@ int qfs_home_setup(QStorage *s){
         "\\Users","\\Users\\Default","\\Users\\Default\\Desktop",
         "\\Users\\Default\\Documents","\\Users\\Default\\Downloads",
         "\\Users\\Default\\Pictures","\\Users\\Default\\Music",
-        "\\Users\\Default\\Videos"
+        "\\Users\\Default\\Videos","\\Users\\Default\\Applications"
     };
     QFsEntry item;
     for(size_t i=0;i<sizeof(folders)/sizeof(folders[0]);i++){

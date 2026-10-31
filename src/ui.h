@@ -5,6 +5,7 @@
 #include "storage.h"
 #include "media.h"
 #include "ntcore.h"
+#include "package.h"
 #define Q_MAX_W 1920
 #define Q_MAX_H 1080
 #define Q_UI_SCRATCH_PIXELS (4*((Q_MAX_W/4+16)*(Q_MAX_H/4+16))+3*Q_MAX_W*Q_MAX_H)
@@ -34,6 +35,10 @@ typedef struct {
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
     int terminal_volume,terminal_count,photo_zoom,store_page;
+    int store_view,store_pending,store_source_volume,store_installed_count,store_confirm_remove;
+    QPackage store_info;
+    QFsEntry store_installed[24];
+    char store_source_path[QFS_PATH],store_status[96];
     int task_tab,task_selected,task_scroll;
     uint32_t task_refresh_us;
     uint64_t uptime_us;

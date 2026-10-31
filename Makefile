@@ -1,4 +1,4 @@
-VERSION = 0.42.1
+VERSION = 0.42.2
 CC = clang
 LINK = lld-link
 PYTHON = python3
@@ -53,7 +53,7 @@ Quartzie-x64-uefi.img: build/esp.img tools/gpt.py
 Quartzie-x64.iso: build/esp-iso.img tools/iso.py
 	$(PYTHON) tools/iso.py $< $@
 build/ui-test: tests/ui.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ui.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ui.c src/ui.c src/storage.c src/media.c src/codecs.c src/package.c build/font.c build/icons.c -o $@
 build/ps2-test: tests/ps2.c src/ps2.c src/ps2.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/ps2.c src/ps2.c -o $@
 build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build

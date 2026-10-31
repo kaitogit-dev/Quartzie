@@ -437,7 +437,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->clip_left=0;q->clip_top=0;q->clip_right=w;q->clip_bottom=h;
     q->file_view=1;q->file_nav=1;q->file_extensions=1;q->file_clip_volume=-1;q->file_history_index=-1;
     q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
-    q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
+    q->store_confirm_remove=-1;q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
@@ -999,6 +999,74 @@ static int file_suffix(const char *name,const char *suffix){
     }
     return 1;
 }
+static const char *store_directory(QDesktop *q){
+    return q->storage&&q->storage->home_index!=q->storage->ram_index?
+        "\\Users\\Default\\Applications":0;
+}
+static void store_message(QDesktop *q,const char *message){
+    int i=0;
+    for(;message[i]&&i<(int)sizeof(q->store_status)-1;i++)q->store_status[i]=message[i];
+    q->store_status[i]=0;q->dirty=1;
+}
+static void store_refresh(QDesktop *q){
+    q->store_installed_count=0;
+    const char *directory=store_directory(q);
+    if(!directory)return;
+    int count=qfs_list(q->storage,q->storage->home_index,directory,q->store_installed,24);
+    if(count<0)return;
+    int out=0;
+    for(int i=0;i<count;i++)if(!q->store_installed[i].directory&&file_suffix(q->store_installed[i].name,".qapp"))
+        q->store_installed[out++]=q->store_installed[i];
+    q->store_installed_count=out;
+}
+static void store_import(QDesktop *q,int volume,const char *path){
+    if(!q->storage||!q->media_buffer||!q->media_capacity){files_message(q,"Package storage unavailable");return;}
+    q->media.playing=0;q->media.kind=QM_NONE;
+    size_t length=0;QPackage info={0};
+    if(qfs_read(q->storage,volume,path,q->media_buffer,q->media_capacity,&length)!=0||
+       qpkg_verify(q->media_buffer,length,&info)!=0){
+        files_message(q,"Invalid, corrupt or oversized QApp package");return;
+    }
+    q->store_info=info;q->store_source_volume=volume;
+    int i=0;for(;path[i]&&i<QFS_PATH-1;i++)q->store_source_path[i]=path[i];
+    q->store_source_path[i]=0;q->store_pending=1;q->store_view=1;
+    store_message(q,"Verified package ready to install");
+    q_open(q,Q_STORE);
+}
+static void store_install(QDesktop *q){
+    const char *directory=store_directory(q);
+    if(!directory){store_message(q,"Attach persistent Home storage to install");return;}
+    char filename[96],target[QFS_PATH];
+    int i=0;
+    for(;q->store_info.id[i]&&i<78;i++)filename[i]=q->store_info.id[i];
+    filename[i++]='.';filename[i++]='q';filename[i++]='a';filename[i++]='p';filename[i++]='p';filename[i]=0;
+    if(qfs_join(target,sizeof(target),directory,filename)!=0){store_message(q,"Invalid package identifier");return;}
+    size_t length=0;QPackage verified={0};
+    if(qfs_read(q->storage,q->store_source_volume,q->store_source_path,q->media_buffer,q->media_capacity,&length)!=0||
+       qpkg_verify(q->media_buffer,length,&verified)!=0||!files_equal(verified.id,q->store_info.id)){
+        store_message(q,"Source package changed or verification failed");return;
+    }
+    if(qfs_copy(q->storage,q->store_source_volume,q->store_source_path,q->storage->home_index,target)!=0){
+        store_message(q,"Already installed or unable to write package");return;
+    }
+    QPackage installed={0};size_t installed_length=0;
+    if(qfs_read(q->storage,q->storage->home_index,target,q->media_buffer,q->media_capacity,&installed_length)!=0||
+       qpkg_verify(q->media_buffer,installed_length,&installed)!=0||!files_equal(installed.id,verified.id)){
+        qfs_delete(q->storage,q->storage->home_index,target);
+        store_message(q,"Package installation verification failed");return;
+    }
+    q->store_pending=0;q->store_confirm_remove=-1;store_refresh(q);
+    store_message(q,"Package installed and verified");
+}
+static void store_remove(QDesktop *q,int index){
+    if(index<0||index>=q->store_installed_count||!store_directory(q))return;
+    if(q->store_confirm_remove!=index){q->store_confirm_remove=index;q->dirty=1;return;}
+    char path[QFS_PATH];
+    if(qfs_join(path,sizeof(path),store_directory(q),q->store_installed[index].name)!=0||
+       qfs_delete(q->storage,q->storage->home_index,path)!=0){store_message(q,"Could not remove package");return;}
+    q->store_confirm_remove=-1;store_refresh(q);store_message(q,"Package removed");
+}
+
 static void files_open(QDesktop *q,int index){
     if(index<0||index>=q->file_count)return;
     QFsEntry *entry=&q->files[index];
@@ -1008,6 +1076,7 @@ static void files_open(QDesktop *q,int index){
     if(entry->directory){
         files_go(q,q->file_volume,path,1);return;
     }
+    if(file_suffix(entry->name,".qapp")){store_import(q,q->file_volume,path);return;}
     if(file_suffix(entry->name,".txt")||file_suffix(entry->name,".log")||file_suffix(entry->name,".md")){
         size_t length=0;
         if(!q->storage||qfs_read(q->storage,q->file_volume,path,q->notes,sizeof(q->notes)-1,&length)!=0){
@@ -2036,19 +2105,51 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     }else if(app==Q_TASKS){
         draw_tasks(q,w,x,y,cw,ink,muted);
     }else if(app==Q_STORE){
-        text(q,x,y+47,"App Library",muted,0);
-        const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
-        for(int i=0;i<4;i++){
-            int app_index=entries[q->store_page*4+i];
-            int pitch=w->w>650?230:190;
-            int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
-            surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
-            app_icon(q,bx+39,by+39,app_index,43,ink);
-            text(q,bx+72,by+40,names[app_index],ink,0);
-            text(q,bx+72,by+69,"Open",accent(q),0);
+        if(q->store_pending){
+            text(q,x+4,y+45,"Install Quartzie package",ink,2);
+            surface(q,x+2,y+63,cw-4,236,16,inner_material(q),q->theme?125:152);
+            string_limit(q,x+19,y+103,q->store_info.name,ink,1,cw-40,1);
+            string_limit(q,x+19,y+136,q->store_info.id,muted,0,cw-40,1);
+            string_limit(q,x+19,y+166,q->store_info.version,muted,0,cw-40,1);
+            text(q,x+19,y+196,files_equal(q->store_info.platform,"android")?"Android package":"Windows executable",ink,0);
+            text(q,x+19,y+225,"SHA-256 and archive integrity verified",muted,0);
+            surface(q,x+18,y+246,140,40,11,colors(q)->selected,186);
+            text(q,x+51,y+272,"Install",ink,1);
+            surface(q,x+169,y+246,130,40,11,inner_material(q),154);
+            text(q,x+195,y+272,"Cancel",ink,0);
+        }else{
+            text(q,x,y+47,q->store_view?"Installed packages":"App Library",ink,1);
+            surface(q,x+cw-196,y+13,192,37,10,inner_material(q),q->theme?151:170);
+            text(q,x+cw-183,y+38,q->store_view?"Built-in apps":"Installed packages",ink,0);
+            if(q->store_view){
+                if(!store_directory(q))
+                    text(q,x+12,y+117,"Attach a writable Home disk",muted,1);
+                else if(!q->store_installed_count)
+                    text(q,x+12,y+117,"No installed packages",muted,1);
+                for(int i=0;i<q->store_installed_count&&i<5;i++){
+                    int yy=y+78+i*59;
+                    surface(q,x+1,yy,cw-2,53,12,inner_material(q),q->theme?139:154);
+                    sprite(q,x+32,yy+26,QI_COMPRESSED,32);
+                    string_limit(q,x+59,yy+32,q->store_installed[i].name,ink,0,cw-207,1);
+                    surface(q,x+cw-139,yy+8,126,38,9,i==q->store_confirm_remove?colors(q)->selected:inner_material(q),154);
+                    text(q,x+cw-126,yy+34,i==q->store_confirm_remove?"Confirm remove":"Remove",ink,0);
+                }
+            }else{
+                const int apps[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
+                for(int i=0;i<4;i++){
+                    int app_index=apps[q->store_page*4+i];
+                    int pitch=w->w>650?230:190;
+                    int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
+                    surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
+                    app_icon(q,bx+39,by+39,app_index,43,ink);
+                    text(q,bx+72,by+40,names[app_index],ink,0);
+                    text(q,bx+72,by+69,"Open",accent(q),0);
+                }
+                text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
+                text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
+            }
         }
-        text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
-        text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
+        if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
         text(q,x,y+45,"Quartzie 0.42.1",ink,2);
         text(q,x,y+97,"A space to create.",ink,1);
@@ -2937,6 +3038,22 @@ void q_click(QDesktop *q,int x,int y){
         }
         int bx=w->x+32,by=w->y+60;
         if(chosen==Q_STORE){
+            int cw=w->w-64;
+            if(q->store_pending){
+                if(hit(x,y,bx+18,by+246,140,40)){store_install(q);return;}
+                if(hit(x,y,bx+169,by+246,130,40)){q->store_pending=0;store_message(q,"Installation cancelled");return;}
+                return;
+            }
+            if(hit(x,y,bx+cw-196,by+13,192,37)){
+                q->store_view=!q->store_view;q->store_confirm_remove=-1;
+                if(q->store_view)store_refresh(q);
+                q->dirty=1;return;
+            }
+            if(q->store_view){
+                for(int i=0;i<q->store_installed_count&&i<5;i++)
+                    if(hit(x,y,bx+cw-139,by+78+i*59+8,126,38)){store_remove(q,i);return;}
+                q->store_confirm_remove=-1;q->dirty=1;return;
+            }
             const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
             if(hit(x,y,bx,by+302,140,45)){q->store_page=1-q->store_page;q->dirty=1;return;}
             for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+78+(i/2)*118,174,102)){
