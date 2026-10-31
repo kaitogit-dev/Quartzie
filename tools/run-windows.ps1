@@ -1,3 +1,4 @@
+param([ValidateSet("none","dsound")][string]$AudioBackend = "none")
 $ErrorActionPreference = "Stop"
 $qemu = Join-Path $env:ProgramFiles "qemu"
 $executable = Join-Path $qemu "qemu-system-x86_64.exe"
@@ -15,4 +16,4 @@ $variablesCopy = Join-Path $env:TEMP "quartzie-0.43.1-vars.fd"
 Copy-Item $variables $variablesCopy -Force
 $displays = (& $executable -display help 2>&1 | Out-String)
 $display = if ($displays -match "(?m)^\s*gtk\s*$") { "gtk,zoom-to-fit=on,show-cursor=off" } else { "sdl,show-cursor=off" }
-& $executable -machine "q35,pcspk-audiodev=quartzie" -audiodev "dsound,id=quartzie" -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -drive "if=none,id=quartzie-user,format=raw,file=$userdisk" -device usb-storage,drive=quartzie-user -nic user,model=e1000
+& $executable -machine "q35,pcspk-audiodev=quartzie" -audiodev "$AudioBackend,id=quartzie" -m 512 -vga std -accel whpx -accel tcg -display $display -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" -drive "if=pflash,format=raw,unit=1,file=$variablesCopy" -cdrom $iso -boot order=d -usb -device usb-tablet -drive "if=none,id=quartzie-user,format=raw,file=$userdisk" -device usb-storage,drive=quartzie-user -nic user,model=e1000
