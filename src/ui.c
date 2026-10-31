@@ -2990,9 +2990,10 @@ static void files_clip(QDesktop *q,int cut){
 static void files_delete_selected(QDesktop *q){
     if(q->file_location==1||!q->storage)return;
     if(!q->file_checked_count&&q->file_selected<0){files_message(q,"Select items first");return;}
-    if(!q->file_confirm){
+    if(q->file_confirm!=1){
         q->file_confirm=1;
-        files_message(q,q->file_location==2?"Select Delete again to remove forever":"Select Delete again to confirm");
+        files_message(q,q->file_location==2||q->file_volume!=q->storage->home_index?
+            "Select Delete again to permanently remove":"Select Delete again to move to Recycle Bin");
         return;
     }
     int failures=0;
@@ -3009,7 +3010,8 @@ static void files_delete_selected(QDesktop *q){
     }
     int bin=q->file_location==2;
     files_refresh(q);
-    files_message(q,failures?"Some selected items could not be deleted":bin?"Permanently deleted":"Moved to Recycle Bin");
+    files_message(q,failures?"Some selected items could not be deleted":
+        bin||q->file_volume!=q->storage->home_index?"Permanently deleted":"Moved to Recycle Bin");
 }
 static void files_shortcut(QDesktop *q,int index){
     if(!q->storage)return;
@@ -3120,7 +3122,7 @@ static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
             }
             if(hit(x,y,left+113,top+57,138,33)){files_delete_selected(q);return 1;}
             if(hit(x,y,left+259,top+57,126,33)){
-                if(!q->file_confirm){q->file_confirm=1;files_message(q,"Select Empty Bin again to confirm");return 1;}
+                if(q->file_confirm!=2){q->file_confirm=2;files_message(q,"Select Empty Bin again to confirm");return 1;}
                 int ok=qtrash_empty(q->storage)==0;
                 files_refresh(q);files_message(q,ok?"Recycle Bin emptied":"Could not empty Recycle Bin");
                 return 1;

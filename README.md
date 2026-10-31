@@ -39,4 +39,3 @@ The boot volume includes `QSTART.EXE`. To substitute a supported AMD64 PE32+ pro
 python3 tools/replace_app.py Quartzie-0.43.1-x64.iso program.exe Quartzie-custom.iso
 ```
 
-Font and codec notices are retained in `FONT-LICENSE.txt` and `LICENSES/media-codecs.txt`.

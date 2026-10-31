@@ -110,7 +110,7 @@ int qtrash_put(QStorage *s,int volume,const char *path,int is_dir){
        same(path,"\\QUSER.DAT")||prepare(s)!=0)return -1;
     const char *root=directory(s);
     int listing=qfs_list(s,volume,root,trash_list_buffer,QFS_ENTRIES);
-    if(listing<0)return -1;
+    if(listing<0||listing>QFS_ENTRIES-2)return -1;
     for(int number=1;number<=9999999;number++){
         char id[]="T0000000";
         int value=number;
