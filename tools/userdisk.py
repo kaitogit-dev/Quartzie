@@ -14,7 +14,7 @@ def create():
     boot=memoryview(image)[:512]
     boot[:3]=b"\xeb\x3c\x90"
     boot[3:11]=b"QUARTZIE"
-    struct.pack_into("<HBHBHHBHHHII",boot,11,512,1,RESERVED,2,512,SECTORS,0xf8,FAT_SECTORS,63,255,0,0)
+    struct.pack_into("<HBHBHHBHHHII",boot,11,512,1,RESERVED,2,512,0,0xf8,FAT_SECTORS,63,255,0,SECTORS)
     boot[36:39]=b"\x80\x00\x29"
     struct.pack_into("<I",boot,39,0x51555352)
     boot[43:54]=b"QUARTZIE   "

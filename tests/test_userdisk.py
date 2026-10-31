@@ -11,7 +11,7 @@ class DataDiskTests(unittest.TestCase):
         self.assertEqual(len(image),32*1024*1024)
         self.assertEqual(image[510:512],b"\x55\xaa")
         self.assertEqual(struct.unpack_from("<H",image,11)[0],512)
-        self.assertEqual(struct.unpack_from("<H",image,19)[0],userdisk.SECTORS)
+        self.assertEqual(struct.unpack_from("<I",image,32)[0],userdisk.SECTORS)
         self.assertEqual(struct.unpack_from("<H",image,22)[0],userdisk.FAT_SECTORS)
         root=(userdisk.RESERVED+2*userdisk.FAT_SECTORS)*512
         self.assertEqual(image[root:root+11],b"QUSER   DAT")
