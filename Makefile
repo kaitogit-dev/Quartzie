@@ -5,7 +5,7 @@ PYTHON = python3
 FONT_REGULAR ?= /usr/share/fonts/opentype/inter/Inter-Regular.otf
 FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
-OBJECTS = build/boot.obj build/ui.obj build/storage.obj build/media.obj build/codecs.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj build/cursor.obj
+OBJECTS = build/boot.obj build/ui.obj build/package.obj build/storage.obj build/media.obj build/codecs.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj build/cursor.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-userdata.img
 release: all
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
@@ -40,6 +40,10 @@ build/embed_app.obj: build/embed_app.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 Quartzie-userdata.img: tools/userdisk.py
 	$(PYTHON) tools/userdisk.py $@
+build/native-test.qapp: build/winapp.exe tools/qapp.py | build
+	$(PYTHON) tools/qapp.py pack build/winapp.exe -o $@ --name "Quartzie Test" --id quartzie.testapp --version 1.0
+build/package-test: tests/package_native.c src/package.c src/package.h | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/package_native.c src/package.c -o $@
 build/esp.img: build/BOOTX64.EFI build/winapp.exe tools/esp.py tools/media_samples.py
 	$(PYTHON) tools/esp.py build/BOOTX64.EFI $@ build/winapp.exe
 build/esp-iso.img: build/BOOTX64.EFI build/winapp.exe tools/compact_esp.py tools/media_samples.py
@@ -56,7 +60,8 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c -o $@
-test: build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/package-test build/native-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+	./build/package-test build/native-test.qapp
 	./build/settings-test
 	./build/media-test
 	./build/theme-test
