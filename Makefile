@@ -7,7 +7,7 @@ FONT_MEDIUM ?= /usr/share/fonts/opentype/inter/Inter-SemiBold.otf
 CFLAGS = --target=x86_64-pc-windows-msvc -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror -Isrc
 OBJECTS = build/boot.obj build/profiles.obj build/update.obj build/ui.obj build/network.obj build/package.obj build/storage.obj build/trash.obj build/media.obj build/codecs.obj build/font.obj build/ps2.obj build/pe64.obj build/ntcore.obj build/winapi.obj build/fileboot.obj build/hostcursor.obj build/embed_app.obj build/icons.obj build/cursor.obj
 all: Quartzie-x64.iso Quartzie-x64-uefi.img Quartzie-userdata.img
-release: all
+release: all build/Quartzie-$(VERSION).UPD
 	cp Quartzie-x64.iso Quartzie-$(VERSION)-x64.iso
 	cp Quartzie-x64-uefi.img Quartzie-$(VERSION)-x64.img
 	cp Quartzie-userdata.img Quartzie-$(VERSION)-userdata.img
@@ -48,6 +48,8 @@ build/profiles-test: tests/profiles.c src/profiles.c src/profiles.h src/package.
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/profiles.c src/profiles.c src/package.c src/storage.c -o $@
 build/update-test: tests/update.c src/update.c src/update.h src/package.c src/storage.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/update.c src/update.c src/package.c src/storage.c -o $@
+build/Quartzie-$(VERSION).UPD: build/BOOTX64.EFI tools/update.py
+	$(PYTHON) tools/update.py pack build/BOOTX64.EFI -o $@ --version $(VERSION)
 build/trash-test: tests/trash.c src/trash.c src/storage.c src/trash.h src/storage.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/trash.c src/trash.c src/storage.c src/profiles.c src/update.c src/package.c -o $@
 build/network-test: tests/network.c src/network.c src/network.h src/efi.h | build
@@ -95,6 +97,8 @@ test: build/profiles-test build/update-test build/trash-test build/network-test 
 	./build/transitions-test
 verify: all test build/Quartzie.cur
 	$(PYTHON) tests/test_package.py
+	$(PYTHON) tools/update.py pack build/BOOTX64.EFI -o build/update-test.UPD --version $(VERSION)
+	$(PYTHON) tools/update.py check build/update-test.UPD
 	$(PYTHON) tests/test_userdisk.py
 	$(PYTHON) tools/verify.py Quartzie-x64.iso Quartzie-x64-uefi.img build/esp.img build/BOOTX64.EFI build/esp-iso.img
 	$(PYTHON) tools/check_firmware.py build/BOOTX64.EFI

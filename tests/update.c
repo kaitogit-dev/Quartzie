@@ -43,6 +43,10 @@ int main(void){
     CHECK(qupd_apply(&fs,0,0,path,buffer,sizeof(buffer))==0);
     CHECK(qupd_clear_backup(&fs,0)==0);
     CHECK(qupd_clear_backup(&fs,0)!=0);
+    CHECK(qupd_apply(&fs,0,0,path,buffer,sizeof(buffer))==0);
+    CHECK(qfs_delete(&fs,0,"\\EFI\\BOOT\\BOOTX64.EFI")==0);
+    CHECK(qupd_rollback(&fs,0,buffer,sizeof(buffer))==0);
+    CHECK(qupd_health(&fs,0,buffer,sizeof(buffer))==0);
     puts("PASS: firmware update SHA256, staging, integrity, rollback and backup");
     return 0;
 }

@@ -39,6 +39,7 @@ jobs:
             Quartzie-0.44.0-x64.iso
             Quartzie-0.44.0-x64.img
             Quartzie-0.44.0-userdata.img
+            build/Quartzie-0.44.0.UPD
             build/BOOTX64.EFI
             build/Quartzie.cur
             assets/icons.zip
