@@ -49,7 +49,7 @@ build/profiles-test: tests/profiles.c src/profiles.c src/profiles.h src/package.
 build/update-test: tests/update.c src/update.c src/update.h src/package.c src/storage.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/update.c src/update.c src/package.c src/storage.c -o $@
 build/trash-test: tests/trash.c src/trash.c src/storage.c src/trash.h src/storage.h | build
-	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/trash.c src/trash.c src/storage.c src/profiles.c src/update.c -o $@
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/trash.c src/trash.c src/storage.c src/profiles.c src/update.c src/package.c -o $@
 build/network-test: tests/network.c src/network.c src/network.h src/efi.h | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/network.c src/network.c -o $@
 build/package-test: tests/package_native.c src/package.c src/package.h | build
