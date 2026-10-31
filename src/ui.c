@@ -1038,9 +1038,13 @@ static void files_refresh(QDesktop *q){
 }
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity){
     if(!q)return;
+    int first_attach=q->storage==0;
     q->storage=storage;q->media_buffer=buffer;q->media_capacity=capacity;
     if(storage){
         qprofiles_load(storage);
+        if(first_attach&&qprofiles_has_pin(storage,storage->profile)){
+            q->locked=1;q->pin_input_len=0;q->pin_input[0]=0;
+        }
         q->profile_count=qprofiles_list(storage,q->profiles,QPROFILE_LIMIT);
         if(q->profile_count<0)q->profile_count=0;
         int current_found=0;
