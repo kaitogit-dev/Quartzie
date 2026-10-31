@@ -11,8 +11,12 @@ static QStorage storage;
 int main(void){
     qfs_init(&storage,0,0);
     CHECK(storage.count==1&&storage.ram_index==0);
+    uint64_t total=0,remaining=0;
+    CHECK(qfs_space(&storage,0,&total,&remaining)==0&&total==remaining);
+    CHECK(total==(uint64_t)QFS_MEMORY_FILES*QFS_MEMORY_BYTES);
     CHECK(qfs_mkdir(&storage,0,"\\Pictures")==0);
     CHECK(qfs_write(&storage,0,"\\Pictures\\test.txt","hello",5)==0);
+    CHECK(qfs_space(&storage,0,&total,&remaining)==0&&remaining==total-2*QFS_MEMORY_BYTES);
     QFsEntry entries[QFS_ENTRIES];
     CHECK(qfs_list(&storage,0,"\\",entries,QFS_ENTRIES)==1);
     CHECK(entries[0].directory&&strcmp(entries[0].name,"Pictures")==0);

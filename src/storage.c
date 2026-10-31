@@ -27,6 +27,7 @@ struct QSimpleFS {
 static EFI_GUID fs_guid={0x964e5b22,0x6459,0x11d2,{0x8e,0x39,0,0xa0,0xc9,0x69,0x72,0x3b}};
 static EFI_GUID image_guid={0x5b1b31a1,0x9562,0x11d2,{0x8e,0x3f,0,0xa0,0xc9,0x69,0x72,0x3b}};
 static EFI_GUID info_guid={0x09576e92,0x6d3f,0x11d2,{0x8e,0x39,0,0xa0,0xc9,0x69,0x72,0x3b}};
+static EFI_GUID fs_info_guid={0x09576e93,0x6d3f,0x11d2,{0x8e,0x39,0,0xa0,0xc9,0x69,0x72,0x3b}};
 static void zero(void *p,size_t n){uint8_t *b=p;for(size_t i=0;i<n;i++)b[i]=0;}
 static int equal(const char *a,const char *b){
     for(;*a&&*b;a++,b++)if(*a!=*b)return 0;
@@ -191,6 +192,34 @@ void qfs_init(QStorage *s,EFI_HANDLE image,EFI_BOOT_SERVICES *boot){
         }else s->home_index=s->ram_index;
     }
 }
+
+int qfs_space(QStorage *s,int volume,uint64_t *total,uint64_t *free_bytes){
+    if(!s||!total||!free_bytes||volume<0||volume>=s->count)return -1;
+    if(volume==s->ram_index){
+        int used=0;
+        for(int i=0;i<QFS_MEMORY_FILES;i++)if(s->memory[i].active)used++;
+        *total=(uint64_t)QFS_MEMORY_FILES*QFS_MEMORY_BYTES;
+        *free_bytes=(uint64_t)(QFS_MEMORY_FILES-used)*QFS_MEMORY_BYTES;
+        return 0;
+    }
+    QFile *root=0;
+    if(open_path(s,volume,"\\",1,0,&root)!=0||!root||!root->GetInfo){
+        if(root&&root->Close)root->Close(root);
+        return -1;
+    }
+    union {uint64_t align;uint8_t data[512];} info;
+    uint64_t len=sizeof(info.data);
+    int ok=root->GetInfo(root,&fs_info_guid,&len,info.data)==0&&len>=40;
+    if(ok){
+        uint64_t capacity=*(const uint64_t *)(const void *)(info.data+16);
+        uint64_t available=*(const uint64_t *)(const void *)(info.data+24);
+        if(!capacity||available>capacity)ok=0;
+        else{*total=capacity;*free_bytes=available;}
+    }
+    if(root->Close)root->Close(root);
+    return ok?0:-1;
+}
+
 int qfs_home_setup(QStorage *s){
     if(!s||s->home_index<0||s->home_index>=s->ram_index)return -1;
     const char *folders[]={

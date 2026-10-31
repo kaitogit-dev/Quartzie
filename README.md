@@ -1,83 +1,42 @@
 # Quartzie
 
-An x86-64 UEFI desktop with a framebuffer compositor, native applications, a UEFI filesystem browser, an NT-style services core, and an experimental PE32+ executable loader.
+An x86-64 UEFI desktop with a glass compositor, native applications, FAT storage, virtual desktops, a native services core, and an experimental PE32+ compatibility layer.
 
 ## Build
 
-On Ubuntu:
+Ubuntu dependencies: `clang`, `lld`, `xorriso`, `ovmf`, `qemu-system-x86`, `python3-pil`, `fonts-inter`, `make`, and `gcc`.
 
 ```sh
-sudo apt-get install clang lld xorriso python3-pil fonts-inter make gcc
 make verify
 make release
 ```
 
-The release artifacts are `Quartzie-0.43.1-x64.iso` and `Quartzie-0.43.1-x64.img`. GitHub Actions builds and tests both boot formats and publishes them as workflow artifacts.
+GitHub Actions verifies the firmware and application tests, boots both ISO and GPT images under OVMF, and publishes the ISO, UEFI disk, and writable Home disk.
 
-## Boot
+## Boot and storage
 
-Boot the ISO with x86-64 QEMU and OVMF:
+The boot ISO is `Quartzie-0.43.1-x64.iso`. Attach `Quartzie-0.43.1-userdata.img` as a writable USB mass-storage disk to retain user files and preferences between sessions. The Windows QEMU launcher `tools/run-windows.ps1` attaches the disk automatically. Keep the same data image when upgrading.
 
-```sh
-qemu-system-x86_64 -machine q35 -m 512 -vga std \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom Quartzie-0.43.1-x64.iso -usb -device usb-tablet
-```
+Quartzie uses `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, Videos, and Applications. If the user disk is missing, Home falls back to temporary RAM storage.
 
-For Windows QEMU, use `tools/run-windows.ps1`.
+Files offers folder browsing, multiple views, searching, sorting, multi-selection, copying, moving, and renaming. Home deletions move to **Recycle Bin**, with restore, permanent removal, and empty-bin operations. Deletions from other volumes require explicit confirmation and are permanent. Settings > Storage shows capacity and free space for volumes that report it.
 
-## Controls
+## Desktop and applications
 
-| Input | Action |
-| --- | --- |
-| F1–F6 | Open a pinned application |
-| F7 | Application launcher |
-| F8 | Notifications |
-| F9 | Control center |
-| F10 | Minimize |
-| F11 | Maximize or restore |
-| F12 | Close window |
-| Esc | Dismiss overlays |
+Drag window title bars to screen edges or corners for snapping; hover over Maximize for snap layouts. The dock switcher offers three desktops and lets you move the active window between them. Tab cycles through windows on the active desktop. Task Manager lists running apps and native processes, and can terminate selected tasks.
 
-Drag a window title bar to move it, or to the top edge to maximize. Drag a maximized title bar downward to restore the window. The launcher supports search, arrow-key selection, and Enter.
+Notes supports editable text and saving to Documents. Calculator supports arithmetic precedence and keeps recent results. Photos opens BMP, PNG, JPG, GIF (first frame), and TGA; it can rotate, mirror, browse pictures, and export BMP. Media Player supports MP3, PCM WAV, and uncompressed AVI, with track navigation, repeat and volume controls. Audio uses the PC speaker backend.
 
-## Files and media
+Quartzie Store installs verified `.qapp` archives from Files to the user disk and supports removal. Convert EXE/APK payloads using `tools/qapp.py`; installing a package does not imply runtime support. The PE32+ loader can run supported test executables through a limited Win32 bridge; Android application execution remains under development.
 
-Files uses single-click selection and double-click opening, with Enter opening the selected entry. Files enumerates UEFI-readable FAT volumes, including the boot volume and attached FAT-formatted disks. A writable Home RAM volume is also available for files and folders during the current session; its contents reset after reboot. Browse folders, create text files or directories, delete entries, and open text files in Notes. Notes saves to the selected writable file.
+UEFI Simple Network Protocol is used for real adapter, MAC, link, and MTU diagnostics in Settings > Network and Terminal `netinfo`. TCP/IP, DNS and web browsing are not yet integrated.
 
-Photos opens BMP, PNG, JPEG, GIF (first frame), and TGA. Media Player supports MP3, PCM WAV (8/16-bit mono or stereo), and uncompressed AVI video with 24/32-bit BGR frames. Audio uses the PC speaker interface, so audible output requires an emulated or physical PC speaker audio path. MP4, H.264, and AAC remain unsupported.
+## Test executable
 
-The boot volume includes `PHOTO.BMP`, `SOUND.WAV`, and `CLIP.AVI` as viewer test files. Photos and Media Player are available from Start and are not pinned to the dock. To keep files across ISO boots, attach a separate writable FAT-formatted disk.
-
-## PE32+ support
-
-The boot volume includes `QSTART.EXE`. To replace it with an AMD64 PE32+ executable:
+The boot volume includes `QSTART.EXE`. To substitute a supported AMD64 PE32+ program:
 
 ```sh
 python3 tools/replace_app.py Quartzie-0.43.1-x64.iso program.exe Quartzie-custom.iso
 ```
 
-The loader implements relocation, import resolution by name and ordinal, and PE export lookup. The current `KERNEL32.dll` bridge implements `WriteFile`, `GetStdHandle`, `GetTickCount`, `GetLastError`, `GetCurrentProcessId`, `GetCurrentThreadId`, `GetCommandLineA`, and `GetModuleHandleA`. This is a targeted compatibility layer, not a complete Win32 environment.
-
-## Source layout
-
-- `src/` — UEFI entry point, compositor, input, native services, PE loader, and Win32 bridge
-- `tools/` — image generation, assets, firmware checks, and ISO verification
-- `tests/` — native behavior and rendering tests
-- `assets/` — original icon and cursor artwork
-
-The bundled Inter font is subject to the terms in `FONT-LICENSE.txt`. Media codec notices are in `LICENSES/media-codecs.txt`.
-
-Persistent user files use `Quartzie-0.43.1-userdata.img`, a writable FAT16 volume included with each build. Attach it as a USB mass-storage disk alongside the ISO. Quartzie discovers it from its volume marker and creates `Users\\Default` with Desktop, Documents, Downloads, Pictures, Music, and Videos. Reuse the same data disk between boots to retain files. `tools/run-windows.ps1` attaches the data disk automatically. Without this disk Quartzie falls back to temporary Home RAM.
-
-Desktop switcher: the small three-bar control at the right end of the dock opens a choice of three desktops. Click the upper half of a desktop tile to switch; click its bottom row to move the currently focused window there. Hover the maximize button to choose a snap zone. Use Tab to bring forward another open window on the current desktop.
-
-Light/dark mode, accent and animation preferences persist in `QUARTZIE.CFG` on Home between boots with the same user-data disk.
-
-Quartzie Store now accepts native `.qapp` packages from Files. Open a verified `.qapp` in Explorer, confirm Install in Store, and the package is copied to persistent `Users\\Default\\Applications` and independently verified after writing. The Installed packages tab lists and removes packages with a two-click confirmation. Use `tools/qapp.py pack` to convert EXE/APK uploads to signed-off `.qapp` archives with manifest and SHA-256 data. Installation does not automatically execute an application; program execution depends on its supported runtime.
-
-Photos now supports non-destructive 90-degree rotation, horizontal mirroring, browse previous/next images and Save BMP, which writes a new 24-bit bitmap to the writable Home Pictures folder. Media Player now supports previous/next tracks in the current directory, repeat mode, volume adjustment and muting; auto-next advances when playback finishes. Audio still uses the PC speaker on the current firmware backend.
-
-Network diagnostics now use UEFI Simple Network Protocol to enumerate actual adapters and read their MAC addresses, link state and MTUs. See Settings > Network or run `netinfo` in Terminal. This release provides hardware discovery and link diagnostics; TCP/IP, DNS, Internet downloads, and browsing require additional networking stack work.
-
-The Windows QEMU launcher now attaches an emulated E1000 network device by default so Quartzie can discover a NIC through firmware. This does not yet provide web access: the network controls report only adapter and physical link diagnostics.
+Font and codec notices are retained in `FONT-LICENSE.txt` and `LICENSES/media-codecs.txt`.

@@ -2069,7 +2069,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.40.6",secondary(q),0);
+    if(w->h>=620)text(q,x+21,y+w->h-113,"Quartzie 0.43.1",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
@@ -2161,6 +2161,21 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
             for(int i=0;i<rows;i++){
                 const char *label=q->storage->volumes[i].label;
                 const char *description=i==q->storage->ram_index?"Temporary session storage":i==q->storage->home_index?"Persistent user files":"Mounted volume";
+                char detail[80];
+                uint64_t total=0,free_bytes=0;
+                if(i!=q->storage->ram_index&&qfs_space(q->storage,i,&total,&free_bytes)==0){
+                    char amount[20],limit[20];
+                    settings_number(amount,(int)clamp((int)(free_bytes/1048576u),0,999999));
+                    settings_number(limit,(int)clamp((int)(total/1048576u),0,999999));
+                    int at=0;
+                    for(int j=0;amount[j]&&at<75;j++)detail[at++]=amount[j];
+                    const char *part=" MiB free of ";
+                    for(int j=0;part[j]&&at<75;j++)detail[at++]=part[j];
+                    for(int j=0;limit[j]&&at<75;j++)detail[at++]=limit[j];
+                    const char *end=" MiB";
+                    for(int j=0;end[j]&&at<75;j++)detail[at++]=end[j];
+                    detail[at]=0;description=detail;
+                }
                 settings_card(q,left,y+124+i*79,width,69,label,description,1);
             }
         }
