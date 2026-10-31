@@ -19,6 +19,7 @@ static void assign(char *out,const char *name){
     out[i]=0;
 }
 static int dir(QStorage *s,const char *name,char *out){
+    (void)s;
     size_t at=0;
     const char *prefix="\\Users\\";
     for(int i=0;prefix[i];i++)out[at++]=prefix[i];
@@ -28,7 +29,7 @@ static int dir(QStorage *s,const char *name,char *out){
     return at<QFS_PATH?0:-1;
 }
 static int has_user(QStorage *s,const char *name){
-    QFsEntry list[QFS_ENTRIES];int n=qfs_list(s,s->home_index,"\\Users",list,QFS_ENTRIES);
+    static QFsEntry list[QFS_ENTRIES];int n=qfs_list(s,s->home_index,"\\Users",list,QFS_ENTRIES);
     for(int i=0;i<n;i++)if(list[i].directory&&equal(list[i].name,name))return 1;
     return 0;
 }
@@ -78,7 +79,7 @@ int qprofiles_load(QStorage *s){
 }
 int qprofiles_list(QStorage *s,QProfile *out,int capacity){
     if(!s||!out||capacity<1)return -1;
-    QFsEntry all[QFS_ENTRIES];int n=qfs_list(s,s->home_index,"\\Users",all,QFS_ENTRIES);
+    static QFsEntry all[QFS_ENTRIES];int n=qfs_list(s,s->home_index,"\\Users",all,QFS_ENTRIES);
     if(n<0)return -1;
     int count=0;
     for(int i=0;i<n&&count<capacity;i++)if(all[i].directory&&valid(all[i].name)){

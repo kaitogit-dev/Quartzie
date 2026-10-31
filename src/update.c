@@ -21,7 +21,7 @@ static int has_file(QStorage *s,int volume,const char *path){
     parent[i]=0;int at=0;
     for(i=cut+1;path[i]&&at<71;i++)name[at++]=path[i];
     name[at]=0;
-    QFsEntry files[QFS_ENTRIES];
+    static QFsEntry files[QFS_ENTRIES];
     int n=qfs_list(s,volume,parent,files,QFS_ENTRIES);
     for(i=0;i<n;i++)if(match(files[i].name,name)&&!files[i].directory)return 1;
     return 0;
