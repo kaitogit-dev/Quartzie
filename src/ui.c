@@ -876,7 +876,7 @@ static void draw_tray(QDesktop *q){
     int x=q->width-345,y=16;
     int previous_topbar=q->render_topbar;
     q->render_topbar=1;
-    pane(q,x,y,319,58,19,colors(q)->dock,q->theme?212:162);
+    surface(q,x,y,319,58,19,colors(q)->dock,q->theme?212:162);
     int online=0;
     if(q->network)for(int i=0;i<q->network->count;i++)
         if(!q->network->adapters[i].link_known||q->network->adapters[i].link_present)online=1;
