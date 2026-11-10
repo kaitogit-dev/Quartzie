@@ -155,7 +155,12 @@ int main(void){
     q_draw(&ui);
     q_click(&ui,content+43,by+167);
     CHECK(ui.theme==0);
-    q_click(&ui,content+44+2*61,by+307);
+    q_click(&ui,content+width*5/8,by+300);
+    CHECK(ui.accent==2);
+    q_draw(&ui);
+    q_click(&ui,content+width*7/8,by+350);
+    CHECK(ui.accent==7);
+    q_click(&ui,content+width*5/8,by+300);
     CHECK(ui.accent==2);
     type_query("accent");
     CHECK(ui.settings_search_length==6&&ui.settings_page==2);

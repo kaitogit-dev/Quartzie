@@ -42,7 +42,8 @@ typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
     int menu,notifications,quick,active,drag,drag_x,drag_y;
     int pressed,last_button,frame_count,hover;
-    int desktop,desktop_view,snap_menu_app;
+    int desktop,desktop_view,snap_menu_app,snap_candidate;
+    uint32_t snap_hover_us;
     int drag_start_x,drag_start_y,drag_moved;
     int note_length,note_cursor,note_scroll,note_dirty,command_length,calc_length;
     int terminal_volume,terminal_count,photo_zoom,store_page;

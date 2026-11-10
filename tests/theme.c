@@ -90,6 +90,13 @@ int main(void){
     surface(&desktop,32,32,190,190,16,material(&desktop),180);
     int light_span=luminance(framebuffer[128*256+166])-luminance(framebuffer[128*256+90]);
     CHECK(absval(dark_span-light_span)<100);
-    puts("PASS: matching dark/light glass translucency, undimmed wallpaper, and theme cache invalidation");
+    desktop.render_app=-1;
+    desktop.clip_left=0;desktop.clip_top=0;desktop.clip_right=256;desktop.clip_bottom=256;
+    for(int y=0;y<256;y++)for(int x=0;x<256;x++)framebuffer[y*256+x]=x<128?0x203040:0xb0c0d0;
+    tint_overlay(&desktop,92,110,72,34,12,colors(&desktop)->hover,88);
+    CHECK(framebuffer[128*256+105]!=framebuffer[128*256+148]);
+    CHECK(framebuffer[128*256+105]!=0x203040);
+    CHECK(framebuffer[128*256+148]!=0xb0c0d0);
+    puts("PASS: translucent shell highlights, dark/light glass, undimmed wallpaper, and theme caches");
     return 0;
 }

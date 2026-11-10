@@ -68,6 +68,14 @@ static void check_window_controls(void){
     q_open(&ui,Q_NOTES);
     QWindow *w=&ui.windows[Q_NOTES];
     q_move(&ui,w->x+w->w-90,w->y+26);
+    CHECK(ui.snap_candidate==Q_NOTES&&ui.snap_menu_app==-1);
+    for(int i=0;i<10;i++)q_tick_timed(&ui,240000);
+    CHECK(ui.snap_menu_app==-1);
+    q_tick_timed(&ui,99000);
+    CHECK(ui.snap_menu_app==-1);
+    q_tick_timed(&ui,1000);
+    CHECK(ui.snap_menu_app==Q_NOTES);
+    q_move(&ui,w->x+w->w-90,w->y+46);
     CHECK(ui.snap_menu_app==Q_NOTES);
     int sx=w->x+w->w-265,sy=w->y+48;
     q_click(&ui,sx+11+81+25,sy+37+22);
