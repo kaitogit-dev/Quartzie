@@ -26,6 +26,12 @@
 #define Q_MEDIA 8
 #define Q_TASKS 9
 #define Q_SETTINGS_PAGES 9
+#define Q_DESKTOP_FILES 32
+#define Q_NOTICES 5
+typedef struct {
+    char title[32],message[88];
+    uint64_t stamp_us;
+} QNotice;
 typedef struct {
     int x,y,w,h,open,z,minimized,maximized,restore_x,restore_y,restore_w,restore_h;
     int tween_step,tween_kind,tween_x,tween_y,tween_w,tween_h;
@@ -53,6 +59,12 @@ typedef struct {
     uint32_t task_refresh_us;
     uint64_t uptime_us;
     uint32_t audio_display_us;
+    int clock_hour,clock_minute,clock_valid;
+    int desktop_selected,desktop_hover,desktop_click_index,desktop_file_count,notification_count;
+    uint32_t desktop_click_elapsed_us;
+    uint64_t desktop_change_counter;
+    QFsEntry desktop_files[Q_DESKTOP_FILES];
+    QNotice notices[Q_NOTICES];
     char terminal_path[QFS_PATH],terminal_lines[7][96];
     int menu_search_length,calc_history_count;
     int settings_page,settings_search_length,settings_loaded;
@@ -103,6 +115,7 @@ typedef struct {
 } QDesktop;
 void q_ui_set_scratch(uint32_t *storage);
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
+void q_set_clock(QDesktop *q,int hour,int minute);
 void q_draw(QDesktop *q);
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
 void q_attach_network(QDesktop *q,QNetwork *network);
