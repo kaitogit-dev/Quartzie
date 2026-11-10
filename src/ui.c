@@ -874,6 +874,7 @@ static void draw_quick(QDesktop *q){
     text(q,x+36,y+331,"Settings and personalization",foreground(q),0);
 }
 static void draw_tray(QDesktop *q){
+    if(!q->storage)return;
     int x=q->width-345,y=16;
     int previous_topbar=q->render_topbar;
     q->render_topbar=1;
