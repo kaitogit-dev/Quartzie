@@ -96,6 +96,44 @@ static void check_window_controls(void){
     CHECK(ui.desktop==2&&ui.active==Q_NOTES);
 }
 
+static QStorage shell_storage;
+static void check_shell_surfaces(void){
+    qfs_init(&shell_storage,0,0);
+    q_init(&ui,1280,720,canvas,background,blur);
+    q_attach_storage(&ui,&shell_storage,0,0);
+    q_set_date(&ui,2026,11,10);
+    q_set_clock(&ui,20,17);
+    int tray_x=ui.width-244,tray_y=ui.height-89;
+    q_click(&ui,tray_x+86,tray_y+32);
+    CHECK(ui.calendar_open&&!ui.quick&&!ui.notifications);
+    int calendar_x=ui.width-366,calendar_y=tray_y-365;
+    q_click(&ui,calendar_x+303,calendar_y+77);
+    CHECK(ui.calendar_open&&ui.calendar_offset==1);
+    q_click(&ui,calendar_x+265,calendar_y+325);
+    CHECK(!ui.calendar_offset);
+    q_key(&ui,27,0);
+    CHECK(!ui.calendar_open);
+    q_click(&ui,tray_x+28,tray_y+35);
+    CHECK(ui.windows[Q_SETTINGS].open&&ui.settings_page==6);
+    int dock_left=(ui.width-566)/2,dock_y=ui.height-89;
+    int pinned_files_x=dock_left+72+29;
+    q_context(&ui,pinned_files_x,dock_y+35);
+    CHECK(ui.dock_menu_app==Q_FILES&&!ui.windows[Q_FILES].open);
+    q_click(&ui,ui.dock_menu_x+30,ui.dock_menu_y+67);
+    CHECK(ui.windows[Q_FILES].open&&ui.dock_menu_app==-1);
+    q_context(&ui,pinned_files_x,dock_y+35);
+    CHECK(ui.dock_menu_app==Q_FILES);
+    q_click(&ui,ui.dock_menu_x+28,ui.dock_menu_y+49+4*39+12);
+    CHECK(!ui.windows[Q_FILES].open&&ui.dock_menu_app==-1);
+    q_click(&ui,dock_left+36,dock_y+35);
+    CHECK(ui.menu);
+    int menu_x0=(ui.width-510)/2,menu_y0=ui.height-607;
+    q_click(&ui,menu_x0+26+116+35,menu_y0+449+16);
+    char expected[QFS_PATH];
+    CHECK(qfs_profile_path(&shell_storage,"Documents",expected,sizeof(expected))==0);
+    CHECK(strcmp(ui.file_path,expected)==0);
+    CHECK(ui.windows[Q_FILES].open);
+}
 int main(void){
     q_init(&ui,1920,1080,canvas,background,blur);
     q_drag_buffers(&ui,drag);
@@ -193,5 +231,6 @@ int main(void){
     puts("PASS: dock toggle, focus, maximize, drag-to-top, drag-to-restore, theme fill, and hover");
     check_snap_and_desktop();
     check_window_controls();
+    check_shell_surfaces();
     return 0;
 }

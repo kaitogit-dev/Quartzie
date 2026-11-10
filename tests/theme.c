@@ -117,6 +117,24 @@ int main(void){
         uint32_t status_pixel=framebuffer[(size_t)(status_top+7)*1024+status_left+113];
         CHECK(absval(luminance(dock_pixel)-luminance(status_pixel))<50);
     }
-    puts("PASS: translucent shell highlights, dark/light glass, undimmed wallpaper, and theme caches");
+    CHECK(calendar_days(2024,2)==29);
+    CHECK(calendar_days(2025,2)==28);
+    CHECK(calendar_weekday(2026,11,10)==1);
+    CHECK(calendar_weekday(2026,11,1)==6);
+    for(int use_dark=0;use_dark<2;use_dark++){
+        q_init(&desktop,1024,768,framebuffer,wall,work);
+        desktop.theme=use_dark;
+        for(size_t i=0;i<1024u*768u;i++)framebuffer[i]=use_dark?0x182d49:0xe7f0fb;
+        int px=dock_x(&desktop)+80,py=dock_y(&desktop)+50;
+        draw_dock(&desktop);
+        int normal=luminance(framebuffer[(size_t)py*1024+px]);
+        for(size_t i=0;i<1024u*768u;i++)framebuffer[i]=use_dark?0x182d49:0xe7f0fb;
+        desktop.hover=Q_FILES;
+        draw_dock(&desktop);
+        int selected=luminance(framebuffer[(size_t)py*1024+px]);
+        if(use_dark)CHECK(selected>normal+120);
+        else CHECK(selected!=normal);
+    }
+    puts("PASS: visible dark selections, translucent glass, Gregorian calendar and theme caches");
     return 0;
 }

@@ -25,7 +25,7 @@ int main(void){
     CHECK(qfs_write(&fs,0,"\\EFI\\BOOT\\BOOTX64.EFI",old,sizeof(old))==0);
     memset(archive,0,sizeof(archive));
     memcpy(archive,"QUPD",4);archive[4]=1;
-    memcpy(archive+5,"0.45.1",6);archive[21]=sizeof(next)&255;archive[22]=sizeof(next)>>8;
+    memcpy(archive+5,"0.45.2",6);archive[21]=sizeof(next)&255;archive[22]=sizeof(next)>>8;
     qpkg_sha256(next,sizeof(next),archive+25);memcpy(archive+64,next,sizeof(next));
     QUpdate info={0};
     CHECK(qupd_verify(archive,sizeof(archive),&info)==0);
