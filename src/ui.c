@@ -1125,8 +1125,6 @@ static void desktop_refresh(QDesktop *q){
         char path[QFS_PATH];
         if(qfs_profile_path(q->storage,"Desktop",path,sizeof(path))==0){
             int n=qfs_list(q->storage,q->storage->home_index,path,q->desktop_files,Q_DESKTOP_FILES);
-            if(n<0&&qfs_mkdir(q->storage,q->storage->home_index,path)==0)
-                n=qfs_list(q->storage,q->storage->home_index,path,q->desktop_files,Q_DESKTOP_FILES);
             if(n>0)q->desktop_file_count=n;
         }
         q->desktop_change_counter=q->storage->change_counter;
