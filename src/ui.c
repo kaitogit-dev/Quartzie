@@ -456,6 +456,7 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->file_selected=-1;q->file_click_index=-1;q->file_path[0]='\\';q->file_path[1]=0;q->note_volume=-1;q->terminal_path[0]='\\';q->terminal_path[1]=0;
     q->update_target=-1;q->update_source_volume=-1;q->store_confirm_remove=-1;q->media_volume_level=80;q->task_selected=-1;q->snap_menu_app=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     q->desktop_selected=-1;q->desktop_hover=-1;q->desktop_click_index=-1;q->desktop_change_counter=UINT64_MAX;
+    q->context_target=-1;
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
@@ -480,7 +481,7 @@ void q_set_clock(QDesktop *q,int hour,int minute){
 static void close_popups(QDesktop *q){
     q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;
     q->menu_search_length=0;q->menu_search[0]=0;
-    q->desktop_view=0;q->snap_menu_app=-1;
+    q->desktop_view=0;q->snap_menu_app=-1;q->context_open=0;
 }
 static const char *preferences_path(QDesktop *q){
     static char path[QFS_PATH];
@@ -863,6 +864,21 @@ static void draw_tray(QDesktop *q){
     text(q,x+239,y+37,q->notification_count?"*":"i",q->notification_count?accent(q):foreground(q),1);
     surface(q,x+272,y+9,38,40,12,q->quick?colors(q)->selected:inner_material(q),q->theme?162:145);
     sprite(q,x+291,y+29,QI_SETTINGS,25);
+}
+static void draw_context_menu(QDesktop *q){
+    if(!q->context_open)return;
+    int x=q->context_x,y=q->context_y;
+    pane(q,x,y,237,253,18,material(q),q->theme?238:213);
+    const char *items[]={
+        q->context_target>=0?"Open":"Open Desktop",
+        "New folder","New text document","Refresh","Personalize","Task Manager"
+    };
+    for(int i=0;i<6;i++){
+        int top=y+9+i*39;
+        if(i==3)thin_rule(q,x+14,top-2,208,43);
+        surface(q,x+8,top,221,35,10,inner_material(q),q->theme?122:135);
+        text(q,x+20,top+24,items[i],foreground(q),0);
+    }
 }
 static void focus_remaining(QDesktop *q){
     q->active=-1;
@@ -2969,6 +2985,7 @@ static void draw_overlays(QDesktop *q){
     draw_menu(q);
     draw_notifications(q);
     draw_quick(q);
+    draw_context_menu(q);
 }
 static void draw_scene(QDesktop *q,int skip){
     draw_base(q,skip);
@@ -3555,6 +3572,18 @@ static void desktop_open(QDesktop *q,int index){
         return;
     }
 }
+void q_context(QDesktop *q,int x,int y){
+    if(!q||q->locked)return;
+    if(q_dock_hit(q,x,y)>=0||hit(x,y,q->width-345,16,319,58))return;
+    for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
+        hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h))return;
+    close_popups(q);
+    q->context_target=desktop_hit(q,x,y);
+    if(q->context_target>=0)q->desktop_selected=q->context_target;
+    q->context_x=clamp(x,4,q->width-242);
+    q->context_y=clamp(y,4,q->height-258);
+    q->context_open=1;q->dirty=1;q->hover_only=0;
+}
 static int files_click(QDesktop *q,QWindow *w,int x,int y,int focused){
     int left=w->x+15,top=w->y+60,full=w->w-30;
     int side=q->file_nav?188:0;
@@ -3723,6 +3752,19 @@ void q_click(QDesktop *q,int x,int y){
         }
         if(hit(x,y,bx+35,by+250,380,49))profile_unlock(q);
         return;
+    }
+    if(q->context_open){
+        int cx=q->context_x,cy=q->context_y,target=q->context_target;
+        q->context_open=0;q->dirty=1;
+        if(hit(x,y,cx,cy,237,253)){
+            int option=(y-cy-9)/39;
+            if(option==0){if(target>=0)desktop_open(q,target);else open_profile_folder(q,"Desktop");}
+            else if(option==1||option==2){open_profile_folder(q,"Desktop");files_begin(q,option==1?1:2);}
+            else if(option==3)desktop_refresh(q);
+            else if(option==4){settings_navigate(q,2);q_open(q,Q_SETTINGS);}
+            else if(option==5)q_open(q,Q_TASKS);
+            return;
+        }
     }
     if(q->desktop_view){
         int vx=clamp((q->width-522)/2,5,q->width-522),vy=dock_y(q)-173;
@@ -4021,6 +4063,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
         }
         return;
     }
+    if(q->context_open&&(scan==23||ch==27)){q->context_open=0;q->dirty=1;return;}
     if(q->active==Q_SETTINGS&&q->profile_edit){
         if(ch==27){q->profile_edit=0;q->dirty=1;return;}
         if(ch=='\r'){profile_edit_submit(q);return;}

@@ -61,6 +61,7 @@ typedef struct {
     uint32_t audio_display_us;
     int clock_hour,clock_minute,clock_valid;
     int desktop_selected,desktop_hover,desktop_click_index,desktop_file_count,notification_count;
+    int context_open,context_x,context_y,context_target;
     uint32_t desktop_click_elapsed_us;
     uint64_t desktop_change_counter;
     QFsEntry desktop_files[Q_DESKTOP_FILES];
@@ -130,6 +131,7 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us);
 void q_drag_buffers(QDesktop *q,uint32_t *background);
 void q_dock_buffers(QDesktop *q,uint32_t *background);
 void q_click(QDesktop *q,int x,int y);
+void q_context(QDesktop *q,int x,int y);
 void q_press(QDesktop *q,int x,int y);
 void q_release(QDesktop *q);
 void q_move(QDesktop *q,int x,int y);

@@ -74,7 +74,7 @@ static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
 static int pointer_ps2_confirmed;
 static uint64_t clock_ticks_per_us=1;
-static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed;
+static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed,pointer_secondary;
 static uint64_t read_clock(void){
     unsigned int low,high;
     __asm__ volatile("rdtsc":"=a"(low),"=d"(high));
@@ -97,8 +97,9 @@ static void pointer_sample(void *context){
                 int next_x=(int)(px*(uint64_t)(desktop.width-1)/max_x);
                 int next_y=(int)(py*(uint64_t)(desktop.height-1)/max_y);
                 int next_pressed=(state.ActiveButtons&1)!=0;
-                if(next_x!=pointer_x||next_y!=pointer_y||next_pressed!=pointer_pressed){
-                    pointer_x=next_x;pointer_y=next_y;pointer_pressed=next_pressed;
+                int next_secondary=(state.ActiveButtons&2)!=0;
+                if(next_x!=pointer_x||next_y!=pointer_y||next_pressed!=pointer_pressed||next_secondary!=pointer_secondary){
+                    pointer_x=next_x;pointer_y=next_y;pointer_pressed=next_pressed;pointer_secondary=next_secondary;
                     pointer_ps2=0;
                     pointer_ps2_confirmed=0;
                     moved=1;
@@ -119,10 +120,11 @@ static void pointer_sample(void *context){
             int64_t my=(int64_t)state.RelativeMovementY*400+pointer_rem_y;
             int dx=(int)(mx/(int64_t)sx),dy=(int)(my/(int64_t)sy);
             int next_pressed=state.LeftButton!=0;
+            int next_secondary=state.RightButton!=0;
             pointer_rem_x=(int)(mx%(int64_t)sx);
             pointer_rem_y=(int)(my%(int64_t)sy);
-            if(dx||dy||next_pressed!=pointer_pressed){
-                pointer_x+=dx;pointer_y+=dy;pointer_pressed=next_pressed;
+            if(dx||dy||next_pressed!=pointer_pressed||next_secondary!=pointer_secondary){
+                pointer_x+=dx;pointer_y+=dy;pointer_pressed=next_pressed;pointer_secondary=next_secondary;
                 pointer_ps2=0;
                 moved=1;
             }
@@ -132,10 +134,12 @@ static void pointer_sample(void *context){
         int dx=0,dy=0,buttons=0;
         if(q_ps2_poll(pointer_ps2,&dx,&dy,&buttons)){
             int next_pressed=(buttons&1)!=0;
-            if(dx||dy||next_pressed!=pointer_pressed){
+            int next_secondary=(buttons&2)!=0;
+            if(dx||dy||next_pressed!=pointer_pressed||next_secondary!=pointer_secondary){
                 pointer_x+=dx;
                 pointer_y+=dy;
                 pointer_pressed=next_pressed;
+                pointer_secondary=next_secondary;
                 pointer_ps2_confirmed=1;
                 moved=1;
             }
@@ -325,7 +329,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     ps2_active=q_ps2_enable();
     if(ps2_active)pointer_ps2=&ps2;
     serial_text(ps2_active?"QUARTZIE-PS2-READY\n":"QUARTZIE-PS2-FAILED\n");
-    uint8_t left=0;
+    uint8_t left=0,right=0;
     uint64_t tick_before=read_clock();
     bs->Stall(10000);
     uint64_t tick_after=read_clock();
@@ -357,7 +361,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         }
         if(pointer_pressed&&!left)q_press(&desktop,desktop.mouse_x,desktop.mouse_y);
         if(!pointer_pressed&&left)q_release(&desktop);
-        left=(uint8_t)pointer_pressed;
+        if(pointer_secondary&&!right)q_context(&desktop,desktop.mouse_x,desktop.mouse_y);
+        left=(uint8_t)pointer_pressed;right=(uint8_t)pointer_secondary;
         if(!ps2_active&&!ever_moved&&!mouse&&!absolute&&ps2_tries<2&&++ps2_wait>=400){
             ps2_tries++;
             ps2_active=q_ps2_enable();
