@@ -26,7 +26,7 @@ static void verify_frame(void){
     q_draw(&full);
     for(size_t i=0;i<1280u*720u;i++){
         if(scene[i]!=reference[i]){
-            fprintf(stderr,"Start hover mismatch at %zu,%zu\n",i%1280u,i/1280u);
+            fprintf(stderr,"Start hover mismatch at %zu,%zu: %06x != %06x\n",i%1280u,i/1280u,scene[i],reference[i]);
             exit(1);
         }
     }
