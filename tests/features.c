@@ -492,11 +492,11 @@ int main(void){
     CHECK(ui.active==Q_STORE&&ui.windows[Q_STORE].open);
     q_draw(&ui);
     QWindow *store=&ui.windows[Q_STORE];
-    q_click(&ui,store->x+32+87,store->y+60+78+51);
+    q_click(&ui,store->x+32+87,store->y+60+73+27);
     CHECK(ui.active==Q_NOTES&&ui.windows[Q_NOTES].open);
     q_open(&ui,Q_STORE);
     q_draw(&ui);
-    q_click(&ui,store->x+32+230+87,store->y+60+78+51);
+    q_click(&ui,store->x+32+87,store->y+60+73+57+27);
     CHECK(ui.active==Q_CALCULATOR&&ui.windows[Q_CALCULATOR].open);
     check_file_selection();
     check_file_moves();
