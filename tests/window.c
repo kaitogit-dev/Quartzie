@@ -72,13 +72,13 @@ static void check_window_controls(void){
     int sx=w->x+w->w-265,sy=w->y+48;
     q_click(&ui,sx+11+81+25,sy+37+22);
     CHECK(w->snap_zone==2);
-    int dock_left=(ui.width-500)/2,dock_top=ui.height-89;
-    q_click(&ui,dock_left+466,dock_top+30);
+    int dock_left=(ui.width-566)/2,dock_top=ui.height-89;
+    q_click(&ui,dock_left+532,dock_top+30);
     CHECK(ui.desktop_view);
     int vx=(ui.width-522)/2,vy=dock_top-173;
     q_click(&ui,vx+16+2*169+35,vy+43+77);
     CHECK(w->desktop==2&&ui.desktop==0);
-    q_click(&ui,dock_left+466,dock_top+30);
+    q_click(&ui,dock_left+532,dock_top+30);
     q_click(&ui,vx+16+2*169+35,vy+43+20);
     CHECK(ui.desktop==2&&ui.active==Q_NOTES);
 }
@@ -88,8 +88,8 @@ int main(void){
     q_drag_buffers(&ui,drag);
     q_dock_buffers(&ui,dock_backdrop);
     CHECK(ui.width==1920&&ui.height==1080);
-    int start_x=(ui.width-500)/2+32,start_y=ui.height-89+35;
-    int files_x=(ui.width-500)/2+95;
+    int start_x=(ui.width-566)/2+36,start_y=ui.height-89+35;
+    int files_x=(ui.width-566)/2+101;
     CHECK(q_dock_hit(&ui,start_x,start_y)==10);
     CHECK(q_dock_hit(&ui,files_x,start_y)==Q_FILES);
     q_move(&ui,start_x,start_y);
@@ -124,8 +124,8 @@ int main(void){
     q_click(&ui,min_x,min_y);
     CHECK(ui.windows[Q_NOTES].open&&ui.windows[Q_NOTES].minimized&&ui.active!=Q_NOTES);
     q_draw(&ui);
-    int dock_left=(ui.width-500)/2,dock_top=ui.height-89;
-    q_click(&ui,dock_left+69+54+26,dock_top+32);
+    int dock_left=(ui.width-566)/2,dock_top=ui.height-89;
+    q_click(&ui,dock_left+72+62+29,dock_top+32);
     CHECK(ui.windows[Q_NOTES].open&&!ui.windows[Q_NOTES].minimized&&ui.active==Q_NOTES);
     q_draw(&ui);
     QWindow *w=&ui.windows[Q_NOTES];
@@ -165,14 +165,14 @@ int main(void){
     CHECK(!w->open);
     q_open(&ui,Q_FILES);
     q_draw(&ui);
-    q_move(&ui,dock_left+69+2*54+26,dock_top+30);
+    q_move(&ui,dock_left+72+2*62+29,dock_top+30);
     CHECK(ui.hover==Q_TERMINAL&&ui.hover_only);
     CHECK(ui.dock_cache_valid);
     q_draw(&ui);
     CHECK(ui.damage_valid&&ui.damage_w<ui.width&&ui.damage_h<ui.height);
     CHECK(ui.damage_h<250);
     same_as_full();
-    q_move(&ui,dock_left+69+4*54+26,dock_top+30);
+    q_move(&ui,dock_left+72+4*62+29,dock_top+30);
     CHECK(ui.hover==Q_SETTINGS&&ui.hover_only);
     q_draw(&ui);
     CHECK(ui.damage_valid);

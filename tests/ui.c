@@ -46,15 +46,15 @@ int main(void){
     q_draw(&desktop);check(desktop.frame_count==1&&!desktop.dirty);
     shot("build/desktop.ppm");
     q_draw(&desktop);check(desktop.frame_count==1);
-    int left=(1280-500)/2,top=720-89;
-    check(q_dock_hit(&desktop,left+32,top+28)==10);
-    q_click(&desktop,left+32,top+28);check(desktop.menu&&!desktop.notifications);
+    int left=(1280-566)/2,top=720-89;
+    check(q_dock_hit(&desktop,left+36,top+28)==10);
+    q_click(&desktop,left+36,top+28);check(desktop.menu&&!desktop.notifications);
     q_draw(&desktop);shot("build/start.ppm");
     q_click(&desktop,(1280-510)/2+50,720-607+140);
     check(!desktop.menu&&desktop.windows[Q_FILES].open&&desktop.active==Q_FILES);
     q_draw(&desktop);shot("build/files.ppm");
     q_key(&desktop,0,18);check(desktop.notifications);
-    q_click(&desktop,left+69+54+26,top+32);
+    q_click(&desktop,left+72+62+29,top+32);
     check(!desktop.notifications&&desktop.windows[Q_NOTES].open&&desktop.active==Q_NOTES);
     int previous=desktop.note_length;
     q_key(&desktop,'A',0);check(desktop.note_length==previous+1&&desktop.notes[previous]=='A');
@@ -66,7 +66,7 @@ int main(void){
     q_move(&desktop,desktop.mouse_x+90,desktop.mouse_y+30);
     check(desktop.windows[Q_NOTES].x!=w.x);
     q_release(&desktop);check(desktop.drag==-1);
-    q_click(&desktop,left+69+4*54+26,top+32);
+    q_click(&desktop,left+72+4*62+29,top+32);
     check(desktop.active==Q_SETTINGS);
     int theme=desktop.theme;
     QWindow settings=desktop.windows[Q_SETTINGS];
@@ -83,19 +83,19 @@ int main(void){
     q_draw(&desktop);shot("build/settings.ppm");
     q_key(&desktop,0,19);check(desktop.quick&&!desktop.notifications);
     q_click(&desktop,1280-363+39,72+80+35);check(desktop.theme==theme);
-    q_click(&desktop,left+69+3*54+26,top+32);check(desktop.active==Q_CALCULATOR);
+    q_click(&desktop,left+72+3*62+29,top+32);check(desktop.active==Q_CALCULATOR);
     q_key(&desktop,'1',0);q_key(&desktop,'2',0);q_key(&desktop,'+',0);q_key(&desktop,'3',0);q_key(&desktop,'=',0);
     check(strcmp(desktop.answer,"15")==0);
     q_draw(&desktop);shot("build/calculator.ppm");
     for(int i=0;i<Q_APPS;i++){
         int tx=(1280-510)/2+26+(i%4)*116+47;
         int ty=720-607+112+(i/4)*103+42;
-        q_click(&desktop,left+32,top+28);
+        q_click(&desktop,left+36,top+28);
         check(desktop.menu);
         q_click(&desktop,tx,ty);
         check(desktop.active==i&&!desktop.menu);
     }
-    q_move(&desktop,left+69+2*54+26,top+30);
+    q_move(&desktop,left+72+2*62+29,top+30);
     check(desktop.hover==Q_TERMINAL);
     q_draw(&desktop);
     check(framebuffer[0]!=0&&framebuffer[100*1280+100]!=0);

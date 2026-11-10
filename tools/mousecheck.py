@@ -60,7 +60,7 @@ def send_vnc_mouse(click_start=False):
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
             time.sleep(0.018)
         if click_start:
-            x = (width - 500) // 2 + 32
+            x = (width - 566) // 2 + 36
             y = height - 89 + 34
             stream.sendall(struct.pack('>BBHH', 5, 0, x, y))
             time.sleep(0.65)
@@ -85,7 +85,7 @@ def send_qmp_start_click(socket_path):
             if b'"return"' not in response:
                 raise RuntimeError(f'Mouse event failed: {response!r}')
         event([
-            {'type': 'abs', 'data': {'axis': 'x', 'value': round(742 * 32767 / 1919)}},
+            {'type': 'abs', 'data': {'axis': 'x', 'value': round(713 * 32767 / 1919)}},
             {'type': 'abs', 'data': {'axis': 'y', 'value': round(1025 * 32767 / 1079)}},
         ])
         time.sleep(0.45)
