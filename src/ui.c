@@ -242,7 +242,8 @@ static void surface(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint
             if(dx<2||dy<2)c=blend(c,rim_color,edge_alpha);
             if(dx>w-3||dy>h-3)c=blend(c,lower_color,lower_alpha);
             if(rim>0)c=blend(c,rim_color,dark?clamp(rim/5,0,48):clamp(rim/3,0,72));
-            q->pixels[at]=cover==256?c:blend(q->pixels[at],c,cover);
+            uint32_t underlay=q->render_topbar?q->wallpaper[at]:q->pixels[at];
+            q->pixels[at]=cover==256?c:blend(underlay,c,cover);
         }
     }
 }
