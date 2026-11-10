@@ -826,17 +826,35 @@ static void draw_menu(QDesktop *q){
     text(q,x+49,y+510,"Lock",foreground(q),0);
     text(q,x+324,y+510,"Quartzie",secondary(q),0);
 }
+static int tray_top(QDesktop *q){return q->height-198;}
+static int notice_visible(QDesktop *q){
+    int available=(tray_top(q)-112)/76;
+    if(available<1)available=1;
+    int count=q->notification_count;
+    return count<available?count:available;
+}
+static int notice_height(QDesktop *q){
+    int count=notice_visible(q);
+    return count?90+count*76:185;
+}
+static int notice_top(QDesktop *q){
+    int height=notice_height(q);
+    return q->storage?clamp(tray_top(q)-height-12,8,q->height-height-4):87;
+}
+static int quick_top(QDesktop *q){
+    return q->storage?clamp(tray_top(q)-372,8,q->height-364):87;
+}
 static void draw_notifications(QDesktop *q){
     if(!q->notifications)return;
-    int x=q->width-385,y=87;
-    int height=q->notification_count?90+q->notification_count*76:185;
+    int x=q->width-385,y=notice_top(q);
+    int height=notice_height(q);
     pane(q,x,y,359,height,22,material(q),q->theme?224:191);
     text(q,x+23,y+39,"Activity",foreground(q),1);
     if(q->notification_count){
         surface(q,x+247,y+15,89,32,9,inner_material(q),q->theme?180:155);
         text(q,x+263,y+37,"Clear all",foreground(q),0);
         thin_rule(q,x+19,y+58,321,53);
-        for(int i=0;i<q->notification_count;i++){
+        for(int i=0;i<notice_visible(q);i++){
             QNotice *n=&q->notices[i];
             int top=y+67+i*76;
             surface(q,x+16,top,327,67,13,inner_material(q),q->theme?151:136);
@@ -852,7 +870,7 @@ static void draw_notifications(QDesktop *q){
 }
 static void draw_quick(QDesktop *q){
     if(!q->quick)return;
-    int x=q->width-363,y=87;
+    int x=q->width-363,y=quick_top(q);
     pane(q,x,y,336,360,22,material(q),q->theme?224:191);
     text(q,x+24,y+40,"Control center",foreground(q),1);
     thin_rule(q,x+24,y+59,288,54);
@@ -880,7 +898,7 @@ static void draw_quick(QDesktop *q){
 }
 static void draw_tray(QDesktop *q){
     if(!q->storage)return;
-    int x=q->width-345,y=16;
+    int x=q->width-345,y=tray_top(q);
     int previous_topbar=q->render_topbar;
     q->render_topbar=1;
     surface(q,x,y,319,58,19,colors(q)->dock,q->theme?212:162);
@@ -3609,7 +3627,7 @@ static void desktop_open(QDesktop *q,int index){
 }
 void q_context(QDesktop *q,int x,int y){
     if(!q||q->locked)return;
-    if(q_dock_hit(q,x,y)>=0||hit(x,y,q->width-345,16,319,58))return;
+    if(q_dock_hit(q,x,y)>=0||(q->storage&&hit(x,y,q->width-345,tray_top(q),319,58)))return;
     for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
         hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h))return;
     close_popups(q);
@@ -3819,7 +3837,7 @@ void q_click(QDesktop *q,int x,int y){
         q->snap_menu_app=-1;q->dirty=1;
     }
     int tray=q->width-345;
-    if(hit(x,y,tray,16,319,58)){
+    if(q->storage&&hit(x,y,tray,tray_top(q),319,58)){
         if(x<tray+215){int was=q->quick;close_popups(q);q->quick=!was;}
         else if(x<tray+270){int was=q->notifications;close_popups(q);q->notifications=!was;}
         else{int was=q->quick;close_popups(q);q->quick=!was;}
@@ -3868,8 +3886,8 @@ void q_click(QDesktop *q,int x,int y){
         q->menu=0;q->dirty=1;
     }
     if(q->notifications){
-        int bx=q->width-385,by=87;
-        int height=q->notification_count?90+q->notification_count*76:185;
+        int bx=q->width-385,by=notice_top(q);
+        int height=notice_height(q);
         if(q->notification_count&&hit(x,y,bx+247,by+15,89,32)){
             q->notification_count=0;q->dirty=1;return;
         }
@@ -3877,7 +3895,7 @@ void q_click(QDesktop *q,int x,int y){
         q->notifications=0;q->dirty=1;
     }
     if(q->quick){
-        int bx=q->width-363,by=87;
+        int bx=q->width-363,by=quick_top(q);
         if(hit(x,y,bx+19,by+75,298,66)){q_set_theme(q,!q->theme);return;}
         if(hit(x,y,bx+19,by+151,298,71)){
             int index=(x-(bx+20))/36;
@@ -4071,7 +4089,7 @@ void q_move(QDesktop *q,int x,int y){
     }
     int desktop_hover=-1;
     if(dock<0&&!q->menu&&!q->notifications&&!q->quick&&!q->desktop_view&&
-        !hit(q->mouse_x,q->mouse_y,q->width-345,16,319,58)){
+        !(q->storage&&hit(q->mouse_x,q->mouse_y,q->width-345,tray_top(q),319,58))){
         int blocked=0;
         for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
             hit(q->mouse_x,q->mouse_y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h)){blocked=1;break;}
