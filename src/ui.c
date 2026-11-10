@@ -2938,8 +2938,11 @@ static void draw_window(QDesktop *q,int app){
     if(w->maximized)matte(q,w->x,w->y,w->w,w->h,0,material(q),244);
     else matte_pane(q,w->x,w->y,w->w,w->h,18,material(q),244);
     int topbar=q->render_topbar;
+    int chrome_app=q->render_app;
     q->render_topbar=1;
+    q->render_app=-1;
     surface(q,w->x,w->y,w->w,57,w->maximized?0:16,material(q),q->theme?207:184);
+    q->render_app=chrome_app;
     q->render_topbar=topbar;
     thin_rule(q,w->x+23,w->y+56,w->w-46,q->theme?47:60);
     app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
