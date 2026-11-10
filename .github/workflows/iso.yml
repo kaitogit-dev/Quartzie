@@ -34,14 +34,14 @@ jobs:
       - name: Publish artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Quartzie-0.44.0-x64-UEFI
+          name: Quartzie-0.45.0-x64-UEFI
           if-no-files-found: error
           compression-level: 9
           path: |
-            Quartzie-0.44.0-x64.iso
-            Quartzie-0.44.0-x64.img
-            Quartzie-0.44.0-userdata.img
-            build/Quartzie-0.44.0.UPD
+            Quartzie-0.45.0-x64.iso
+            Quartzie-0.45.0-x64.img
+            Quartzie-0.45.0-userdata.img
+            build/Quartzie-0.45.0.UPD
             build/BOOTX64.EFI
             build/Quartzie.cur
             tools/run-windows.ps1
