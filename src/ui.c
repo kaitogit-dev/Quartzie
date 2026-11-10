@@ -501,19 +501,26 @@ void q_init(QDesktop *q,int w,int h,uint32_t *pixels,uint32_t *wallpaper_pixels,
     q->update_target=-1;q->update_source_volume=-1;q->store_confirm_remove=-1;q->media_volume_level=80;q->task_selected=-1;q->snap_menu_app=-1;q->snap_candidate=-1;q->active=-1;q->drag=-1;q->hover=-1;q->hover_last=-1;q->menu_hover=-1;q->render_app=-1;q->glass_cached_app=-1;q->mouse_x=w/2;q->mouse_y=h/2;q->dirty=1;q->answer[0]='0';
     q->desktop_selected=-1;q->desktop_hover=-1;q->desktop_click_index=-1;q->desktop_change_counter=UINT64_MAX;
     q->context_target=-1;q->dock_menu_app=-1;
+    int work_bottom=h-104;
+    int max_window_h=work_bottom-14;
     for(int i=0;i<Q_APPS;i++){
         QWindow *a=&q->windows[i];
         a->w=clamp(w-210,530,880);a->h=clamp(h-170,390,600);
-        a->x=(w-a->w)/2+(i%3)*18-18;a->y=(h-a->h)/2+(i%3)*16-16;
+        if(a->h>max_window_h)a->h=max_window_h;
+        a->x=(w-a->w)/2+(i%3)*18-18;
+        a->y=clamp((work_bottom-a->h)/2+(i%3)*16-16,12,work_bottom-a->h);
     }
     QWindow *explorer=&q->windows[Q_FILES];
     explorer->w=clamp(w-76,720,1260);explorer->h=clamp(h-100,530,830);
-    explorer->x=(w-explorer->w)/2;explorer->y=(h-explorer->h)/2;
+    if(explorer->h>max_window_h)explorer->h=max_window_h;
+    explorer->x=(w-explorer->w)/2;
+    explorer->y=clamp((work_bottom-explorer->h)/2,12,work_bottom-explorer->h);
     QWindow *settings=&q->windows[Q_SETTINGS];
     settings->w=clamp(w-124,640,1060);
     settings->h=clamp(h-104,470,750);
+    if(settings->h>max_window_h)settings->h=max_window_h;
     settings->x=(w-settings->w)/2;
-    settings->y=(h-settings->h)/2;
+    settings->y=clamp((work_bottom-settings->h)/2,12,work_bottom-settings->h);
     wallpaper(q);
 }
 void q_set_clock(QDesktop *q,int hour,int minute){

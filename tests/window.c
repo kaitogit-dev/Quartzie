@@ -65,6 +65,7 @@ static void check_snap_and_desktop(void){
 
 static void check_window_controls(void){
     q_init(&ui,1280,720,canvas,background,blur);
+    for(int i=0;i<Q_APPS;i++)CHECK(ui.windows[i].y>=12&&ui.windows[i].y+ui.windows[i].h<=ui.height-104);
     q_open(&ui,Q_NOTES);
     QWindow *w=&ui.windows[Q_NOTES];
     q_move(&ui,w->x+w->w-90,w->y+26);
