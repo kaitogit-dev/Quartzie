@@ -1,5 +1,6 @@
 #define _GNU_SOURCE 1
 #include "winapi.h"
+#include "pe64.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
