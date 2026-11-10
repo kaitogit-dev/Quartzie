@@ -848,7 +848,7 @@ static void draw_menu(QDesktop *q){
     pane(q,x,y,w,522,26,material(q),q->theme?209:146);
     text(q,x+29,y+49,"Start",foreground(q),2);
     if(q->storage)string_limit(q,x+306,y+47,q->storage->profile,secondary(q),0,166,1);
-    surface(q,x+26,y+64,457,39,12,inner_material(q),q->theme?123:164);
+    matte(q,x+26,y+64,457,39,10,inner_material(q),q->theme?128:164);
     text(q,x+41,y+90,q->menu_search_length?q->menu_search:"Search apps...",q->menu_search_length?foreground(q):secondary(q),0);
     int matches=0;
     for(int slot=0;slot<Q_APPS;slot++){
@@ -858,8 +858,7 @@ static void draw_menu(QDesktop *q){
         int bx=x+26+(slot%4)*116,by=y+112+(slot/4)*103;
         int lift=q->animations_enabled?q->menu_lift[app]*6/256:0;
         int selected=q->menu_hover==app||q->menu_lift[app]>0;
-        surface(q,bx,by-lift,107,94,17,selected?colors(q)->selected:inner_material(q),selected?(q->theme?190:173):(q->theme?168:128));
-        if(selected)thin_rule(q,bx+14,by+88-lift,79,q->theme?74:112);
+        if(selected)shell_selection(q,bx,by-lift,107,94,13,1);
         app_icon(q,bx+53,by+35-lift,app,43,q->theme?0xecfaff:0xffffff);
         int width=text_width(names[app],1);
         text(q,bx+(107-width)/2,by+79-lift,names[app],foreground(q),0);
@@ -870,10 +869,10 @@ static void draw_menu(QDesktop *q){
     const char *places[]={"Home","Documents","Downloads","Pictures"};
     for(int i=0;i<4;i++){
         int xx=x+26+i*116;
-        surface(q,xx,y+449,107,35,10,inner_material(q),q->theme?155:158);
+        matte(q,xx,y+449,107,35,9,inner_material(q),q->theme?117:154);
         string_limit(q,xx+9,y+473,places[i],foreground(q),0,92,1);
     }
-    surface(q,x+26,y+491,105,27,9,inner_material(q),q->theme?162:159);
+    matte(q,x+26,y+491,105,27,8,inner_material(q),q->theme?117:154);
     text(q,x+49,y+510,"Lock",foreground(q),0);
     text(q,x+324,y+510,"Quartzie",secondary(q),0);
 }
@@ -909,7 +908,7 @@ static void draw_notifications(QDesktop *q){
         for(int i=0;i<notice_visible(q);i++){
             QNotice *n=&q->notices[i];
             int top=y+67+i*76;
-            matte(q,x+16,top,327,67,13,inner_material(q),q->theme?151:136);
+            thin_rule(q,x+24,top+65,310,q->theme?59:41);
             circular(q,x+36,top+24,7,accent(q),225);
             string_limit(q,x+55,top+28,n->title,foreground(q),1,270,1);
             string_limit(q,x+24,top+52,n->message,secondary(q),0,292,1);
@@ -926,17 +925,17 @@ static void draw_quick(QDesktop *q){
     pane(q,x,y,336,360,22,material(q),q->theme?224:191);
     text(q,x+24,y+40,"Control center",foreground(q),1);
     thin_rule(q,x+24,y+59,288,54);
-    matte(q,x+19,y+75,298,66,15,inner_material(q),q->theme?135:136);
+    thin_rule(q,x+20,y+143,296,q->theme?55:38);
     text(q,x+37,y+103,"Appearance",foreground(q),1);
     text(q,x+37,y+125,q->theme?"Dark glass":"Light glass",secondary(q),0);
-    matte(q,x+19,y+151,298,71,15,inner_material(q),q->theme?135:136);
+    thin_rule(q,x+20,y+223,296,q->theme?55:38);
     text(q,x+37,y+178,"Accent",foreground(q),1);
     for(int i=0;i<8;i++){
         int cx=x+38+i*36;
         circular(q,cx,y+200,11,(uint32_t[]){0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85,0xef709a,0xe8ca70,0x69a6ff,0xadaee7}[i],255);
         if(q->accent==i)circular(q,cx,y+200,4,q->theme?0x192537:0xffffff,255);
     }
-    matte(q,x+19,y+231,298,65,15,inner_material(q),q->theme?135:136);
+    thin_rule(q,x+20,y+297,296,q->theme?55:38);
     text(q,x+37,y+258,"Sound",foreground(q),1);
     text(q,x+37,y+281,q->media_muted?"Muted":"Media volume",secondary(q),0);
     matte(q,x+179,y+246,32,34,9,inner_material(q),167);
@@ -945,7 +944,7 @@ static void draw_quick(QDesktop *q){
     text(q,x+189,y+271,"-",foreground(q),1);
     text(q,x+227,y+271,"+",foreground(q),1);
     text(q,x+265,y+270,q->media_muted?"Off":"On",foreground(q),0);
-    matte(q,x+19,y+305,298,38,12,inner_material(q),q->theme?149:153);
+    matte(q,x+19,y+305,298,38,9,inner_material(q),q->theme?118:153);
     text(q,x+36,y+331,"Settings and personalization",foreground(q),0);
 }
 static void draw_tray(QDesktop *q){
