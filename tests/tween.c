@@ -56,8 +56,8 @@ int main(void){
     finish();
     CHECK(window->x==x&&window->y==y);
     CHECK(window->w==width&&window->h==height);
-    int left=(ui.width-632)/2,top=ui.height-89;
-    q_move(&ui,left+77+77+30,top+30);
+    int left=(ui.width-500)/2,top=ui.height-89;
+    q_move(&ui,left+69+54+26,top+30);
     q_draw(&ui);
     q_tick(&ui);
     CHECK(ui.dock_lift[Q_NOTES]>0);

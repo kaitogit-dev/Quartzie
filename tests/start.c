@@ -38,7 +38,7 @@ int main(void){
     q_draw(&ui);
     CHECK(ui.dock_cache_valid);
     CHECK(q_icon_pixels(QI_START)!=0);
-    int x=(ui.width-632)/2+37,y=ui.height-89+36;
+    int x=(ui.width-500)/2+32,y=ui.height-89+36;
     CHECK(q_dock_hit(&ui,x,y)==10);
     CHECK(!ui.start_hover&&!ui.start_lift);
     q_enable_animations(&ui);

@@ -26,8 +26,8 @@ static int difference(int y){
 int main(void){
     q_init(&ui,1280,720,pixels,background,blurred);
     q_draw(&ui);
-    CHECK(pixels[(size_t)148*1280+35]!=background[(size_t)148*1280+35]);
-    CHECK(pixels[(size_t)148*1280+141]!=background[(size_t)148*1280+141]);
+    CHECK(pixels[(size_t)56*1280+62]!=background[(size_t)56*1280+62]);
+    CHECK(pixels[(size_t)144*1280+62]!=background[(size_t)144*1280+62]);
     for(int y=8;y<440;y+=17)for(int x=260;x<940;x+=23)
         CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
     for(int y=8;y<61;y+=11)for(int x=300;x<980;x+=41)
