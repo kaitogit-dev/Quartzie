@@ -26,7 +26,9 @@ static int difference(int y){
 int main(void){
     q_init(&ui,1280,720,pixels,background,blurred);
     q_draw(&ui);
-    for(int y=8;y<440;y+=17)for(int x=35;x<230;x+=23)
+    CHECK(pixels[(size_t)148*1280+35]!=background[(size_t)148*1280+35]);
+    CHECK(pixels[(size_t)148*1280+141]!=background[(size_t)148*1280+141]);
+    for(int y=8;y<440;y+=17)for(int x=260;x<940;x+=23)
         CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
     for(int y=8;y<61;y+=11)for(int x=300;x<980;x+=41)
         CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
@@ -41,6 +43,6 @@ int main(void){
     CHECK(abs((int)(p>>16&255)-(int)(v>>16&255))<35);
     CHECK(abs((int)(p>>8&255)-(int)(v>>8&255))<35);
     CHECK(abs((int)(p&255)-(int)(v&255))<35);
-    puts("PASS: no top panel or Favorites, clean wallpaper and integrated window header");
+    puts("PASS: desktop shortcuts, unobstructed wallpaper and integrated window header");
     return 0;
 }
