@@ -8,16 +8,18 @@ $ErrorActionPreference = "Stop"
 $qemu = Join-Path $env:ProgramFiles "qemu"
 $executable = Join-Path $qemu "qemu-system-x86_64.exe"
 if (!(Test-Path $executable)) { throw "QEMU not found: $executable" }
-$iso = Join-Path $PSScriptRoot "Quartzie-0.44.0-x64.iso"
+$bundle = Split-Path -Parent $PSScriptRoot
+if (!(Test-Path (Join-Path $bundle "Quartzie-0.44.0-x64.iso"))) { $bundle = $PSScriptRoot }
+$iso = Join-Path $bundle "Quartzie-0.44.0-x64.iso"
 if (!(Test-Path $iso)) { $iso = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.44.0-x64.iso" }
-$systemDisk = Join-Path $PSScriptRoot "Quartzie-0.44.0-x64.img"
+$systemDisk = Join-Path $bundle "Quartzie-0.44.0-x64.img"
 if (!(Test-Path $systemDisk)) { $systemDisk = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.44.0-x64.img" }
 if ($BootMode -eq "iso" -and !(Test-Path $iso)) { throw "ISO not found: $iso" }
 if ($BootMode -eq "disk" -and !(Test-Path $systemDisk)) { throw "System image not found: $systemDisk" }
 $firmware = Join-Path $qemu "share\edk2-x86_64-code.fd"
 $variables = Join-Path $qemu "share\edk2-i386-vars.fd"
 if (!(Test-Path $firmware) -or !(Test-Path $variables)) { throw "UEFI firmware not found in QEMU share directory" }
-$userdisk = Join-Path $PSScriptRoot "Quartzie-0.44.0-userdata.img"
+$userdisk = Join-Path $bundle "Quartzie-0.44.0-userdata.img"
 if (!(Test-Path $userdisk)) { $userdisk = Join-Path $env:USERPROFILE "Downloads\Quartzie-0.44.0-userdata.img" }
 if (!(Test-Path $userdisk)) { throw "Persistent data disk not found: $userdisk" }
 $variablesCopy = Join-Path $env:TEMP "quartzie-0.44.0-vars.fd"
