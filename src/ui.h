@@ -40,7 +40,8 @@ typedef struct {
 } QWindow;
 typedef struct {
     int width,height,mouse_x,mouse_y,dirty,theme,accent;
-    int menu,notifications,quick,active,drag,drag_x,drag_y;
+    int menu,notifications,quick,calendar_open,calendar_offset,active,drag,drag_x,drag_y;
+    int dock_menu_app,dock_menu_x,dock_menu_y;
     int pressed,last_button,frame_count,hover;
     int desktop,desktop_view,snap_menu_app,snap_candidate;
     uint32_t snap_hover_us;
