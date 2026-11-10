@@ -65,6 +65,22 @@ static int bind_imports(uint8_t *mem,size_t size,uint32_t rva,uint32_t length,co
     }
     return terminated?Q_PE_OK:Q_PE_IMPORT;
 }
+size_t q_pe64_image_size(const void *file,size_t file_size){
+    const uint8_t *src=(const uint8_t *)file;
+    if(!src||!span(0,64,file_size)||get16(src)!=0x5a4d)return 0;
+    uint32_t pe=get32(src+60);
+    if(!span(pe,24,file_size)||get32(src+pe)!=0x4550)return 0;
+    const uint8_t *coff=src+pe+4;
+    if(get16(coff)!=0x8664)return 0;
+    uint16_t sections=get16(coff+2),optional=get16(coff+16);
+    size_t opt=(size_t)pe+24;
+    if(!sections||sections>96||optional<112||!span(opt,optional,file_size))return 0;
+    if(get16(src+opt)!=0x20b)return 0;
+    uint32_t bytes=get32(src+opt+56),headers=get32(src+opt+60),entry=get32(src+opt+16);
+    if(bytes<4096||bytes>64u*1024u*1024u||headers>bytes||entry>=bytes||
+        !span(0,headers,file_size)||!span(opt+optional,(size_t)sections*40,file_size))return 0;
+    return bytes;
+}
 int q_pe64_load(const void *file,size_t file_size,void *memory,size_t capacity,const QPe64Resolver *resolver,QPe64Image *out){
     if(!file||!memory||!out)return Q_PE_INVALID;
     const uint8_t *src=(const uint8_t *)file;

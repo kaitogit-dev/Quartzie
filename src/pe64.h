@@ -21,6 +21,7 @@ enum {
     Q_PE_IMPORT=-5,
     Q_PE_MEMORY=-6
 };
+size_t q_pe64_image_size(const void *file,size_t file_size);
 int q_pe64_load(const void *file,size_t file_size,void *memory,size_t capacity,const QPe64Resolver *resolver,QPe64Image *out);
 void *q_pe64_entry(const QPe64Image *image);
 void *q_pe64_export(const QPe64Image *image,const char *name);
