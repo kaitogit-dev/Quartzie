@@ -1156,7 +1156,7 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
                     mapped+=q->kernel->processes[i].regions[j].length;
         }
         char value[32];
-        matte(q,x,y+79,cw,w->h-188,15,inner_material(q),q->theme?128:154);
+        thin_rule(q,x+8,y+79,cw-16,q->theme?55:43);
         const char *labels[]={"Open apps","Processes","Threads","Mapped virtual MiB","Uptime seconds","Scheduler ticks","Context switches","System calls"};
         uint64_t numbers[]={ (uint64_t)apps,(uint64_t)processes,(uint64_t)threads,mapped/(1024u*1024u),
             q->uptime_us/1000000u,q->kernel?q->kernel->clock_ticks:0,
@@ -1172,7 +1172,7 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     }
     int max_rows=clamp((w->h-245)/42,3,10);
     if(q->task_scroll>=count)q->task_scroll=count>0?(count-1)/max_rows*max_rows:0;
-    matte(q,x,y+75,cw,w->h-190,14,inner_material(q),q->theme?112:155);
+    thin_rule(q,x+8,y+75,cw-16,q->theme?55:43);
     text(q,x+19,y+99,q->task_tab==0?"Application":"Native process",muted,0);
     text(q,x+cw-145,y+99,q->task_tab==0?"State":"PID / Memory",muted,0);
     for(int row=0;row<max_rows;row++){
@@ -1698,7 +1698,7 @@ static void notes_vertical(QDesktop *q,int direction){
     q->dirty=1;
 }
 static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
-    matte(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
+    matte(q,x,y+30,cw,w->h-158,4,inner_material(q),q->theme?74:138);
     int row=0,advance=0,cursor_row=0,cursor_x=0;
     int max_width=cw-47;
     for(int i=0;i<=q->note_length;i++){
@@ -1717,7 +1717,6 @@ static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     if(cursor_row>=q->note_scroll+visible)q->note_scroll=cursor_row-visible+1;
     int line=0,at=0,px=0;
     char display[256];
-    if(!q->note_length)text(q,x+23,y+73,"Write something...",muted,1);
     for(int i=0;i<=q->note_length;i++){
         char c=i<q->note_length?q->notes[i]:0;
         int width=c&&c!='\n'?q_font_glyph(1,(unsigned char)c)->advance:0;
@@ -2125,7 +2124,6 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             matte(q,dx,dy,210,76,9,inner_material(q),q->theme?131:133);
             sprite(q,dx+32,dy+37,QI_FILE_EXPLORER,43);
             string_limit(q,dx+62,dy+37,q->storage->volumes[i].label,ink,0,139,1);
-            text(q,dx+62,dy+59,"Open drive",muted,0);
         }
     }else{
         int cols=files_columns(q,w),item_h=files_item_height(q);
@@ -2243,7 +2241,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     if(height<110)height=110;
     if(app==Q_PHOTOS||q->media.kind==QM_VIDEO)draw_media_canvas(q,x,y+45,cw,height);
     else{
-        matte(q,x,y+45,cw,height,18,inner_material(q),q->theme?180:160);
+        matte(q,x,y+45,cw,height,4,inner_material(q),q->theme?180:160);
         int center=y+45+height/2;
         for(int i=0;i<84;i++){
             int pos=x+20+(cw-40)*i/84;
@@ -2391,8 +2389,8 @@ static void settings_switch(QDesktop *q,int x,int y,int on){
 static void settings_card(QDesktop *q,int x,int y,int w,int h,const char *heading,const char *description,int arrow){
     if(w<20||h<20)return;
     thin_rule(q,x+17,y+h-1,w-34,q->theme?52:40);
-    text(q,x+19,y+31,heading,foreground(q),1);
-    string_limit(q,x+19,y+55,description,secondary(q),0,w-(arrow?68:36),1);
+    string_limit(q,x+19,y+h/2+7,heading,foreground(q),0,w-(arrow?68:36),1);
+    (void)description;
     if(arrow){
         int right=x+w-27,mid=y+h/2;
         segment(q,right-5,mid-6,right+1,mid,secondary(q));
@@ -2576,7 +2574,6 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     matte(q,x,y+11,side,nav_bottom-11,19,inner_material(q),q->theme?131:127);
     app_icon(q,x+38,y+47,Q_SETTINGS,40,foreground(q));
     text(q,x+68,y+42,"Quartzie",foreground(q),1);
-    text(q,x+69,y+64,"Local device",secondary(q),0);
     matte(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
     string_limit(q,x+27,y+105,q->settings_search_length?q->settings_search:"Find a setting",q->settings_search_length?foreground(q):secondary(q),0,side-51,1);
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
@@ -2589,15 +2586,13 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_icon(q,x+32,yy+19,i);
         text(q,x+55,yy+25,settings_pages[i],foreground(q),0);
     }
-    if(w->h>=700)text(q,x+21,y+w->h-113,"Quartzie 0.44.0",secondary(q),0);
     if(q->settings_search_length){
         text(q,left,y+39,"Search results",foreground(q),2);
         int row=0;
         for(int i=0;i<Q_SETTINGS_PAGES;i++)if(settings_result(q,i)){
             int yy=y+76+row*75;
             if(yy+67>y+w->h-76)break;
-            const char *subtitles[Q_SETTINGS_PAGES]={"Overview","Display and performance","Colors and wallpapers","Installed applications","Volumes and drives","Device information","Network interfaces","User profiles and screen lock","Firmware installation and recovery"};
-            settings_card(q,left,yy,width,66,settings_pages[i],subtitles[i],1);
+            settings_card(q,left,yy,width,66,settings_pages[i],0,1);
             row++;
         }
         if(!row)text(q,left+8,y+116,"No matching settings",secondary(q),1);
@@ -2605,30 +2600,16 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     }
     int page=q->settings_page;
     text(q,left,y+39,settings_pages[page],foreground(q),2);
-    const char *subtitles[Q_SETTINGS_PAGES]={
-        "Your space, your settings",
-        "Display and performance",
-        "Make Quartzie yours",
-        "Open your applications",
-        "Manage local storage",
-        "Device information",
-        "Network adapters and link status",
-        "User accounts and sign-in",
-        "Updates, integrity and recovery"
-    };
-    text(q,left,y+69,subtitles[page],secondary(q),0);
     if(page==0){
-        matte(q,left,y+92,width,105,18,colors(q)->selected,q->theme?171:174);
-        app_icon(q,left+52,y+143,Q_SETTINGS,62,foreground(q));
-        text(q,left+103,y+140,"Quartzie",foreground(q),2);
-        text(q,left+104,y+168,"Ready for your next idea",secondary(q),0);
         const int targets[4]={1,2,3,4};
-        const char *descriptions[4]={"Display and motion","Colors and appearance","Your apps","Files and drives"};
-        int gap=12,tile=(width-gap)/2;
-        int tile_y=w->h<550?201:210,step=w->h<550?93:102,tile_h=w->h<550?80:91;
         for(int i=0;i<4;i++){
-            int bx=left+(i%2)*(tile+gap),by=y+tile_y+(i/2)*step;
-            settings_card(q,bx,by,tile,tile_h,settings_pages[targets[i]],descriptions[i],1);
+            int yy=y+104+i*62;
+            settings_icon(q,left+28,yy+24,targets[i]);
+            text(q,left+58,yy+30,settings_pages[targets[i]],foreground(q),1);
+            thin_rule(q,left+16,yy+55,width-32,q->theme?47:34);
+            int right=left+width-24;
+            segment(q,right-6,yy+18,right,yy+24,secondary(q));
+            segment(q,right,yy+24,right-6,yy+30,secondary(q));
         }
     }else if(page==1){
         char resolution[32];settings_resolution(q,resolution);
@@ -2638,17 +2619,17 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_card(q,left,y+275,width,77,"Personalization","Theme and accent colors",1);
         if(w->h>=560)settings_card(q,left,y+364,width,77,"About","System details",1);
     }else if(page==2){
-        matte(q,left,y+92,width,123,18,inner_material(q),q->theme?124:166);
-        text(q,left+20,y+125,"Choose your mode",foreground(q),1);
+        text(q,left+8,y+125,"Appearance",foreground(q),1);
+        thin_rule(q,left+8,y+137,width-16,q->theme?48:37);
         int bx=left+19,button=(width-48)/2;
         for(int i=0;i<2;i++){
             int xx=bx+i*(button+10),selected=q->theme==i;
-            matte(q,xx,y+144,button,52,13,selected?colors(q)->selected:material(q),selected?201:121);
+            if(selected)matte(q,xx,y+144,button,52,8,colors(q)->selected,176);
             if(selected)rectangle(q,xx+13,y+159,4,22,accent(q));
             text(q,xx+27,y+176,i?"Dark":"Light",foreground(q),1);
         }
-        matte(q,left,y+230,width,154,16,inner_material(q),q->theme?124:166);
-        text(q,left+20,y+263,"Accent color",foreground(q),1);
+        text(q,left+8,y+263,"Accent color",foreground(q),1);
+        thin_rule(q,left+8,y+272,width-16,q->theme?48:37);
         const uint32_t accents[8]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85,0xef709a,0xe8ca70,0x69a6ff,0xadaee7};
         for(int i=0;i<8;i++){
             int cx=left+width*(2*(i%4)+1)/8,cy=y+300+(i/4)*50;
@@ -2669,14 +2650,12 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         if(w->h>=570)settings_card(q,left,y+473,width,58,"Set a photo as wallpaper","Open Photos and select Set wallpaper",1);
     }else if(page==3){
         const int apps[5]={Q_FILES,Q_NOTES,Q_PHOTOS,Q_MEDIA,Q_STORE};
-        const char *descriptions[5]={"Browse your drives","Edit text files","View pictures","Play audio and video","Explore available apps"};
         int row_h=clamp((w->h-230)/5,45,64);
         for(int i=0;i<5;i++){
             int yy=y+92+i*(row_h+9);
             thin_rule(q,left+12,yy+row_h-1,width-24,q->theme?48:33);
             app_icon(q,left+31,yy+row_h/2,apps[i],32,foreground(q));
             text(q,left+62,yy+27,names[apps[i]],foreground(q),1);
-            if(row_h>=58)string_limit(q,left+62,yy+48,descriptions[i],secondary(q),0,width-109,1);
             segment(q,left+width-33,yy+row_h/2-5,left+width-27,yy+row_h/2,secondary(q));
             segment(q,left+width-27,yy+row_h/2,left+width-33,yy+row_h/2+5,secondary(q));
         }
@@ -2709,7 +2688,6 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
                 settings_card(q,left,y+124+i*79,width,69,label,description,1);
             }
         }
-        text(q,left+5,y+w->h-109,"Select a drive to browse it in Files.",secondary(q),0);
     }else if(page==7){
         int compact=w->h<600,create_y=compact?322:446,lock_y=compact?375:499;
         int list_y=compact?177:211,list_count=compact?3:5;
@@ -2740,9 +2718,8 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         if(q->profile_status[0])string_limit(q,left+7,y+(compact?440:560),q->profile_status,secondary(q),0,width-12,1);
     }else if(page==8){
         const char *actions[]={"Check for updates","Install verified update","Run boot diagnostics","Roll back firmware","Restore appearance settings","Discard rollback backup"};
-        const char *descs[]={"Search FAT drives and Downloads","Write to a writable EFI system disk","Inspect boot EFI, storage, accounts and fallback","Restore the saved previous EFI","Recover the last saved configuration","Allow installation of a further update"};
         int row=clamp((w->h-175)/6,49,76);
-        for(int i=0;i<6;i++)settings_card(q,left,y+92+i*row,width,row-8,actions[i],descs[i],1);
+        for(int i=0;i<6;i++)settings_card(q,left,y+92+i*row,width,row-8,actions[i],0,1);
         if(q->update_status[0])string_limit(q,left+5,y+w->h-57,q->update_status,secondary(q),0,width-10,1);
     }else if(page==6){
         text(q,left+5,y+112,"Detected network interfaces",foreground(q),1);
@@ -2787,9 +2764,7 @@ static void settings_click(QDesktop *q,QWindow *w,int x,int y){
     switch(q->settings_page){
         case 0:{
             const int pages[4]={1,2,3,4};
-            int tile=(width-12)/2;
-            int tile_y=w->h<550?201:210,step=w->h<550?93:102,tile_h=w->h<550?80:91;
-            for(int i=0;i<4;i++)if(hit(x,y,left+(i%2)*(tile+12),by+tile_y+(i/2)*step,tile,tile_h)){
+            for(int i=0;i<4;i++)if(hit(x,y,left,by+104+i*62,width,57)){
                 settings_navigate(q,pages[i]);return;
             }
             break;
@@ -2911,8 +2886,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
             string_limit(q,x+19,y+136,q->store_info.id,muted,0,cw-40,1);
             string_limit(q,x+19,y+166,q->store_info.version,muted,0,cw-40,1);
             text(q,x+19,y+196,files_equal(q->store_info.platform,"android")?"Android package":"Windows executable",ink,0);
-            text(q,x+19,y+225,"SHA-256 and archive integrity verified",muted,0);
-            matte(q,x+18,y+246,140,40,11,colors(q)->selected,186);
+                matte(q,x+18,y+246,140,40,11,colors(q)->selected,186);
             text(q,x+51,y+272,"Install",ink,1);
             matte(q,x+169,y+246,130,40,11,inner_material(q),154);
             text(q,x+195,y+272,"Cancel",ink,0);
@@ -2927,7 +2901,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
                     text(q,x+12,y+117,"No installed packages",muted,1);
                 for(int i=0;i<q->store_installed_count&&i<5;i++){
                     int yy=y+78+i*59;
-                    matte(q,x+1,yy,cw-2,53,12,inner_material(q),q->theme?139:154);
+                    thin_rule(q,x+4,yy+53,cw-8,q->theme?48:35);
                     sprite(q,x+32,yy+26,QI_COMPRESSED,32);
                     string_limit(q,x+59,yy+32,q->store_installed[i].name,ink,0,cw-207,1);
                     matte(q,x+cw-139,yy+8,126,38,9,i==q->store_confirm_remove?colors(q)->selected:inner_material(q),154);
@@ -2937,21 +2911,18 @@ static void window_content(QDesktop *q,int app,QWindow *w){
                 const int apps[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
                 for(int i=0;i<4;i++){
                     int app_index=apps[q->store_page*4+i];
-                    int pitch=w->w>650?230:190;
-                    int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
-                    matte(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
-                    app_icon(q,bx+39,by+39,app_index,43,ink);
-                    text(q,bx+72,by+40,names[app_index],ink,0);
-                    text(q,bx+72,by+69,"Open",accent(q),0);
+                    int by=y+73+i*57;
+                    app_icon(q,x+31,by+24,app_index,36,ink);
+                    text(q,x+66,by+31,names[app_index],ink,1);
+                    text(q,x+cw-77,by+31,"Open",accent(q),0);
+                    thin_rule(q,x+8,by+54,cw-16,q->theme?47:35);
                 }
-                text(q,x,y+333,q->store_page?"Previous":"Next",accent(q),1);
-                text(q,x+150,y+333,q->store_page?"2 / 2":"1 / 2",muted,0);
+                text(q,x+12,y+328,q->store_page?"Previous":"Next",accent(q),1);
             }
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
         text(q,x,y+45,"Quartzie 0.44.0",ink,2);
-        text(q,x,y+97,"A space to create.",ink,1);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
         text(q,x,y+192,"F1-F6  Open applications",ink,0);
@@ -4018,8 +3989,8 @@ void q_click(QDesktop *q,int x,int y){
                 q->store_confirm_remove=-1;q->dirty=1;return;
             }
             const int entries[8]={Q_NOTES,Q_CALCULATOR,Q_FILES,Q_TERMINAL,Q_SETTINGS,Q_PHOTOS,Q_MEDIA,Q_ABOUT};
-            if(hit(x,y,bx,by+302,140,45)){q->store_page=1-q->store_page;q->dirty=1;return;}
-            for(int i=0;i<4;i++)if(hit(x,y,bx+(i%2)*(w->w>650?230:190),by+78+(i/2)*118,174,102)){
+            if(hit(x,y,bx,by+300,140,47)){q->store_page=1-q->store_page;q->dirty=1;return;}
+            for(int i=0;i<4;i++)if(hit(x,y,bx,by+73+i*57,cw,55)){
                 q_open(q,entries[q->store_page*4+i]);return;
             }
         }else if(chosen==Q_SETTINGS){

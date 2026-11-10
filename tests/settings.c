@@ -141,7 +141,7 @@ int main(void){
     if(side>220)side=220;
     if(side<175)side=175;
     int content=bx+side+25,width=w->w-64-side-25;
-    q_click(&ui,content+width/4,by+252);
+    q_click(&ui,content+width/4,by+136);
     CHECK(ui.settings_page==1);
     CHECK(ui.animations_enabled==1);
     q_click(&ui,content+width-40,by+217);
