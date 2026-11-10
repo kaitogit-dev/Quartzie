@@ -59,7 +59,7 @@ int main(void){
     int left=(ui.width-500)/2,top=ui.height-89;
     q_move(&ui,left+69+54+26,top+30);
     q_draw(&ui);
-    q_tick(&ui);
+    q_tick_timed(&ui,16000);
     CHECK(ui.dock_lift[Q_NOTES]>0);
     q_draw(&ui);
     CHECK(ui.damage_valid&&ui.damage_h<250);
