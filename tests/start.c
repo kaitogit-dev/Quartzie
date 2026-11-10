@@ -36,6 +36,7 @@ int main(void){
     q_init(&ui,1280,720,scene,wall,blur);
     q_dock_buffers(&ui,dock_cache);
     q_draw(&ui);
+    verify_frame();
     CHECK(ui.dock_cache_valid);
     CHECK(q_icon_pixels(QI_START)!=0);
     int x=(ui.width-632)/2+37,y=ui.height-89+36;
