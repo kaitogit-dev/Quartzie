@@ -97,6 +97,26 @@ int main(void){
     CHECK(framebuffer[128*256+105]!=framebuffer[128*256+148]);
     CHECK(framebuffer[128*256+105]!=0x203040);
     CHECK(framebuffer[128*256+148]!=0xb0c0d0);
+    static QStorage status_storage;
+    for(int use_dark=0;use_dark<2;use_dark++){
+        q_init(&desktop,1024,768,framebuffer,wall,work);
+        desktop.storage=&status_storage;
+        desktop.theme=use_dark;
+        desktop.render_topbar=0;
+        for(size_t i=0;i<1024u*768u;i++){
+            wall[i]=use_dark?0xe7f0fb:0x0a1930;
+            framebuffer[i]=use_dark?0x182d49:0xe7f0fb;
+        }
+        int dock_left=dock_x(&desktop),dock_top=dock_y(&desktop);
+        int status_left=tray_left(&desktop),status_top=tray_top(&desktop);
+        CHECK(status_top+70<=dock_top||status_top==dock_top);
+        draw_dock(&desktop);
+        draw_tray(&desktop);
+        CHECK(desktop.render_topbar==0);
+        uint32_t dock_pixel=framebuffer[(size_t)(dock_top+7)*1024+dock_left+170];
+        uint32_t status_pixel=framebuffer[(size_t)(status_top+7)*1024+status_left+113];
+        CHECK(absval(luminance(dock_pixel)-luminance(status_pixel))<50);
+    }
     puts("PASS: translucent shell highlights, dark/light glass, undimmed wallpaper, and theme caches");
     return 0;
 }

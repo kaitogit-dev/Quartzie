@@ -789,7 +789,7 @@ int q_dock_hit(QDesktop *q,int x,int y){
 }
 static void draw_dock(QDesktop *q){
     int x=dock_x(q),y=dock_y(q);
-    pane(q,x,y,dock_width(q),70,24,colors(q)->dock,q->theme?205:143);
+    pane(q,x,y,dock_width(q),70,22,colors(q)->dock,q->theme?205:143);
     int start_lift=q->animations_enabled?q->start_lift*5/256:0;
     if(q->menu||q->start_hover||q->start_lift>0)
         tint_overlay(q,x+8,y+8-start_lift,54,52,13,colors(q)->hover,q->theme?92:100);
@@ -874,7 +874,7 @@ static void draw_menu(QDesktop *q){
     text(q,x+324,y+510,"Quartzie",secondary(q),0);
 }
 static int tray_left(QDesktop *q){return q->width-244;}
-static int tray_top(QDesktop *q){return q->width<1100||dock_x(q)+dock_width(q)+12>tray_left(q)?dock_y(q)-65:dock_y(q)+6;}
+static int tray_top(QDesktop *q){return q->width<1100||dock_x(q)+dock_width(q)+12>tray_left(q)?dock_y(q)-80:dock_y(q);}
 static int notice_visible(QDesktop *q){
     int available=(tray_top(q)-112)/76;
     if(available<1)available=1;
@@ -947,20 +947,17 @@ static void draw_quick(QDesktop *q){
 static void draw_tray(QDesktop *q){
     if(!q->storage)return;
     int x=tray_left(q),y=tray_top(q);
-    int previous=q->render_topbar;
-    q->render_topbar=1;
-    surface(q,x,y,228,58,19,colors(q)->dock,q->theme?207:157);
-    q->render_topbar=previous;
+    pane(q,x,y,228,70,22,colors(q)->dock,q->theme?205:143);
     int online=0;
     if(q->network)for(int i=0;i<q->network->count;i++)
         if(!q->network->adapters[i].link_known||q->network->adapters[i].link_present)online=1;
-    sprite(q,x+28,y+29,online?QI_WIFI:QI_NO_WIFI,25);
+    sprite(q,x+28,y+35,online?QI_WIFI:QI_NO_WIFI,25);
     char clock[]="--:--";
     if(q->clock_valid){
         clock[0]=(char)('0'+q->clock_hour/10);clock[1]=(char)('0'+q->clock_hour%10);
         clock[3]=(char)('0'+q->clock_minute/10);clock[4]=(char)('0'+q->clock_minute%10);
     }
-    text(q,x+52,y+26,clock,foreground(q),1);
+    text(q,x+52,y+32,clock,foreground(q),1);
     char date[]="--.--.----";
     if(q->clock_year>=2000){
         date[0]=(char)('0'+q->clock_day/10);date[1]=(char)('0'+q->clock_day%10);
@@ -968,13 +965,13 @@ static void draw_tray(QDesktop *q){
         date[6]=(char)('0'+q->clock_year/1000%10);date[7]=(char)('0'+q->clock_year/100%10);
         date[8]=(char)('0'+q->clock_year/10%10);date[9]=(char)('0'+q->clock_year%10);
     }
-    string_limit(q,x+52,y+46,date,secondary(q),0,110,1);
-    if(q->notifications)matte(q,x+160,y+9,31,40,9,colors(q)->selected,173);
-    if(q->quick)matte(q,x+194,y+9,31,40,9,colors(q)->selected,173);
-    circular(q,x+176,y+28,8,foreground(q),q->notification_count?226:150);
-    circular(q,x+176,y+28,5,colors(q)->dock,255);
-    if(q->notification_count)circular(q,x+184,y+18,4,accent(q),255);
-    sprite(q,x+208,y+29,QI_SETTINGS,25);
+    string_limit(q,x+52,y+52,date,secondary(q),0,110,1);
+    if(q->notifications)tint_overlay(q,x+160,y+15,31,40,10,colors(q)->selected,q->theme?88:98);
+    if(q->quick)tint_overlay(q,x+194,y+15,31,40,10,colors(q)->selected,q->theme?88:98);
+    circular(q,x+176,y+34,8,foreground(q),q->notification_count?226:150);
+    circular(q,x+176,y+34,5,colors(q)->dock,255);
+    if(q->notification_count)circular(q,x+184,y+24,4,accent(q),255);
+    sprite(q,x+208,y+35,QI_SETTINGS,25);
 }
 static void draw_context_menu(QDesktop *q){
     if(!q->context_open)return;
@@ -2736,7 +2733,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         matte(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.45.0",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.45.1",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -2922,7 +2919,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.45.0",ink,2);
+        text(q,x,y+45,"Quartzie 0.45.1",ink,2);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
         text(q,x,y+192,"F1-F6  Open applications",ink,0);
@@ -3672,7 +3669,7 @@ static void desktop_open(QDesktop *q,int index){
 }
 void q_context(QDesktop *q,int x,int y){
     if(!q||q->locked)return;
-    if(q_dock_hit(q,x,y)>=0||(q->storage&&hit(x,y,tray_left(q),tray_top(q),228,58)))return;
+    if(q_dock_hit(q,x,y)>=0||(q->storage&&hit(x,y,tray_left(q),tray_top(q),228,70)))return;
     for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
         hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h))return;
     close_popups(q);
@@ -3883,7 +3880,7 @@ void q_click(QDesktop *q,int x,int y){
         q->snap_menu_app=-1;q->dirty=1;
     }
     int tray=tray_left(q);
-    if(q->storage&&hit(x,y,tray,tray_top(q),228,58)){
+    if(q->storage&&hit(x,y,tray,tray_top(q),228,70)){
         if(x<tray+160){int was=q->quick;close_popups(q);q->quick=!was;}
         else if(x<tray+193){int was=q->notifications;close_popups(q);q->notifications=!was;}
         else{int was=q->quick;close_popups(q);q->quick=!was;}
@@ -4151,7 +4148,7 @@ void q_move(QDesktop *q,int x,int y){
     }
     int desktop_hover=-1;
     if(dock<0&&!q->menu&&!q->notifications&&!q->quick&&!q->desktop_view&&
-        !(q->storage&&hit(q->mouse_x,q->mouse_y,tray_left(q),tray_top(q),228,58))){
+        !(q->storage&&hit(q->mouse_x,q->mouse_y,tray_left(q),tray_top(q),228,70))){
         int blocked=0;
         for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
             hit(q->mouse_x,q->mouse_y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h)){blocked=1;break;}
