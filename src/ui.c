@@ -416,7 +416,12 @@ static int dock_unpinned_count(QDesktop *q){
     for(int i=Q_DOCK_APPS;i<Q_APPS;i++)if(q->windows[i].open)count++;
     return count;
 }
-static int dock_x(QDesktop *q){return (q->width-632-55*dock_unpinned_count(q))/2;}
+static int dock_x(QDesktop *q){
+    int x=(q->width-632)/2;
+    int end=x+632+55*dock_unpinned_count(q);
+    if(end>q->width-8)x-=end-(q->width-8);
+    return clamp(x,8,q->width-640);
+}
 static int dock_y(QDesktop *q){return q->height-89;}
 static int menu_x(QDesktop *q){return (q->width-510)/2;}
 static int menu_y(QDesktop *q){return clamp(q->height-607,12,q->height-100);}
