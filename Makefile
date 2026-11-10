@@ -23,7 +23,7 @@ build/font.c: tools/font.py | build
 	$(PYTHON) tools/font.py $@ $(FONT_REGULAR) $(FONT_MEDIUM)
 build/font.obj: build/font.c src/font.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
-build/icons.c: tools/icons.py tools/clean_icons.py assets/icons.zip assets/start-icon.png.base64 assets/about-icon.png.base64 assets/calculator-icon.png.base64 assets/notes-icon.png.base64 assets/store-icon.png.base64 | build
+build/icons.c: tools/icons.py tools/clean_icons.py assets/icons.zip assets/start-icon.png.base64 assets/about-icon.png.base64 assets/calculator-icon.png.base64 assets/notes-icon.png.base64 assets/store-icon.png.base64 assets/this-pc-icon.png.base64 | build
 	$(PYTHON) tools/icons.py assets/icons.zip $@
 build/icons.obj: build/icons.c src/icons.h | build
 	$(CC) $(CFLAGS) -c $< -o $@

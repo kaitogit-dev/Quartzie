@@ -74,6 +74,37 @@ static EFI_ABSOLUTE_POINTER_PROTOCOL *pointer_absolute;
 static QPs2Mouse *pointer_ps2;
 static int pointer_ps2_confirmed;
 static uint64_t clock_ticks_per_us=1;
+static int q_weekday(int y,int m,int d){
+    if(m<3){m+=12;y--;}
+    int k=y%100,j=y/100;
+    int h=(d+13*(m+1)/5+k+k/4+j/4+5*j)%7;
+    return (h+6)%7;
+}
+static int q_days_month(int y,int m){
+    static const uint8_t days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    if(m<1||m>12)return 31;
+    if(m==2&&(y%4==0&&(y%100!=0||y%400==0)))return 29;
+    return days[m-1];
+}
+static void q_set_local_time(QDesktop *desktop,const QEFI_TIME *utc){
+    int y=utc->Year,m=utc->Month,d=utc->Day,h=utc->Hour,minute=utc->Minute;
+    if(y<2000||m<1||m>12||d<1||d>31||h>23||minute>59)return;
+    if(utc->TimeZone==0||utc->TimeZone==2047){
+        int march_end=31-q_weekday(y,3,31);
+        int october_end=31-q_weekday(y,10,31);
+        int summer=(m>3&&m<10)||(m==3&&(d>march_end||(d==march_end&&h>=1)))||
+            (m==10&&(d<october_end||(d==october_end&&h<1)));
+        int total=h*60+minute+120+(summer?60:0);
+        if(total>=1440){
+            total-=1440;
+            d++;
+            if(d>q_days_month(y,m)){d=1;m++;if(m>12){m=1;y++;}}
+        }
+        h=total/60;minute=total%60;
+    }
+    q_set_clock(desktop,h,minute);
+    q_set_date(desktop,y,m,d);
+}
 static int pointer_x,pointer_y,pointer_rem_x,pointer_rem_y,pointer_pressed,pointer_secondary;
 static uint64_t read_clock(void){
     unsigned int low,high;
@@ -291,7 +322,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     QEFI_RUNTIME_SERVICES *runtime=(QEFI_RUNTIME_SERVICES *)table->RuntimeServices;
     QEFI_TIME rtc={0};
     if(runtime&&runtime->GetTime&&runtime->GetTime(&rtc,0)==0)
-        q_set_clock(&desktop,rtc.Hour,rtc.Minute);
+        q_set_local_time(&desktop,&rtc);
     qc_memory(codec_memory,48u*1024u*1024u);
     qfs_init(native_storage,image,bs);
     qnet_refresh(bs,&native_network);
@@ -388,7 +419,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         if(time_refresh_us>=1000000){
             time_refresh_us%=1000000;
             if(runtime&&runtime->GetTime&&runtime->GetTime(&rtc,0)==0)
-                q_set_clock(&desktop,rtc.Hour,rtc.Minute);
+                q_set_local_time(&desktop,&rtc);
         }
         if(desktop.dirty){
             q_draw(&desktop);

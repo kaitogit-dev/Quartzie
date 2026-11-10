@@ -35,6 +35,11 @@ def build(archive, output):
         if custom.size != (64, 64):
             raise ValueError("Custom app icon must be 64x64")
         sources.append(custom)
+    pc_raw = base64.b64decode(pathlib.Path("assets/this-pc-icon.png.base64").read_text().strip())
+    pc = Image.open(BytesIO(pc_raw)).convert("RGBA")
+    if pc.size != (64, 64):
+        raise ValueError("This PC icon must be 64x64")
+    sources.append(clean(pc))
     lines = ['#include "icons.h"']
     for size in SIZES:
         lines.append(f"static const uint32_t atlas_{size}[QI_COUNT][{size}*{size}] = {{")

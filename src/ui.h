@@ -27,6 +27,7 @@
 #define Q_TASKS 9
 #define Q_SETTINGS_PAGES 9
 #define Q_DESKTOP_FILES 32
+#define Q_DESKTOP_PINNED 3
 #define Q_NOTICES 5
 typedef struct {
     char title[32],message[88];
@@ -60,6 +61,7 @@ typedef struct {
     uint64_t uptime_us;
     uint32_t audio_display_us;
     int clock_hour,clock_minute,clock_valid;
+    int clock_day,clock_month,clock_year;
     int desktop_selected,desktop_hover,desktop_click_index,desktop_file_count,notification_count;
     int context_open,context_x,context_y,context_target;
     uint32_t desktop_click_elapsed_us;
@@ -117,6 +119,7 @@ typedef struct {
 void q_ui_set_scratch(uint32_t *storage);
 void q_init(QDesktop *q,int width,int height,uint32_t *pixels,uint32_t *wallpaper,uint32_t *blurred);
 void q_set_clock(QDesktop *q,int hour,int minute);
+void q_set_date(QDesktop *q,int year,int month,int day);
 void q_draw(QDesktop *q);
 void q_attach_storage(QDesktop *q,QStorage *storage,uint8_t *buffer,size_t capacity);
 void q_attach_network(QDesktop *q,QNetwork *network);

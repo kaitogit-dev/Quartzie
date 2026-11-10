@@ -491,6 +491,12 @@ void q_set_clock(QDesktop *q,int hour,int minute){
         q->clock_hour=hour;q->clock_minute=minute;q->clock_valid=1;q->dirty=1;q->hover_only=0;
     }
 }
+void q_set_date(QDesktop *q,int year,int month,int day){
+    if(!q||year<2000||year>9999||month<1||month>12||day<1||day>31)return;
+    if(q->clock_year!=year||q->clock_month!=month||q->clock_day!=day){
+        q->clock_year=year;q->clock_month=month;q->clock_day=day;q->dirty=1;q->hover_only=0;
+    }
+}
 static void close_popups(QDesktop *q){
     q->menu=0;q->menu_hover=-1;q->notifications=0;q->quick=0;
     q->menu_search_length=0;q->menu_search[0]=0;
@@ -1190,8 +1196,8 @@ static void desktop_refresh(QDesktop *q){
         }
         q->desktop_change_counter=q->storage->change_counter;
     }
-    if(q->desktop_selected>=6+q->desktop_file_count)q->desktop_selected=-1;
-    if(q->desktop_hover>=6+q->desktop_file_count)q->desktop_hover=-1;
+    if(q->desktop_selected>=Q_DESKTOP_PINNED+q->desktop_file_count)q->desktop_selected=-1;
+    if(q->desktop_hover>=Q_DESKTOP_PINNED+q->desktop_file_count)q->desktop_hover=-1;
     q->desktop_click_index=-1;q->desktop_click_elapsed_us=0;
 }
 static void files_refresh(QDesktop *q){
@@ -2950,7 +2956,7 @@ static void desktop_tile_position(QDesktop *q,int index,int *x,int *y){
 static int desktop_hit(QDesktop *q,int x,int y){
     int rows=clamp((q->height-166)/88,3,10);
     int max=rows*clamp((q->width-36)/96,1,16);
-    int total=6+q->desktop_file_count;
+    int total=Q_DESKTOP_PINNED+q->desktop_file_count;
     if(total>max)total=max;
     for(int i=0;i<total;i++){
         int xx,yy;desktop_tile_position(q,i,&xx,&yy);
@@ -2959,19 +2965,19 @@ static int desktop_hit(QDesktop *q,int x,int y){
     return -1;
 }
 static void draw_desktop(QDesktop *q){
-    static const char *labels[]={"This PC","Home","Documents","Downloads","Recycle Bin","Settings"};
-    static const int icons[]={QI_FILE_EXPLORER,QI_FOLDER,QI_FOLDER,QI_FOLDER,QI_TRASHBIN,QI_SETTINGS};
+    static const char *labels[]={"This PC","Recycle Bin","Settings"};
+    static const int icons[]={QI_THIS_PC,QI_TRASHBIN,QI_SETTINGS};
     int rows=clamp((q->height-166)/88,3,10);
     int max=rows*clamp((q->width-36)/96,1,16);
-    int total=6+q->desktop_file_count;
+    int total=Q_DESKTOP_PINNED+q->desktop_file_count;
     if(total>max)total=max;
     for(int i=0;i<total;i++){
         int x,y;desktop_tile_position(q,i,&x,&y);
         if(i==q->desktop_selected||i==q->desktop_hover)
             surface(q,x,y,90,82,12,colors(q)->selected,i==q->desktop_selected?110:48);
-        int icon_id=i<6?icons[i]:files_icon(&q->desktop_files[i-6]);
-        sprite(q,x+45,y+29,icon_id,52);
-        const char *name=i<6?labels[i]:q->desktop_files[i-6].name;
+        int icon_id=i<Q_DESKTOP_PINNED?icons[i]:files_icon(&q->desktop_files[i-Q_DESKTOP_PINNED]);
+        sprite(q,x+45,y+30,icon_id,58);
+        const char *name=i<Q_DESKTOP_PINNED?labels[i]:q->desktop_files[i-Q_DESKTOP_PINNED].name;
         int tw=text_width(name,0);
         int centered=x+(90-(tw>86?86:tw))/2;
         string_limit(q,centered+1,y+75,name,0x10203b,0,86,1);
@@ -3613,17 +3619,14 @@ static void open_profile_folder(QDesktop *q,const char *suffix){
     q_open(q,Q_FILES);
 }
 static void desktop_open(QDesktop *q,int index){
-    if(index==5){q_open(q,Q_SETTINGS);return;}
+    if(index==2){q_open(q,Q_SETTINGS);return;}
     if(index==0){files_this_pc(q,1);q_open(q,Q_FILES);return;}
-    if(index==1){open_profile_folder(q,"");return;}
-    if(index==2){open_profile_folder(q,"Documents");return;}
-    if(index==3){open_profile_folder(q,"Downloads");return;}
-    if(index==4){
+    if(index==1){
         if(!q->storage)return;
         q->file_location=2;q->file_menu=0;q->file_submenu=0;
         files_refresh(q);files_history(q);q_open(q,Q_FILES);return;
     }
-    int file=index-6;
+    int file=index-Q_DESKTOP_PINNED;
     if(file<0||file>=q->desktop_file_count||!q->storage)return;
     char folder[QFS_PATH];
     if(qfs_profile_path(q->storage,"Desktop",folder,sizeof(folder))!=0)return;
@@ -4236,7 +4239,7 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     }
     if(q->active<0&&q->desktop_selected>=0){
         int rows=clamp((q->height-166)/88,3,10);
-        int total=6+q->desktop_file_count;
+        int total=Q_DESKTOP_PINNED+q->desktop_file_count;
         int max=rows*clamp((q->width-36)/96,1,16);
         if(total>max)total=max;
         if(ch=='\r'){desktop_open(q,q->desktop_selected);return;}
