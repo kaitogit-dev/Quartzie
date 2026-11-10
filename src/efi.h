@@ -46,6 +46,17 @@ typedef struct {
     void *ConfigurationTable;
 } EFI_SYSTEM_TABLE;
 typedef struct {
+    uint16_t Year;
+    uint8_t Month,Day,Hour,Minute,Second,Pad1;
+    uint32_t Nanosecond;
+    int16_t TimeZone;
+    uint8_t Daylight,Pad2;
+} QEFI_TIME;
+typedef struct {
+    EFI_TABLE_HEADER Header;
+    EFI_STATUS (EFIAPI *GetTime)(QEFI_TIME *,void *);
+} QEFI_RUNTIME_SERVICES;
+typedef struct {
     uint32_t Version,HorizontalResolution,VerticalResolution,PixelFormat;
     struct { uint32_t RedMask,GreenMask,BlueMask,ReservedMask; } PixelInformation;
     uint32_t PixelsPerScanLine;

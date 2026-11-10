@@ -284,6 +284,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     q_ui_set_scratch(ui_storage);
     cursor_prepare();
     q_init(&desktop,w,h,backbuffer,wallpaper_buffer,frosted_buffer);
+    QEFI_RUNTIME_SERVICES *runtime=(QEFI_RUNTIME_SERVICES *)table->RuntimeServices;
+    QEFI_TIME rtc={0};
+    if(runtime&&runtime->GetTime&&runtime->GetTime(&rtc,0)==0)
+        q_set_clock(&desktop,rtc.Hour,rtc.Minute);
     qc_memory(codec_memory,48u*1024u*1024u);
     qfs_init(native_storage,image,bs);
     qnet_refresh(bs,&native_network);
@@ -331,6 +335,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
     present();
     q_enable_animations(&desktop);
     uint64_t last_tick=read_clock();
+    uint64_t time_refresh_us=0;
     serial_text("QUARTZIE-DESKTOP-READY\n");
     serial_text("QUARTZIE-INPUT-READY\n");
     for(;;){
@@ -374,6 +379,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image,EFI_SYSTEM_TABLE *table){
         last_tick=now;
         if(delta>250000)delta=250000;
         q_tick_timed(&desktop,(uint32_t)delta);
+        time_refresh_us+=delta;
+        if(time_refresh_us>=1000000){
+            time_refresh_us%=1000000;
+            if(runtime&&runtime->GetTime&&runtime->GetTime(&rtc,0)==0)
+                q_set_clock(&desktop,rtc.Hour,rtc.Minute);
+        }
         if(desktop.dirty){
             q_draw(&desktop);
             pointer_sample(0);
