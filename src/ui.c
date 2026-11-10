@@ -419,7 +419,7 @@ static int dock_unpinned_count(QDesktop *q){
 static int dock_width(QDesktop *q){return 500+50*dock_unpinned_count(q);}
 static int dock_x(QDesktop *q){
     int width=dock_width(q);
-    int x=(q->width-width)/2;
+    int x=(q->width-500)/2;
     if(q->storage&&q->width>=width+244&&x+width>q->width-240)
         x=q->width-width-240;
     return clamp(x,8,q->width-width-8);
