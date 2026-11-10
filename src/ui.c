@@ -418,7 +418,7 @@ static int dock_unpinned_count(QDesktop *q){
 static int dock_x(QDesktop *q){return (q->width-632-55*dock_unpinned_count(q))/2;}
 static int dock_y(QDesktop *q){return q->height-89;}
 static int menu_x(QDesktop *q){return (q->width-510)/2;}
-static int menu_y(QDesktop *q){return clamp(q->height-621,12,q->height-100);}
+static int menu_y(QDesktop *q){return clamp(q->height-607,12,q->height-100);}
 static const char *names[Q_APPS]={"Files","Notes","Terminal","Calculator","Settings","About","Store","Photos","Media Player","Task Manager"};
 static void desktop_refresh(QDesktop *q);
 static int menu_match(QDesktop *q,int app){
@@ -874,6 +874,8 @@ static void draw_quick(QDesktop *q){
 }
 static void draw_tray(QDesktop *q){
     int x=q->width-345,y=16;
+    int previous_topbar=q->render_topbar;
+    q->render_topbar=1;
     pane(q,x,y,319,58,19,colors(q)->dock,q->theme?212:162);
     int online=0;
     if(q->network)for(int i=0;i<q->network->count;i++)
@@ -891,6 +893,7 @@ static void draw_tray(QDesktop *q){
     text(q,x+239,y+37,q->notification_count?"*":"i",q->notification_count?accent(q):foreground(q),1);
     surface(q,x+272,y+9,38,40,12,q->quick?colors(q)->selected:inner_material(q),q->theme?162:145);
     sprite(q,x+291,y+29,QI_SETTINGS,25);
+    q->render_topbar=previous_topbar;
 }
 static void draw_context_menu(QDesktop *q){
     if(!q->context_open)return;
