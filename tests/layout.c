@@ -42,9 +42,8 @@ int main(void){
     QWindow *w=&ui.windows[Q_FILES];
     int x=w->x+260,top=w->y+51,below=w->y+65;
     uint32_t p=pixels[(size_t)top*1280+x],v=pixels[(size_t)below*1280+x];
-    CHECK(abs((int)(p>>16&255)-(int)(v>>16&255))<35);
-    CHECK(abs((int)(p>>8&255)-(int)(v>>8&255))<35);
-    CHECK(abs((int)(p&255)-(int)(v&255))<35);
-    puts("PASS: desktop shortcuts, unobstructed wallpaper and integrated window header");
+    CHECK(p!=v);
+    CHECK(v!=background[(size_t)below*1280+x]);
+    puts("PASS: three desktop shortcuts, unobstructed wallpaper, glass chrome and matte content");
     return 0;
 }
