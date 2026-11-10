@@ -9,9 +9,23 @@
 #else
 #include <sys/mman.h>
 #endif
-static uint32_t writes;
+static uint32_t writes,last_error;
 static char output[128];
 static uint32_t __attribute__((ms_abi)) win_ticks(void){return 5;}
+static uint64_t __attribute__((ms_abi)) win_ticks64(void){return 5;}
+static uint32_t __attribute__((ms_abi)) win_pid(void){return 12;}
+static void * __attribute__((ms_abi)) win_process_heap(void){return (void *)(uintptr_t)1;}
+static void * __attribute__((ms_abi)) win_heap_alloc(void *heap,uint32_t flags,uint64_t bytes){
+    if(heap!=(void *)(uintptr_t)1)return 0;
+    return flags&8u?calloc(1,(size_t)bytes):malloc((size_t)bytes);
+}
+static int __attribute__((ms_abi)) win_heap_free(void *heap,uint32_t flags,void *buffer){
+    (void)flags;
+    if(heap!=(void *)(uintptr_t)1||!buffer)return 0;
+    free(buffer);return 1;
+}
+static void __attribute__((ms_abi)) win_set_error(uint32_t value){last_error=value;}
+static uint32_t __attribute__((ms_abi)) win_get_error(void){return last_error;}
 static void * __attribute__((ms_abi)) win_handle(uint32_t which){return which==0xfffffff5u?(void *)(uintptr_t)1:0;}
 static int __attribute__((ms_abi)) win_write(void *handle,const void *text,uint32_t length,uint32_t *written,void *overlapped){
     (void)overlapped;
@@ -26,6 +40,13 @@ static void *resolver(void *context,const char *dll,const char *name,uint16_t or
     if(ordinal||!name)return 0;
     if(strcmp(dll,"KERNEL32.dll")!=0)return 0;
     if(strcmp(name,"GetTickCount")==0)return (void *)(uintptr_t)&win_ticks;
+    if(strcmp(name,"GetTickCount64")==0)return (void *)(uintptr_t)&win_ticks64;
+    if(strcmp(name,"GetCurrentProcessId")==0)return (void *)(uintptr_t)&win_pid;
+    if(strcmp(name,"GetProcessHeap")==0)return (void *)(uintptr_t)&win_process_heap;
+    if(strcmp(name,"HeapAlloc")==0)return (void *)(uintptr_t)&win_heap_alloc;
+    if(strcmp(name,"HeapFree")==0)return (void *)(uintptr_t)&win_heap_free;
+    if(strcmp(name,"SetLastError")==0)return (void *)(uintptr_t)&win_set_error;
+    if(strcmp(name,"GetLastError")==0)return (void *)(uintptr_t)&win_get_error;
     if(strcmp(name,"GetStdHandle")==0)return (void *)(uintptr_t)&win_handle;
     if(strcmp(name,"WriteFile")==0)return (void *)(uintptr_t)&win_write;
     return 0;
@@ -47,7 +68,8 @@ int main(int argc,char **argv){
     int load_result=q_pe64_load(data,(size_t)n,image,1024*1024,&host,&loaded);
     if(load_result!=Q_PE_OK)fprintf(stderr,"PE image load status=%d, bytes=%ld\n",load_result,n);
     CHECK(load_result==Q_PE_OK);
-    CHECK(loaded.imports==3);
+    CHECK(loaded.imports==10);
+    CHECK(q_pe64_image_size(data,(size_t)n)==loaded.size);
     uint32_t (__attribute__((ms_abi)) *entry)(void)=(uint32_t (__attribute__((ms_abi)) *)(void))q_pe64_export(&loaded,"QuartzieTest");
     CHECK(entry!=0&&entry()==42);
     void (__attribute__((ms_abi)) *startup)(void)=(void (__attribute__((ms_abi)) *)(void))q_pe64_entry(&loaded);

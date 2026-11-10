@@ -3,3 +3,10 @@ EXPORTS
     GetTickCount
     GetStdHandle
     WriteFile
+    GetTickCount64
+    GetCurrentProcessId
+    GetProcessHeap
+    HeapAlloc
+    HeapFree
+    SetLastError
+    GetLastError

@@ -72,7 +72,7 @@ build/glass-test: tests/glass.c src/ui.c src/ui.h src/font.h src/icons.h build/f
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/glass.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c src/trash.c src/profiles.c src/update.c -o $@
 build/window-test: tests/window.c src/ui.c src/ui.h src/font.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/window.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c src/trash.c src/profiles.c src/update.c -o $@
-test: build/profiles-test build/update-test build/trash-test build/network-test build/package-test build/native-test.qapp build/store-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
+test: build/winapi-test build/profiles-test build/update-test build/trash-test build/network-test build/package-test build/native-test.qapp build/store-test.qapp build/settings-test build/media-test build/theme-test build/features-test build/start-test build/timing-test build/icons-test build/ntcore-test build/pe-test build/winapp.exe build/ui-test build/ps2-test build/glass-test build/window-test build/cursor-test build/layout-test build/tween-test build/transitions-test
 	./build/profiles-test
 	./build/update-test
 	./build/trash-test
@@ -87,6 +87,7 @@ test: build/profiles-test build/update-test build/trash-test build/network-test 
 	./build/timing-test
 	./build/ntcore-test
 	./build/pe-test build/winapp.exe
+	./build/winapi-test build/winapp.exe
 	./build/ui-test
 	./build/ps2-test
 	./build/glass-test
@@ -139,3 +140,6 @@ build/media-test: tests/media.c src/media.c src/media.h src/storage.c src/storag
 build/settings-test: tests/settings.c src/ui.c src/ui.h src/icons.h build/font.c build/icons.c | build
 	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/settings.c src/ui.c src/storage.c src/media.c src/codecs.c build/font.c build/icons.c src/package.c src/trash.c src/profiles.c src/update.c -o $@
 .PHONY: all release test verify clean
+
+build/winapi-test: tests/winapi.c src/winapi.c src/winapi.h src/pe64.c src/pe64.h src/ntcore.c src/ntcore.h src/efi.h build/winapp.exe | build
+	gcc -std=c11 -O2 -Wall -Wextra -Werror -Isrc tests/winapi.c src/winapi.c src/pe64.c src/ntcore.c -o $@
