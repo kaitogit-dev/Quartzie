@@ -251,6 +251,27 @@ static void pane(QDesktop *q,int x,int y,int w,int h,int r,uint32_t tint,int alp
     soft_shadow(q,x,y,w,h,r,32,46);
     surface(q,x,y,w,h,r,tint,alpha);
 }
+static void matte(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint,int alpha){
+    if(w<=0||h<=0)return;
+    int x0=clamp(x,q->clip_left,q->clip_right),x1=clamp(x+w,q->clip_left,q->clip_right);
+    int y0=clamp(y,q->clip_top,q->clip_bottom),y1=clamp(y+h,q->clip_top,q->clip_bottom);
+    if(x0>=x1||y0>=y1)return;
+    uint32_t base=q->theme?0x1c293b:0xf3f7fc;
+    uint32_t fill=tint==0x0d2237?tint:blend(base,tint,clamp(alpha,0,256)/2);
+    for(int py=y0;py<y1;py++){
+        uint32_t *dest=q->pixels+(size_t)py*q->width;
+        int dy=py-y;
+        for(int px=x0;px<x1;px++){
+            int cover=radius?round_cover(px-x,dy,w,h,radius):256;
+            if(cover==256)dest[px]=fill;
+            else if(cover)dest[px]=blend(dest[px],fill,cover);
+        }
+    }
+}
+static void matte_pane(QDesktop *q,int x,int y,int w,int h,int radius,uint32_t tint,int alpha){
+    soft_shadow(q,x,y,w,h,radius,24,35);
+    matte(q,x,y,w,h,radius,tint,alpha);
+}
 static void string_limit(QDesktop *q,int x,int baseline,const char *s,uint32_t color,int style,int max_width,int max_lines){
     int start=x,line=0;
     int leading=style==0?20:style==1?26:style==2?35:51;
@@ -403,7 +424,7 @@ static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
     else if(app==Q_MEDIA)icon_id=QI_MEDIA_PLAYER;
     if(app==Q_TASKS){
         int side=size*3/4;
-        surface(q,cx-side/2,cy-side/2,side,side,side/5,0x316a9e,238);
+        matte(q,cx-side/2,cy-side/2,side,side,side/5,0x316a9e,238);
         for(int i=0;i<4;i++){
             int bar=side*(i+2)/8;
             rectangle(q,cx-side/2+side/8+i*side/5,cy+side/2-side/8-bar,side/9,bar,0xe2f8ff);
@@ -1091,7 +1112,7 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     for(int i=0;i<3;i++){
         int left=x+i*145;
         if(left+136>x+cw)break;
-        surface(q,left,y+17,136,39,10,q->task_tab==i?colors(q)->selected:inner_material(q),q->theme?191:145);
+        matte(q,left,y+17,136,39,10,q->task_tab==i?colors(q)->selected:inner_material(q),q->theme?191:145);
         string_limit(q,left+12,y+43,tabs[i],ink,0,123,1);
     }
     if(q->task_tab==2){
@@ -1104,7 +1125,7 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
                     mapped+=q->kernel->processes[i].regions[j].length;
         }
         char value[32];
-        surface(q,x,y+79,cw,w->h-188,15,inner_material(q),q->theme?128:154);
+        matte(q,x,y+79,cw,w->h-188,15,inner_material(q),q->theme?128:154);
         const char *labels[]={"Open apps","Processes","Threads","Mapped virtual MiB","Uptime seconds","Scheduler ticks","Context switches","System calls"};
         uint64_t numbers[]={ (uint64_t)apps,(uint64_t)processes,(uint64_t)threads,mapped/(1024u*1024u),
             q->uptime_us/1000000u,q->kernel?q->kernel->clock_ticks:0,
@@ -1120,7 +1141,7 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     }
     int max_rows=clamp((w->h-245)/42,3,10);
     if(q->task_scroll>=count)q->task_scroll=count>0?(count-1)/max_rows*max_rows:0;
-    surface(q,x,y+75,cw,w->h-190,14,inner_material(q),q->theme?112:155);
+    matte(q,x,y+75,cw,w->h-190,14,inner_material(q),q->theme?112:155);
     text(q,x+19,y+99,q->task_tab==0?"Application":"Native process",muted,0);
     text(q,x+cw-145,y+99,q->task_tab==0?"State":"PID / Memory",muted,0);
     for(int row=0;row<max_rows;row++){
@@ -1128,7 +1149,8 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         if(index<0)break;
         int top=y+109+row*42;
         if(top+40>y+w->h-119)break;
-        surface(q,x+9,top,cw-18,39,8,index==q->task_selected?colors(q)->selected:inner_material(q),q->theme?165:118);
+        if(index==q->task_selected)matte(q,x+9,top,cw-18,39,8,colors(q)->selected,165);
+        else thin_rule(q,x+16,top+39,cw-32,q->theme?46:31);
         if(q->task_tab==0){
             app_icon(q,x+35,top+20,index,27,ink);
             string_limit(q,x+60,top+26,names[index],ink,0,cw-225,1);
@@ -1149,11 +1171,11 @@ static void draw_tasks(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         }
     }
     int bottom=y+w->h-103;
-    surface(q,x,bottom,124,39,11,inner_material(q),q->theme?151:143);
+    matte(q,x,bottom,124,39,11,inner_material(q),q->theme?151:143);
     text(q,x+26,bottom+26,"Previous",ink,0);
-    surface(q,x+132,bottom,98,39,11,inner_material(q),q->theme?151:143);
+    matte(q,x+132,bottom,98,39,11,inner_material(q),q->theme?151:143);
     text(q,x+151,bottom+26,"Next",ink,0);
-    surface(q,x+cw-151,bottom,151,39,11,q->task_selected>=0?colors(q)->selected:inner_material(q),q->theme?185:129);
+    matte(q,x+cw-151,bottom,151,39,11,q->task_selected>=0?colors(q)->selected:inner_material(q),q->theme?185:129);
     text(q,x+cw-127,bottom+26,"End task",ink,1);
 }
 static void tasks_click(QDesktop *q,QWindow *w,int x,int y){
@@ -1645,7 +1667,7 @@ static void notes_vertical(QDesktop *q,int direction){
     q->dirty=1;
 }
 static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,uint32_t muted){
-    surface(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
+    matte(q,x,y+30,cw,w->h-158,17,inner_material(q),q->theme?74:138);
     int row=0,advance=0,cursor_row=0,cursor_x=0;
     int max_width=cw-47;
     for(int i=0;i<=q->note_length;i++){
@@ -1684,9 +1706,9 @@ static void draw_notes(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         int cx=x+23+cursor_x,cy=y+54+(cursor_row-q->note_scroll)*26;
         rectangle(q,cx,cy,2,23,accent(q));
     }
-    surface(q,x+cw-200,y+2,94,28,9,inner_material(q),q->theme?172:157);
+    matte(q,x+cw-200,y+2,94,28,9,inner_material(q),q->theme?172:157);
     text(q,x+cw-178,y+22,"New",ink,0);
-    surface(q,x+cw-98,y+2,96,28,9,inner_material(q),q->theme?172:157);
+    matte(q,x+cw-98,y+2,96,28,9,inner_material(q),q->theme?172:157);
     text(q,x+cw-74,y+22,"Save",ink,0);
     if(q->file_status[0])string_limit(q,x+8,y+w->h-112,q->file_status,muted,0,cw-16,1);
     else text(q,x+8,y+w->h-112,q->note_dirty?"Unsaved changes":"",muted,0);
@@ -1976,7 +1998,7 @@ static void files_size(const QFsEntry *entry,char *out){
 }
 
 static void files_button(QDesktop *q,int x,int y,int w,const char *label,int active){
-    if(active)surface(q,x,y,w,33,7,colors(q)->selected,q->theme?180:156);
+    if(active)matte(q,x,y,w,33,7,colors(q)->selected,q->theme?180:156);
     string_limit(q,x+10,y+23,label,active?accent(q):foreground(q),0,w-15,1);
 }
 static void files_popup(QDesktop *q,int x,int y,int w,int n,const char *const *labels,int selected){
@@ -1991,14 +2013,14 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     int side=q->file_nav?188:0;
     int main_x=left+side+9,main_w=full-side-16-(q->file_details?188:0);
     int sidebar_y=top+103,footer=w->y+w->h-31;
-    surface(q,left,top,full,44,7,inner_material(q),q->theme?115:139);
+    matte(q,left,top,full,44,7,inner_material(q),q->theme?115:139);
     const char *navigation[]={"<",">","^","Refresh"};
     const int nav_x[]={0,40,80,120},nav_w[]={35,35,35,70};
     for(int i=0;i<4;i++)files_button(q,left+nav_x[i],top+6,nav_w[i],navigation[i],0);
     int search_w=clamp(full/4,144,225),address_x=left+195;
     int address_w=full-203-search_w-8;
     if(address_w<72)address_w=72;
-    surface(q,address_x,top+6,address_w,34,6,q->theme?0x333d4b:0xf0f7ff,218);
+    matte(q,address_x,top+6,address_w,34,6,q->theme?0x333d4b:0xf0f7ff,218);
     char location[QFS_PATH+38];int p=0;
     const char *volume=q->storage&&q->storage->count?q->storage->volumes[q->file_volume].label:"Drives";
     if(q->file_location==1)volume="This PC";
@@ -2010,7 +2032,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     }
     location[p]=0;
     string_limit(q,address_x+11,top+29,q->file_address_active?q->file_address:location,ink,0,address_w-18,1);
-    surface(q,left+full-search_w,top+6,search_w,34,6,q->theme?0x333d4b:0xf0f7ff,213);
+    matte(q,left+full-search_w,top+6,search_w,34,6,q->theme?0x333d4b:0xf0f7ff,213);
     string_limit(q,left+full-search_w+11,top+29,q->file_search_length?q->file_search:"Search this folder",q->file_search_length?ink:muted,0,search_w-18,1);
     thin_rule(q,left,top+50,full,35);
     const char *tools[]={"New v","Cut","Copy","Paste","Rename","Delete","Sort v","View v","..."};
@@ -2026,7 +2048,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
     int canvas_y=top+109,canvas_h=footer-canvas_y;
     rectangle(q,left,canvas_y,full,canvas_h,q->theme?0x191b20:0xf9fcff);
     if(q->file_nav){
-        surface(q,left,sidebar_y,side-6,footer-sidebar_y,8,inner_material(q),q->theme?117:143);
+        matte(q,left,sidebar_y,side-6,footer-sidebar_y,8,inner_material(q),q->theme?117:143);
         const char *shortcuts[]={"Home","Gallery","Desktop","Documents","Pictures","Music","Videos","This PC","Recycle Bin"};
         const int icons[]={QI_FILE_EXPLORER,QI_IMAGE,QI_FOLDER,QI_FOLDER,QI_IMAGE,QI_MEDIA_PLAYER,QI_MEDIA_PLAYER,QI_FILE_EXPLORER,QI_FOLDER};
         for(int i=0;i<9;i++){
@@ -2037,7 +2059,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             int chosen=(i==0&&q->storage&&q->file_volume==q->storage->home_index&&files_equal(q->file_path,home))||
                 (i==7&&q->file_location==1)||(i==8&&q->file_location==2)||
                 (i>=2&&i<=6&&q->storage&&q->file_volume==q->storage->home_index&&files_contains(q->file_path,shortcuts[i]));
-            if(chosen)surface(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
+            if(chosen)matte(q,left+5,py-2,side-17,33,6,colors(q)->selected,137);
             sprite(q,left+22,py+13,icons[i],25);
             string_limit(q,left+41,py+20,shortcuts[i],ink,0,side-49,1);
         }
@@ -2046,14 +2068,14 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         for(int i=0;i<count&&i<5;i++){
             int py=sidebar_y+371+i*35;
             if(py+30>=footer)break;
-            if(!q->file_location&&q->file_volume==i)surface(q,left+5,py-1,side-17,33,6,colors(q)->selected,131);
+            if(!q->file_location&&q->file_volume==i)matte(q,left+5,py-1,side-17,33,6,colors(q)->selected,131);
             sprite(q,left+22,py+14,QI_FILE_EXPLORER,25);
             string_limit(q,left+41,py+21,q->storage->volumes[i].label,ink,0,side-49,1);
         }
     }
     if(q->file_details){
         int dx=left+full-183;
-        surface(q,dx,canvas_y+3,181,canvas_h-4,8,inner_material(q),q->theme?131:143);
+        matte(q,dx,canvas_y+3,181,canvas_h-4,8,inner_material(q),q->theme?131:143);
         text(q,dx+13,canvas_y+33,"Details",ink,1);
         if(q->file_selected>=0&&q->file_selected<q->file_count){
             QFsEntry *entry=&q->files[q->file_selected];
@@ -2069,7 +2091,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         if(q->storage)for(int i=0;i<q->storage->count;i++){
             int dx=main_x+8+(i%2)*225,dy=canvas_y+53+(i/2)*90;
             if(dx+210>main_x+main_w)break;
-            surface(q,dx,dy,210,76,9,inner_material(q),q->theme?131:133);
+            matte(q,dx,dy,210,76,9,inner_material(q),q->theme?131:133);
             sprite(q,dx+32,dy+37,QI_FILE_EXPLORER,43);
             string_limit(q,dx+62,dy+37,q->storage->volumes[i].label,ink,0,139,1);
             text(q,dx+62,dy+59,"Open drive",muted,0);
@@ -2079,7 +2101,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         int page=files_page(q,w),pitch=cols==1?main_w-10:(main_w-14)/cols;
         int size=q->file_view==0?82:q->file_view==1?64:q->file_view==2?48:q->file_view==3?35:30;
         if(q->file_view==5){
-            surface(q,main_x+4,canvas_y+2,main_w-5,33,5,inner_material(q),q->theme?123:148);
+            matte(q,main_x+4,canvas_y+2,main_w-5,33,5,inner_material(q),q->theme?123:148);
             text(q,main_x+42,canvas_y+25,"Name",muted,0);
             text(q,main_x+main_w/2,canvas_y+25,"Type",muted,0);
             text(q,main_x+main_w-100,canvas_y+25,"Size",muted,0);
@@ -2092,7 +2114,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
             int ix=main_x+6+(slot%cols)*pitch,iy=canvas_y+(slot/cols)*item_h,iw=pitch-5;
             if(iy+item_h>footer-5)break;
             if(q->file_checked[index]||index==q->file_selected)
-                surface(q,ix,iy,iw,item_h-4,6,colors(q)->selected,q->theme?154:143);
+                matte(q,ix,iy,iw,item_h-4,6,colors(q)->selected,q->theme?154:143);
             if(q->file_checkboxes){
                 rectangle(q,ix+6,iy+6,14,14,q->theme?0x8094aa:0x96aec3);
                 rectangle(q,ix+8,iy+8,10,10,q->theme?0x191b20:0xf9fcff);
@@ -2130,7 +2152,7 @@ static void draw_files(QDesktop *q,QWindow *w,int x,int y,int cw,uint32_t ink,ui
         int dw=clamp(full-96,310,530),dx=left+(full-dw)/2,dy=top+135;
         pane(q,dx,dy,dw,154,13,material(q),q->theme?239:213);
         text(q,dx+18,dy+35,q->file_operation==1?"New folder":q->file_operation==2?"New text document":"Rename",ink,1);
-        surface(q,dx+17,dy+51,dw-34,43,7,inner_material(q),197);
+        matte(q,dx+17,dy+51,dw-34,43,7,inner_material(q),197);
         string_limit(q,dx+27,dy+79,q->file_input_length?q->file_input:"Enter a name",q->file_input_length?ink:muted,0,dw-52,1);
         text(q,dx+18,dy+128,"Enter  Save         Esc  Cancel",muted,0);
     }
@@ -2190,7 +2212,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
     if(height<110)height=110;
     if(app==Q_PHOTOS||q->media.kind==QM_VIDEO)draw_media_canvas(q,x,y+45,cw,height);
     else{
-        surface(q,x,y+45,cw,height,18,inner_material(q),q->theme?180:160);
+        matte(q,x,y+45,cw,height,18,inner_material(q),q->theme?180:160);
         int center=y+45+height/2;
         for(int i=0;i<84;i++){
             int pos=x+20+(cw-40)*i/84;
@@ -2202,7 +2224,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
         }
     }
     if(app==Q_MEDIA){
-        surface(q,x,y+60+height,101,38,12,colors(q)->selected,q->theme?165:150);
+        matte(q,x,y+60+height,101,38,12,colors(q)->selected,q->theme?165:150);
         text(q,x+21,y+86+height,q->media.playing?"Pause":"Play",ink,1);
         uint64_t duration=qm_duration(&q->media);
         int track=cw-300;
@@ -2223,7 +2245,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
         const char *labels[]={"Fit","100%","200%"};
         for(int i=0;i<3;i++){
             int bx=x+i*83;
-            surface(q,bx,y+60+height,78,38,11,i==q->photo_zoom?colors(q)->selected:inner_material(q),q->theme?177:148);
+            matte(q,bx,y+60+height,78,38,11,i==q->photo_zoom?colors(q)->selected:inner_material(q),q->theme?177:148);
             text(q,bx+14,y+86+height,labels[i],ink,0);
         }
     }
@@ -2233,7 +2255,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
         for(int i=0;i<6;i++){
             int bx=x+offsets[i],width=i==5?143:i==2?107:i==1?69:84;
             if(bx+width>x+cw-2)break;
-            surface(q,bx,y+104+height,width-2,36,10,inner_material(q),q->theme?158:148);
+            matte(q,bx,y+104+height,width-2,36,10,inner_material(q),q->theme?158:148);
             text(q,bx+9,y+128+height,actions[i],ink,0);
         }
     }else{
@@ -2241,7 +2263,7 @@ static void draw_viewer(QDesktop *q,int app,QWindow *w,int x,int y,int cw,uint32
         const int offsets[]={0,88,165,245,311,378};
         for(int i=0;i<6;i++){
             if(x+offsets[i]+67>x+cw)break;
-            surface(q,x+offsets[i],y+104+height,76,36,10,i==2&&q->media_repeat?colors(q)->selected:inner_material(q),q->theme?173:151);
+            matte(q,x+offsets[i],y+104+height,76,36,10,i==2&&q->media_repeat?colors(q)->selected:inner_material(q),q->theme?173:151);
             text(q,x+offsets[i]+8,y+128+height,actions[i],ink,0);
         }
         char volume_label[20]="Volume: 000%";
@@ -2332,12 +2354,12 @@ static void settings_resolution(QDesktop *q,char *out){
     out[i]=0;
 }
 static void settings_switch(QDesktop *q,int x,int y,int on){
-    surface(q,x,y,54,29,15,on?accent(q):colors(q)->rule,on?221:142);
+    matte(q,x,y,54,29,15,on?accent(q):colors(q)->rule,on?221:142);
     circular(q,x+(on?39:15),y+14,10,on?0xffffff:foreground(q),255);
 }
 static void settings_card(QDesktop *q,int x,int y,int w,int h,const char *heading,const char *description,int arrow){
     if(w<20||h<20)return;
-    surface(q,x,y,w,h,16,inner_material(q),q->theme?126:160);
+    thin_rule(q,x+17,y+h-1,w-34,q->theme?52:40);
     text(q,x+19,y+31,heading,foreground(q),1);
     string_limit(q,x+19,y+55,description,secondary(q),0,w-(arrow?68:36),1);
     if(arrow){
@@ -2520,16 +2542,16 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     int left=x+side+25;
     int width=cw-side-25;
     int nav_bottom=w->h-82;
-    surface(q,x,y+11,side,nav_bottom-11,19,inner_material(q),q->theme?131:127);
+    matte(q,x,y+11,side,nav_bottom-11,19,inner_material(q),q->theme?131:127);
     app_icon(q,x+38,y+47,Q_SETTINGS,40,foreground(q));
     text(q,x+68,y+42,"Quartzie",foreground(q),1);
     text(q,x+69,y+64,"Local device",secondary(q),0);
-    surface(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
+    matte(q,x+14,y+82,side-28,36,11,material(q),q->theme?153:176);
     string_limit(q,x+27,y+105,q->settings_search_length?q->settings_search:"Find a setting",q->settings_search_length?foreground(q):secondary(q),0,side-51,1);
     for(int i=0;i<Q_SETTINGS_PAGES;i++){
         int yy=y+128+i*(w->h<600?30:43);
         if(q->settings_page==i){
-            surface(q,x+10,yy,side-20,w->h<600?29:38,10,colors(q)->selected,q->theme?182:167);
+            matte(q,x+10,yy,side-20,w->h<600?29:38,10,colors(q)->selected,q->theme?182:167);
             rectangle(q,x+11,yy+8,3,22,accent(q));
         }
         settings_icon(q,x+32,yy+19,i);
@@ -2564,7 +2586,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
     };
     text(q,left,y+69,subtitles[page],secondary(q),0);
     if(page==0){
-        surface(q,left,y+92,width,105,18,colors(q)->selected,q->theme?171:174);
+        matte(q,left,y+92,width,105,18,colors(q)->selected,q->theme?171:174);
         app_icon(q,left+52,y+143,Q_SETTINGS,62,foreground(q));
         text(q,left+103,y+140,"Quartzie",foreground(q),2);
         text(q,left+104,y+168,"Ready for your next idea",secondary(q),0);
@@ -2584,16 +2606,16 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         settings_card(q,left,y+275,width,77,"Personalization","Theme and accent colors",1);
         if(w->h>=560)settings_card(q,left,y+364,width,77,"About","System details",1);
     }else if(page==2){
-        surface(q,left,y+92,width,123,18,inner_material(q),q->theme?124:166);
+        matte(q,left,y+92,width,123,18,inner_material(q),q->theme?124:166);
         text(q,left+20,y+125,"Choose your mode",foreground(q),1);
         int bx=left+19,button=(width-48)/2;
         for(int i=0;i<2;i++){
             int xx=bx+i*(button+10),selected=q->theme==i;
-            surface(q,xx,y+144,button,52,13,selected?colors(q)->selected:material(q),selected?201:121);
+            matte(q,xx,y+144,button,52,13,selected?colors(q)->selected:material(q),selected?201:121);
             if(selected)rectangle(q,xx+13,y+159,4,22,accent(q));
             text(q,xx+27,y+176,i?"Dark":"Light",foreground(q),1);
         }
-        surface(q,left,y+230,width,116,18,inner_material(q),q->theme?124:166);
+        matte(q,left,y+230,width,116,18,inner_material(q),q->theme?124:166);
         text(q,left+20,y+263,"Accent color",foreground(q),1);
         const uint32_t accents[8]={0x5dcfe3,0x9e9efa,0x77d5af,0xf4ae85,0xef709a,0xe8ca70,0x69a6ff,0xadaee7};
         for(int i=0;i<8;i++){
@@ -2609,7 +2631,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         for(int i=0;i<4;i++){
             int xx=left+i*118,yy=y+416;
             if(xx+112>left+width)break;
-            surface(q,xx,yy,112,47,11,q->wallpaper_mode==i?colors(q)->selected:inner_material(q),q->theme?188:157);
+            matte(q,xx,yy,112,47,11,q->wallpaper_mode==i?colors(q)->selected:inner_material(q),q->theme?188:157);
             text(q,xx+10,yy+30,styles[i],foreground(q),0);
         }
         if(w->h>=570)settings_card(q,left,y+473,width,58,"Set a photo as wallpaper","Open Photos and select Set wallpaper",1);
@@ -2619,7 +2641,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         int row_h=clamp((w->h-230)/5,45,64);
         for(int i=0;i<5;i++){
             int yy=y+92+i*(row_h+9);
-            surface(q,left,yy,width,row_h,14,inner_material(q),q->theme?125:158);
+            thin_rule(q,left+12,yy+row_h-1,width-24,q->theme?48:33);
             app_icon(q,left+31,yy+row_h/2,apps[i],32,foreground(q));
             text(q,left+62,yy+27,names[apps[i]],foreground(q),1);
             if(row_h>=58)string_limit(q,left+62,yy+48,descriptions[i],secondary(q),0,width-109,1);
@@ -2663,18 +2685,19 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         text(q,left+5,y+(compact?169:196),"Accounts",foreground(q),1);
         for(int i=0;i<q->profile_count&&i<list_count;i++){
             int yy=y+list_y+i*(compact?44:43);
-            surface(q,left+2,yy,width-4,38,11,q->profile_target==i?colors(q)->selected:inner_material(q),165);
+            if(q->profile_target==i)matte(q,left+2,yy,width-4,38,9,colors(q)->selected,165);
+            else thin_rule(q,left+14,yy+37,width-28,q->theme?47:32);
             string_limit(q,left+19,yy+26,q->profiles[i].name,foreground(q),0,width-120,1);
             text(q,left+width-90,yy+25,q->profiles[i].has_pin?"PIN":"No PIN",secondary(q),0);
         }
-        surface(q,left+2,y+create_y,165,41,11,inner_material(q),175);
+        matte(q,left+2,y+create_y,165,41,11,inner_material(q),175);
         text(q,left+15,y+create_y+26,"Create account",foreground(q),0);
-        surface(q,left+174,y+create_y,165,41,11,inner_material(q),175);
+        matte(q,left+174,y+create_y,165,41,11,inner_material(q),175);
         text(q,left+188,y+create_y+26,"Set account PIN",foreground(q),0);
-        surface(q,left+2,y+lock_y,176,41,11,colors(q)->selected,185);
+        matte(q,left+2,y+lock_y,176,41,11,colors(q)->selected,185);
         text(q,left+27,y+lock_y+26,"Lock screen",foreground(q),0);
         if(q->profile_edit){
-            surface(q,left+187,y+lock_y,width-189,41,11,inner_material(q),185);
+            matte(q,left+187,y+lock_y,width-189,41,11,inner_material(q),185);
             char obscured[25];int k=0;
             if(q->profile_edit==2&&q->profile_input_len){
                 for(;k<q->profile_input_len;k++)obscured[k]='*';
@@ -2701,7 +2724,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         }
         text(q,left+5,y+w->h-104,"Hardware link and MAC information",secondary(q),0);
     }else if(page==5){
-        surface(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
+        matte(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
         text(q,left+96,y+173,"Version 0.44.0",secondary(q),0);
@@ -2815,7 +2838,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     }else if(app==Q_NOTES){
         draw_notes(q,w,x,y,cw,ink,muted);
     }else if(app==Q_TERMINAL){
-        surface(q,x,y+30,cw,w->h-157,17,0x0d2237,221);
+        matte(q,x,y+30,cw,w->h-157,17,0x0d2237,221);
         string_limit(q,x+18,y+62,q->terminal_path,0x8edee8,0,cw-40,1);
         int spacing=clamp((w->h-345)/7,16,26);
         for(int i=0;i<q->terminal_count;i++)
@@ -2823,19 +2846,19 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         text(q,x+22,y+w->h-179,">",0x88d8e5,1);
         string_limit(q,x+48,y+w->h-179,q->command,0xf8feff,1,cw-66,1);
     }else if(app==Q_CALCULATOR){
-        surface(q,x,y+27,322,81,16,inner_material(q),q->theme?111:144);
+        matte(q,x,y+27,322,81,16,inner_material(q),q->theme?111:144);
         const char *output=q->calc_length?q->calc:q->answer;
         string_limit(q,x+22,y+80,output,ink,2,285,1);
         const char *keys="789/456*123-C0=+";
         for(int i=0;i<16;i++){
             int bx=x+(i%4)*82,by=y+128+(i/4)*57;
-            surface(q,bx,by,73,49,13,(i%4)==3?colors(q)->operator_button:inner_material(q),q->theme?174:151);
+            matte(q,bx,by,73,49,13,(i%4)==3?colors(q)->operator_button:inner_material(q),q->theme?174:151);
             char value[2]={keys[i],0};
             text(q,bx+(73-text_width(value,1))/2,by+32,value,ink,1);
         }
         int history_width=cw-350;
         if(history_width>80){
-            surface(q,x+343,y+27,history_width+7,327,16,inner_material(q),q->theme?92:125);
+            matte(q,x+343,y+27,history_width+7,327,16,inner_material(q),q->theme?92:125);
             text(q,x+355,y+59,"Recent",ink,0);
             for(int i=0;i<q->calc_history_count;i++)
                 string_limit(q,x+355,y+99+i*77,q->calc_history[i],secondary(q),0,history_width-17,2);
@@ -2851,19 +2874,19 @@ static void window_content(QDesktop *q,int app,QWindow *w){
     }else if(app==Q_STORE){
         if(q->store_pending){
             text(q,x+4,y+45,"Install Quartzie package",ink,2);
-            surface(q,x+2,y+63,cw-4,236,16,inner_material(q),q->theme?125:152);
+            matte(q,x+2,y+63,cw-4,236,16,inner_material(q),q->theme?125:152);
             string_limit(q,x+19,y+103,q->store_info.name,ink,1,cw-40,1);
             string_limit(q,x+19,y+136,q->store_info.id,muted,0,cw-40,1);
             string_limit(q,x+19,y+166,q->store_info.version,muted,0,cw-40,1);
             text(q,x+19,y+196,files_equal(q->store_info.platform,"android")?"Android package":"Windows executable",ink,0);
             text(q,x+19,y+225,"SHA-256 and archive integrity verified",muted,0);
-            surface(q,x+18,y+246,140,40,11,colors(q)->selected,186);
+            matte(q,x+18,y+246,140,40,11,colors(q)->selected,186);
             text(q,x+51,y+272,"Install",ink,1);
-            surface(q,x+169,y+246,130,40,11,inner_material(q),154);
+            matte(q,x+169,y+246,130,40,11,inner_material(q),154);
             text(q,x+195,y+272,"Cancel",ink,0);
         }else{
             text(q,x,y+47,q->store_view?"Installed packages":"App Library",ink,1);
-            surface(q,x+cw-196,y+13,192,37,10,inner_material(q),q->theme?151:170);
+            matte(q,x+cw-196,y+13,192,37,10,inner_material(q),q->theme?151:170);
             text(q,x+cw-183,y+38,q->store_view?"Built-in apps":"Installed packages",ink,0);
             if(q->store_view){
                 if(!store_directory(q))
@@ -2872,10 +2895,10 @@ static void window_content(QDesktop *q,int app,QWindow *w){
                     text(q,x+12,y+117,"No installed packages",muted,1);
                 for(int i=0;i<q->store_installed_count&&i<5;i++){
                     int yy=y+78+i*59;
-                    surface(q,x+1,yy,cw-2,53,12,inner_material(q),q->theme?139:154);
+                    matte(q,x+1,yy,cw-2,53,12,inner_material(q),q->theme?139:154);
                     sprite(q,x+32,yy+26,QI_COMPRESSED,32);
                     string_limit(q,x+59,yy+32,q->store_installed[i].name,ink,0,cw-207,1);
-                    surface(q,x+cw-139,yy+8,126,38,9,i==q->store_confirm_remove?colors(q)->selected:inner_material(q),154);
+                    matte(q,x+cw-139,yy+8,126,38,9,i==q->store_confirm_remove?colors(q)->selected:inner_material(q),154);
                     text(q,x+cw-126,yy+34,i==q->store_confirm_remove?"Confirm remove":"Remove",ink,0);
                 }
             }else{
@@ -2884,7 +2907,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
                     int app_index=apps[q->store_page*4+i];
                     int pitch=w->w>650?230:190;
                     int bx=x+(i%2)*pitch,by=y+78+(i/2)*118;
-                    surface(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
+                    matte(q,bx,by,174,102,18,inner_material(q),q->theme?174:184);
                     app_icon(q,bx+39,by+39,app_index,43,ink);
                     text(q,bx+72,by+40,names[app_index],ink,0);
                     text(q,bx+72,by+69,"Open",accent(q),0);
@@ -2912,15 +2935,19 @@ static void draw_window(QDesktop *q,int app){
     if(!w->open||w->minimized||w->desktop!=q->desktop)return;
     int previous_render_app=q->render_app;
     q->render_app=app;
-    prepare_window_glass(q,app,w);
-    if(w->maximized)surface(q,w->x,w->y,w->w,w->h,0,material(q),q->theme?209:149);
-    else pane(q,w->x,w->y,w->w,w->h,25,material(q),q->theme?209:149);
-    thin_rule(q,w->x+23,w->y+56,w->w-46,28);
+    if(q->drag==app)prepare_window_glass(q,app,w);
+    if(w->maximized)matte(q,w->x,w->y,w->w,w->h,0,material(q),244);
+    else matte_pane(q,w->x,w->y,w->w,w->h,18,material(q),244);
+    int topbar=q->render_topbar;
+    q->render_topbar=1;
+    surface(q,w->x,w->y,w->w,57,w->maximized?0:16,material(q),q->theme?207:184);
+    q->render_topbar=topbar;
+    thin_rule(q,w->x+23,w->y+56,w->w-46,q->theme?47:60);
     app_icon(q,w->x+41,w->y+28,app,25,foreground(q));
     text(q,w->x+61,w->y+36,app==Q_STORE?"Quartzie Store":names[app],foreground(q),1);
-    surface(q,w->x+w->w-157,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
-    surface(q,w->x+w->w-108,w->y+13,36,29,10,inner_material(q),q->theme?90:151);
-    surface(q,w->x+w->w-59,w->y+13,36,29,10,colors(q)->close_button,q->theme?185:166);
+    matte(q,w->x+w->w-157,w->y+13,36,29,9,inner_material(q),q->theme?90:151);
+    matte(q,w->x+w->w-108,w->y+13,36,29,9,inner_material(q),q->theme?90:151);
+    matte(q,w->x+w->w-59,w->y+13,36,29,9,colors(q)->close_button,q->theme?185:166);
     rectangle(q,w->x+w->w-147,w->y+29,14,2,foreground(q));
     int bx=w->x+w->w-99,by=w->y+20;
     if(w->maximized){

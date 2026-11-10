@@ -28,6 +28,8 @@ int main(void){
     q_draw(&ui);
     CHECK(pixels[(size_t)56*1280+62]!=background[(size_t)56*1280+62]);
     CHECK(pixels[(size_t)144*1280+62]!=background[(size_t)144*1280+62]);
+    CHECK(Q_DESKTOP_PINNED==3);
+    CHECK(pixels[(size_t)320*1280+62]==background[(size_t)320*1280+62]);
     for(int y=8;y<440;y+=17)for(int x=260;x<940;x+=23)
         CHECK(pixels[(size_t)y*1280+x]==background[(size_t)y*1280+x]);
     for(int y=8;y<61;y+=11)for(int x=300;x<980;x+=41)
