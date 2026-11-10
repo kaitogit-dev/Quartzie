@@ -655,6 +655,7 @@ void q_tick_timed(QDesktop *q,uint32_t elapsed_us){
         int app=q->snap_candidate;
         QWindow *window=&q->windows[app];
         if(q->locked||q->pressed||q->drag>=0||!window->open||window->minimized||window->desktop!=q->desktop){
+            if(q->snap_menu_app==app){q->snap_menu_app=-1;q->dirty=1;q->hover_only=0;}
             q->snap_candidate=-1;q->snap_hover_us=0;
         }else if(q->snap_menu_app<0){
             if(elapsed_us>=2500000u-q->snap_hover_us){
@@ -1006,18 +1007,24 @@ static void close_window(QDesktop *q,int app){
     }
     q->windows[app].snap_zone=0;q->windows[app].open=0;q->windows[app].minimized=0;q->windows[app].maximized=0;
     q->windows[app].tween_kind=0;
+    if(q->snap_menu_app==app)q->snap_menu_app=-1;
+    if(q->snap_candidate==app){q->snap_candidate=-1;q->snap_hover_us=0;}
     q->dock_pulse[app]=q->animations_enabled?256:0;
     begin_scene_tween(q,4);
     focus_remaining(q);q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
 static void minimize_window(QDesktop *q,int app){
     q->windows[app].minimized=1;
+    if(q->snap_menu_app==app)q->snap_menu_app=-1;
+    if(q->snap_candidate==app){q->snap_candidate=-1;q->snap_hover_us=0;}
     q->windows[app].tween_kind=0;
     q->dock_pulse[app]=q->animations_enabled?256:0;
     begin_scene_tween(q,3);
     focus_remaining(q);q->dirty=1;q->hover_only=0;q->drag_cache_valid=0;
 }
 static void maximize_window(QDesktop *q,int app){
+    if(q->snap_menu_app==app)q->snap_menu_app=-1;
+    if(q->snap_candidate==app){q->snap_candidate=-1;q->snap_hover_us=0;}
     QWindow *w=&q->windows[app];
     int from_x=w->x,from_y=w->y,from_w=w->w,from_h=w->h;
     if(!w->maximized){
@@ -1070,6 +1077,8 @@ void q_switch_desktop(QDesktop *q,int desktop){
 }
 void q_move_to_desktop(QDesktop *q,int app,int desktop){
     if(!q||desktop<0||desktop>2||app<0||app>=Q_APPS||!q->windows[app].open)return;
+    if(q->snap_menu_app==app)q->snap_menu_app=-1;
+    if(q->snap_candidate==app){q->snap_candidate=-1;q->snap_hover_us=0;}
     q->windows[app].desktop=desktop;
     if(q->active==app)focus_remaining(q);
     q->scene_tween_active=0;q->scene_tween_pending=0;
