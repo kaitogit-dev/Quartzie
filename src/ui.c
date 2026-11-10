@@ -977,6 +977,82 @@ static void draw_tray(QDesktop *q){
     if(q->notification_count)circular(q,x+184,y+24,4,accent(q),255);
     sprite(q,x+208,y+35,QI_SETTINGS,25);
 }
+static int calendar_days(int year,int month){
+    static const int days[12]={31,28,31,30,31,30,31,31,30,31,30,31};
+    if(month<1||month>12)return 31;
+    if(month==2&&year%4==0&&(year%100!=0||year%400==0))return 29;
+    return days[month-1];
+}
+static int calendar_weekday(int year,int month,int day){
+    static const int offsets[]={0,3,2,5,0,3,5,1,4,6,2,4};
+    if(month<3)year--;
+    return (year+year/4-year/100+year/400+offsets[month-1]+day+6)%7;
+}
+static void calendar_month(QDesktop *q,int *year,int *month){
+    int current_year=q->clock_year>=2000?q->clock_year:2026;
+    int current_month=q->clock_month>=1&&q->clock_month<=12?q->clock_month:1;
+    int number=current_year*12+current_month-1+q->calendar_offset;
+    *year=number/12;*month=number%12+1;
+}
+static int calendar_left(QDesktop *q){return q->width-366;}
+static int calendar_top(QDesktop *q){return clamp(tray_top(q)-365,8,q->height-362);}
+static void draw_calendar(QDesktop *q){
+    if(!q->calendar_open)return;
+    static const char *months[]={"January","February","March","April","May","June",
+        "July","August","September","October","November","December"};
+    static const char *weekdays[]={"M","T","W","T","F","S","S"};
+    int x=calendar_left(q),y=calendar_top(q),year=0,month=0;
+    calendar_month(q,&year,&month);
+    pane(q,x,y,343,354,20,material(q),q->theme?220:185);
+    text(q,x+23,y+38,"Calendar",foreground(q),1);
+    thin_rule(q,x+23,y+50,297,q->theme?58:39);
+    char heading[32];int size=0;
+    const char *name=months[month-1];
+    while(name[size]&&size<20){heading[size]=name[size];size++;}
+    heading[size++]=' ';
+    heading[size++]=(char)('0'+year/1000%10);
+    heading[size++]=(char)('0'+year/100%10);
+    heading[size++]=(char)('0'+year/10%10);
+    heading[size++]=(char)('0'+year%10);
+    heading[size]=0;
+    text(q,x+24,y+86,heading,foreground(q),1);
+    matte(q,x+251,y+61,32,32,9,inner_material(q),q->theme?125:145);
+    matte(q,x+289,y+61,32,32,9,inner_material(q),q->theme?125:145);
+    text(q,x+261,y+83,"<",foreground(q),1);
+    text(q,x+301,y+83,">",foreground(q),1);
+    for(int i=0;i<7;i++)text(q,x+29+i*42,y+125,weekdays[i],secondary(q),0);
+    int first=calendar_weekday(year,month,1),days=calendar_days(year,month);
+    for(int day=1;day<=days;day++){
+        int slot=first+day-1,col=slot%7,row=slot/7;
+        int cx=x+34+col*42,cy=y+146+row*29;
+        int today=q->clock_year==year&&q->clock_month==month&&q->clock_day==day;
+        if(today){
+            shell_selection(q,cx-12,cy-15,35,28,9,1);
+            rectangle(q,cx-3,cy+12,14,2,accent(q));
+        }
+        char number[3];int n=0;
+        if(day>=10)number[n++]=(char)('0'+day/10);
+        number[n++]=(char)('0'+day%10);number[n]=0;
+        text(q,cx-(day<10?2:5),cy+4,number,foreground(q),0);
+    }
+    if(q->calendar_offset)matte(q,x+250,y+310,71,32,9,inner_material(q),q->theme?137:160);
+    text(q,x+263,y+332,"Today",q->calendar_offset?foreground(q):secondary(q),0);
+}
+static void draw_dock_menu(QDesktop *q){
+    int app=q->dock_menu_app;
+    if(app<0||app>=Q_APPS)return;
+    int x=q->dock_menu_x,y=q->dock_menu_y,opened=q->windows[app].open;
+    int height=opened?254:94;
+    pane(q,x,y,228,height,17,material(q),q->theme?222:181);
+    app_icon(q,x+26,y+24,app,27,foreground(q));
+    string_limit(q,x+49,y+30,names[app],foreground(q),1,161,1);
+    thin_rule(q,x+12,y+44,204,q->theme?64:47);
+    const char *labels[]={"Open","Minimize","Maximize / Restore","Move to next desktop","Close"};
+    for(int i=0;i<(opened?5:1);i++){
+        if(i==4)thin_rule(q,x+12,y+49+i*39,204,q->theme?48:38);
+        text(q,x+23,y+73+i*39,labels[i],foreground(q),0);
+    }
+}
 static void draw_context_menu(QDesktop *q){
     if(!q->context_open)return;
     int x=q->context_x,y=q->context_y;
@@ -3086,7 +3162,9 @@ static void draw_overlays(QDesktop *q){
     draw_menu(q);
     draw_notifications(q);
     draw_quick(q);
+    draw_calendar(q);
     draw_context_menu(q);
+    draw_dock_menu(q);
 }
 static void draw_scene(QDesktop *q,int skip){
     draw_base(q,skip);
@@ -3673,7 +3751,16 @@ static void desktop_open(QDesktop *q,int index){
 }
 void q_context(QDesktop *q,int x,int y){
     if(!q||q->locked)return;
-    if(q_dock_hit(q,x,y)>=0||(q->storage&&hit(x,y,tray_left(q),tray_top(q),228,70)))return;
+    int dock=q_dock_hit(q,x,y);
+    if(dock>=0&&dock<Q_APPS){
+        close_popups(q);
+        int height=q->windows[dock].open?254:94;
+        q->dock_menu_app=dock;
+        q->dock_menu_x=clamp(x-100,4,q->width-232);
+        q->dock_menu_y=clamp(y-height-12,4,q->height-height-4);
+        q->dirty=1;q->hover_only=0;return;
+    }
+    if(dock>=0||(q->storage&&hit(x,y,tray_left(q),tray_top(q),228,70)))return;
     for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
         hit(x,y,q->windows[i].x,q->windows[i].y,q->windows[i].w,q->windows[i].h))return;
     close_popups(q);
@@ -3885,10 +3972,37 @@ void q_click(QDesktop *q,int x,int y){
     }
     int tray=tray_left(q);
     if(q->storage&&hit(x,y,tray,tray_top(q),228,70)){
-        if(x<tray+160){int was=q->quick;close_popups(q);q->quick=!was;}
+        if(x<tray+47){close_popups(q);settings_navigate(q,6);q_open(q,Q_SETTINGS);}
+        else if(x<tray+160){int was=q->calendar_open;close_popups(q);q->calendar_open=!was;q->calendar_offset=0;}
         else if(x<tray+193){int was=q->notifications;close_popups(q);q->notifications=!was;}
         else{int was=q->quick;close_popups(q);q->quick=!was;}
         q->dirty=1;return;
+    }
+    if(q->calendar_open){
+        int x0=calendar_left(q),y0=calendar_top(q);
+        if(hit(x,y,x0,y0,343,354)){
+            if(hit(x,y,x0+251,y0+61,32,32))q->calendar_offset=clamp(q->calendar_offset-1,-120,120);
+            else if(hit(x,y,x0+289,y0+61,32,32))q->calendar_offset=clamp(q->calendar_offset+1,-120,120);
+            else if(hit(x,y,x0+250,y0+310,71,32))q->calendar_offset=0;
+            q->dirty=1;return;
+        }
+        q->calendar_open=0;q->dirty=1;
+    }
+    if(q->dock_menu_app>=0){
+        int app=q->dock_menu_app,opened=q->windows[app].open;
+        int mx=q->dock_menu_x,my=q->dock_menu_y,height=opened?254:94;
+        q->dock_menu_app=-1;q->dirty=1;
+        if(hit(x,y,mx,my,228,height)){
+            int action=(y-my-49)/39;
+            if(y>=my+49&&action>=0&&action<(opened?5:1)){
+                if(action==0)q_open(q,app);
+                else if(action==1)minimize_window(q,app);
+                else if(action==2)maximize_window(q,app);
+                else if(action==3)q_move_to_desktop(q,app,(q->desktop+1)%3);
+                else if(action==4)close_window(q,app);
+            }
+            return;
+        }
     }
     int dock=q_dock_hit(q,x,y);
     if(dock==13){
@@ -4149,7 +4263,7 @@ void q_move(QDesktop *q,int x,int y){
         }
     }
     int desktop_hover=-1;
-    if(dock<0&&!q->menu&&!q->notifications&&!q->quick&&!q->desktop_view&&
+    if(dock<0&&!q->menu&&!q->notifications&&!q->quick&&!q->calendar_open&&q->dock_menu_app<0&&!q->desktop_view&&
         !(q->storage&&hit(q->mouse_x,q->mouse_y,tray_left(q),tray_top(q),228,70))){
         int blocked=0;
         for(int i=0;i<Q_APPS;i++)if(q->windows[i].open&&!q->windows[i].minimized&&q->windows[i].desktop==q->desktop&&
@@ -4233,6 +4347,9 @@ void q_key(QDesktop *q,uint16_t ch,uint16_t scan){
     }
     if(ch==9){cycle_window(q);return;}
     if((scan==23||ch==27)&&q->desktop_view){q->desktop_view=0;q->dirty=1;return;}
+    if((scan==23||ch==27)&&(q->calendar_open||q->dock_menu_app>=0)){
+        q->calendar_open=0;q->dock_menu_app=-1;q->dirty=1;return;
+    }
     if(scan==24){q_switch_desktop(q,(q->desktop+2)%3);return;}
     if(scan==25){q_switch_desktop(q,(q->desktop+1)%3);return;}
     if((scan==23||ch==27)&&q->active==Q_SETTINGS&&q->settings_search_length&&!q->menu&&!q->notifications&&!q->quick){
