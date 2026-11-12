@@ -438,14 +438,8 @@ static void app_icon(QDesktop *q,int cx,int cy,int app,int size,uint32_t color){
     else if(app==Q_STORE)icon_id=QI_STORE;
     else if(app==Q_PHOTOS)icon_id=QI_IMAGE;
     else if(app==Q_MEDIA)icon_id=QI_MEDIA_PLAYER;
-    if(app==Q_TASKS){
-        int side=size*3/4;
-        matte(q,cx-side/2,cy-side/2,side,side,side/5,0x316a9e,238);
-        for(int i=0;i<4;i++){
-            int bar=side*(i+2)/8;
-            rectangle(q,cx-side/2+side/8+i*side/5,cy+side/2-side/8-bar,side/9,bar,0xe2f8ff);
-        }
-    }else if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
+    else if(app==Q_TASKS)icon_id=QI_TASK_MANAGER;
+    if(icon_id>=0)sprite(q,cx,cy,icon_id,size);
     else icon(q,cx,cy,app,color);
 }
 static int dock_unpinned_count(QDesktop *q){
@@ -2819,7 +2813,7 @@ static void draw_settings(QDesktop *q,QWindow *w,int x,int y,int cw){
         matte(q,left,y+92,width,122,18,colors(q)->selected,q->theme?160:169);
         app_icon(q,left+49,y+151,Q_ABOUT,59,foreground(q));
         text(q,left+95,y+145,"Quartzie",foreground(q),2);
-        text(q,left+96,y+173,"Version 0.45.2",secondary(q),0);
+        text(q,left+96,y+173,"Version 0.45.3",secondary(q),0);
         char resolution[32];settings_resolution(q,resolution);
         settings_card(q,left,y+227,width,74,"Architecture","x86-64 / UEFI",0);
         settings_card(q,left,y+313,width,74,"Current display",resolution,0);
@@ -3005,7 +2999,7 @@ static void window_content(QDesktop *q,int app,QWindow *w){
         }
         if(q->store_status[0])string_limit(q,x+5,y+w->h-111,q->store_status,muted,0,cw-10,1);
     }else{
-        text(q,x,y+45,"Quartzie 0.45.2",ink,2);
+        text(q,x,y+45,"Quartzie 0.45.3",ink,2);
         thin_rule(q,x,y+122,clamp(cw-28,1,cw),55);
         text(q,x,y+160,"Keyboard",muted,0);
         text(q,x,y+192,"F1-F6  Open applications",ink,0);

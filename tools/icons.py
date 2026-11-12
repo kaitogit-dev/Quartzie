@@ -40,6 +40,11 @@ def build(archive, output):
     if pc.size != (64, 64):
         raise ValueError("This PC icon must be 64x64")
     sources.append(clean(pc))
+    manager_raw = base64.b64decode(pathlib.Path("assets/task-manager-icon.png.base64").read_text().strip())
+    manager = Image.open(BytesIO(manager_raw)).convert("RGBA")
+    if manager.size != (64, 64):
+        raise ValueError("Task Manager icon must be 64x64")
+    sources.append(clean(manager))
     lines = ['#include "icons.h"']
     for size in SIZES:
         lines.append(f"static const uint32_t atlas_{size}[QI_COUNT][{size}*{size}] = {{")
